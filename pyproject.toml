@@ -1,0 +1,91 @@
+[project]
+name = "sped-validator"
+version = "0.1.0"
+description = "Sistema SPED EFD - Conversor de PDFs, Validador e Busca na Documentação"
+requires-python = ">=3.10"
+dependencies = [
+    "pdfplumber>=0.10.0",
+    "sentence-transformers>=2.2.0",
+    "numpy>=1.24.0",
+    "tqdm>=4.65.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "python-multipart>=0.0.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.25.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+    "bandit>=1.7.0",
+]
+
+[project.scripts]
+sped = "cli:main"
+
+# ──────────────────────────────────────────────
+# pytest
+# ──────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+# ──────────────────────────────────────────────
+# ruff
+# ──────────────────────────────────────────────
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "S",    # flake8-bandit (security)
+]
+ignore = [
+    "S101",  # assert usado em testes
+    "S603",  # subprocess sem shell=True
+    "S607",  # partial path
+    "B008",  # Depends() em defaults — padrao FastAPI
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+# ──────────────────────────────────────────────
+# mypy
+# ──────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+ignore_missing_imports = true
+
+# ──────────────────────────────────────────────
+# coverage
+# ──────────────────────────────────────────────
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__",
+    "if TYPE_CHECKING",
+]

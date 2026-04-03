@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip3 --version)",
+      "Bash(python3 -c \"import sqlite3; print\\('sqlite3:', sqlite3.sqlite_version\\)\")",
+      "Bash(pip3 list:*)",
+      "Bash(python3 -c \"import struct; print\\('Python bit:', struct.calcsize\\('P'\\)*8\\)\")",
+      "Bash(python3:*)",
+      "Bash(pip install:*)",
+      "Bash(sudo apt-get:*)",
+      "Read(//usr/bin/**)",
+      "Read(//usr/local/bin/**)",
+      "Bash(cmd.exe /c \"python --version\")",
+      "Bash(cmd.exe /c \"pip --version\")",
+      "Bash(cmd.exe /c \"pip install pdfplumber sentence-transformers numpy tqdm\"0)",
+      "Bash(cmd.exe:*)",
+      "Bash(sqlite3 db/sped.db \".tables\")",
+      "Bash(wc -l src/*.py cli.py config.py)",
+      "Bash(apt list:*)",
+      "Bash(dpkg -l python3-venv)",
+      "Bash(curl -sSf https://astral.sh/uv/install.sh)",
+      "Bash(curl -LsSf https://astral.sh/uv/install.sh)",
+      "Bash(sh)",
+      "Bash(rm -rf frontend)",
+      "Bash(mkdir -p frontend/src/components frontend/src/pages frontend/src/api frontend/src/types frontend/public)"
+    ]
+  }
+}

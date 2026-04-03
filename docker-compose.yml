@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      target: backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - db-data:/app/db
+      - ./src:/app/src
+      - ./api:/app/api
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    environment:
+      - VITE_API_URL=http://api:8000
+
+volumes:
+  db-data:
