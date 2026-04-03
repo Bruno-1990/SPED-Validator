@@ -5,7 +5,11 @@ __pycache__/
 dist/
 build/
 .venv/
+.venv-win/
 venv/
+
+# Node
+node_modules/
 
 # Dados
 db/*.db
@@ -20,3 +24,6 @@ data/sped_files/
 # OS
 .DS_Store
 Thumbs.db
+
+# Coverage
+.coverage
