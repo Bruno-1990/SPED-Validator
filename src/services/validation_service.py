@@ -165,11 +165,14 @@ def _severity_for(error_type: str) -> str:
         "DATE_OUT_OF_PERIOD", "DATE_ORDER", "MISSING_CONDITIONAL",
         "REF_INEXISTENTE",
         "CST_ALIQ_ZERO_FORTE", "CST_CFOP_INCOMPATIVEL",
+        "MONOFASICO_NCM_INCOMPATIVEL", "MONOFASICO_CST_INCORRETO",
     }
     info = {
         "CST_ALIQ_ZERO_MODERADO", "CST_ALIQ_ZERO_INFO",
         "IPI_CST_ALIQ_ZERO", "PIS_CST_ALIQ_ZERO", "COFINS_CST_ALIQ_ZERO",
+        "MONOFASICO_ENTRADA_CST04",
     }
+    # MONOFASICO_ALIQ_INVALIDA e MONOFASICO_VALOR_INDEVIDO caem no default "error"
     if error_type in critical:
         return "critical"
     if error_type in warning:

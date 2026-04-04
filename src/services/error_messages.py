@@ -267,6 +267,71 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
         ),
         "icon": "arrows-cross",
     },
+    "MONOFASICO_ALIQ_INVALIDA": {
+        "friendly": (
+            "CST indica operação monofásica, mas a alíquota é maior que zero "
+            "no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Na revenda de produto monofásico (CST 04), a alíquota de "
+            "PIS/COFINS deve ser zero. O tributo já foi recolhido pelo "
+            "fabricante ou importador (Lei 10.147/00, Lei 10.485/02, "
+            "Lei 10.833/03)."
+        ),
+        "icon": "shield-x",
+    },
+    "MONOFASICO_VALOR_INDEVIDO": {
+        "friendly": (
+            "CST indica operação monofásica, mas há valor de tributo "
+            "preenchido no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Na revenda de produto monofásico, o valor de PIS/COFINS deve "
+            "ser zero. O recolhimento ocorre na etapa de industrialização "
+            "ou importação."
+        ),
+        "icon": "shield-x",
+    },
+    "MONOFASICO_NCM_INCOMPATIVEL": {
+        "friendly": (
+            "CST monofásico informado, mas o NCM do produto não consta na "
+            "lista de incidência monofásica ({register}, linha {line})."
+        ),
+        "guidance": (
+            "Verifique se o produto realmente está sujeito à tributação "
+            "monofásica conforme Lei 10.147/00 (farmacêuticos/higiene), "
+            "Lei 10.485/02 (veículos/autopeças), Lei 10.833/03 (bebidas) "
+            "ou Lei 10.865/04 (combustíveis). Se não for monofásico, "
+            "corrija o CST para 01 (tributação normal) ou outro adequado."
+        ),
+        "icon": "alert-triangle",
+    },
+    "MONOFASICO_CST_INCORRETO": {
+        "friendly": (
+            "Produto com NCM sujeito a incidência monofásica está com CST "
+            "de tributação normal no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Na revenda de produto monofásico, o CST de PIS/COFINS deveria "
+            "ser 04 (monofásico - revenda a alíquota zero). Tributar "
+            "normalmente um produto monofásico pode gerar recolhimento "
+            "indevido em duplicidade."
+        ),
+        "icon": "alert-octagon",
+    },
+    "MONOFASICO_ENTRADA_CST04": {
+        "friendly": (
+            "CST monofásico (04) informado em operação de entrada "
+            "no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Na entrada, o CST 04 se aplica à aquisição para revenda sem "
+            "direito a crédito. Se a empresa for industrializadora com "
+            "direito a crédito de PIS/COFINS, o CST deveria ser 50-56. "
+            "Verifique a natureza da operação e o regime tributário."
+        ),
+        "icon": "info",
+    },
 }
 
 # Mensagem padrão para tipos não mapeados

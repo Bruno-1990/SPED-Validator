@@ -1,4 +1,4 @@
-"""Validação semântica fiscal: CST x alíquota zero, CST x CFOP.
+"""Validação semântica fiscal: CST x alíquota zero, CST x CFOP, monofásicos.
 
 Camada 3 do motor de validação — regras que verificam se o tratamento
 tributário informado faz sentido fiscalmente, além da consistência numérica.
@@ -25,8 +25,176 @@ _CST_ICMS_DIFERIMENTO = {"51"}
 # IPI — CSTs que indicam tributação (saída tributada / entrada com crédito)
 _CST_IPI_TRIBUTADO = {"00", "01", "49", "50", "99"}
 
-# PIS/COFINS — CSTs que indicam operação tributável
+# PIS/COFINS — CSTs que indicam operação tributável (alíquota normal)
 _CST_PIS_COFINS_TRIBUTAVEL = {"01", "02", "03", "49"}
+
+# PIS/COFINS — CST monofásico (revenda a alíquota zero)
+_CST_PIS_COFINS_MONOFASICO = {"04"}
+
+# PIS/COFINS — CST substituição tributária PIS/COFINS
+_CST_PIS_COFINS_ST = {"05"}
+
+# ──────────────────────────────────────────────
+# Constantes — NCMs monofásicos por legislação
+# ──────────────────────────────────────────────
+# Prefixos NCM (4 dígitos) cujos produtos estão sujeitos à incidência
+# monofásica de PIS/COFINS conforme legislação federal.
+# Fonte: Lei 10.147/2000, Lei 10.485/2002, Lei 10.833/2003 Arts. 49-52,
+#        Lei 10.865/2004, Lei 11.116/2005, Decreto 5.059/2004.
+
+# Combustíveis e lubrificantes — Lei 10.865/2004, Lei 11.116/2005
+_NCM_MONOFASICO_COMBUSTIVEIS = {
+    "2207",  # Álcool etílico (etanol)
+    "2710",  # Óleos de petróleo (gasolina, diesel, querosene)
+    "2711",  # Gás de petróleo e hidrocarbonetos gasosos (GLP, GNV)
+    "2713",  # Coque de petróleo
+    "2714",  # Betumes e asfaltos naturais
+    "3403",  # Preparações lubrificantes (exceto óleos)
+    "3811",  # Preparações antidetonantes, aditivos
+    "3826",  # Biodiesel e misturas
+}
+
+# Produtos farmacêuticos — Lei 10.147/2000, Lei 10.548/2002
+_NCM_MONOFASICO_FARMACEUTICOS = {
+    "3001",  # Glândulas e outros órgãos para usos opoterápicos
+    "3002",  # Sangue humano; antissoros; vacinas
+    "3003",  # Medicamentos (exceto posição 3002/3005/3006)
+    "3004",  # Medicamentos em doses ou acondicionados para venda
+    "3005",  # Algodão, gaze, ataduras e artigos análogos
+    "3006",  # Preparações e artigos farmacêuticos
+}
+
+# Produtos de perfumaria, toucador e higiene pessoal — Lei 10.147/2000
+_NCM_MONOFASICO_HIGIENE = {
+    "3303",  # Perfumes e águas de colônia
+    "3304",  # Produtos de beleza, maquiagem, cuidados da pele
+    "3305",  # Preparações capilares
+    "3306",  # Preparações para higiene bucal/dentária
+    "3307",  # Preparações para barbear, desodorantes
+}
+
+# Bebidas frias — Lei 10.833/2003 Arts. 49-52, Lei 13.097/2015
+_NCM_MONOFASICO_BEBIDAS = {
+    "2106",  # Preparações alimentícias (inclui xaropes p/ bebidas)
+    "2201",  # Águas minerais e águas gaseificadas
+    "2202",  # Águas com adição de açúcar (refrigerantes, energéticos)
+}
+
+# Veículos e autopeças — Lei 10.485/2002
+_NCM_MONOFASICO_VEICULOS = {
+    "8429",  # Bulldozers, niveladoras, etc.
+    "8432",  # Máquinas e aparelhos agrícolas
+    "8433",  # Máquinas para colheita
+    "8701",  # Tratores
+    "8702",  # Veículos para transporte coletivo (>10 pessoas)
+    "8703",  # Automóveis de passageiros
+    "8704",  # Veículos para transporte de mercadorias
+    "8705",  # Veículos para usos especiais
+    "8706",  # Chassis com motor
+    "8711",  # Motocicletas e ciclos
+}
+
+# Autopeças — Lei 10.485/2002, Decreto 5.059/2004
+# Principais posições (lista não exaustiva — abrange as mais comuns)
+_NCM_MONOFASICO_AUTOPECAS = {
+    "3917",  # Tubos de plástico (mangueiras automotivas)
+    "4009",  # Tubos de borracha vulcanizada
+    "4010",  # Correias transportadoras de borracha vulcanizada
+    "4011",  # Pneumáticos (pneus) novos de borracha
+    "4012",  # Pneus recauchutados/usados
+    "4013",  # Câmaras de ar de borracha
+    "4504",  # Cortiça aglomerada (juntas)
+    "5910",  # Correias de transmissão de matérias têxteis
+    "6306",  # Toldos (capotas)
+    "6813",  # Guarnições de fricção (pastilhas de freio)
+    "7007",  # Vidros de segurança (pára-brisas)
+    "7009",  # Espelhos de vidro (retrovisores)
+    "7014",  # Vidros para faróis/sinais
+    "7311",  # Recipientes para gás comprimido
+    "7320",  # Molas e folhas de mola de ferro/aço
+    "7325",  # Obras moldadas de ferro/aço (peças fundidas)
+    "7806",  # Obras de chumbo (baterias, balanceamento)
+    "8301",  # Cadeados, fechaduras (fechaduras automotivas)
+    "8302",  # Guarnições, ferragens
+    "8307",  # Tubos flexíveis de metais comuns
+    "8407",  # Motores de pistão de ignição por centelha
+    "8408",  # Motores de pistão de ignição por compressão (diesel)
+    "8409",  # Partes de motores (pistões, bielas, etc.)
+    "8413",  # Bombas (combustível, água)
+    "8414",  # Bombas de ar, compressores
+    "8415",  # Aparelhos de ar condicionado
+    "8421",  # Centrifugadores, filtros
+    "8425",  # Talhas, cadernais, macacos
+    "8431",  # Partes de máquinas (8425-8430)
+    "8481",  # Torneiras, válvulas
+    "8482",  # Rolamentos
+    "8483",  # Árvores de transmissão, engrenagens
+    "8484",  # Juntas metaloplásticas
+    "8505",  # Eletroímãs (embreagens eletromagnéticas)
+    "8507",  # Acumuladores elétricos (baterias)
+    "8511",  # Aparelhos de ignição/arranque
+    "8512",  # Aparelhos de iluminação/sinalização
+    "8527",  # Aparelhos receptores (rádios automotivos)
+    "8536",  # Aparelhos para interrupção de circuitos (fusíveis)
+    "8539",  # Lâmpadas elétricas (faróis)
+    "8544",  # Fios, cabos (chicotes elétricos)
+    "8706",  # Chassis com motor
+    "8707",  # Carrocerias para veículos
+    "8708",  # Partes e acessórios de veículos automotores
+    "8714",  # Partes e acessórios de motocicletas
+    "9026",  # Instrumentos de medida (manômetros)
+    "9029",  # Contadores (velocímetros, tacômetros)
+    "9030",  # Osciloscópios, multímetros
+    "9031",  # Instrumentos de medida e controle
+    "9032",  # Instrumentos de regulação automática
+    "9104",  # Relógios para painéis
+    "9401",  # Assentos (bancos automotivos)
+}
+
+# Papel e papel imune — Lei 10.865/2004 Art. 28
+_NCM_MONOFASICO_PAPEL = {
+    "4801",  # Papel de jornal em rolos ou folhas
+    "4802",  # Papel de imprensa não revestido
+}
+
+# Unificar todos os NCMs monofásicos num único set para consulta rápida
+_NCM_MONOFASICO_TODOS: set[str] = set()
+_NCM_MONOFASICO_TODOS.update(_NCM_MONOFASICO_COMBUSTIVEIS)
+_NCM_MONOFASICO_TODOS.update(_NCM_MONOFASICO_FARMACEUTICOS)
+_NCM_MONOFASICO_TODOS.update(_NCM_MONOFASICO_HIGIENE)
+_NCM_MONOFASICO_TODOS.update(_NCM_MONOFASICO_BEBIDAS)
+_NCM_MONOFASICO_TODOS.update(_NCM_MONOFASICO_VEICULOS)
+_NCM_MONOFASICO_TODOS.update(_NCM_MONOFASICO_AUTOPECAS)
+_NCM_MONOFASICO_TODOS.update(_NCM_MONOFASICO_PAPEL)
+
+# Mapeamento de prefixo NCM → categoria legível (para mensagens)
+_NCM_MONOFASICO_CATEGORIAS: dict[str, str] = {}
+for _ncm in _NCM_MONOFASICO_COMBUSTIVEIS:
+    _NCM_MONOFASICO_CATEGORIAS[_ncm] = "Combustivel/Lubrificante (Lei 10.865/04)"
+for _ncm in _NCM_MONOFASICO_FARMACEUTICOS:
+    _NCM_MONOFASICO_CATEGORIAS[_ncm] = "Farmaceutico (Lei 10.147/00)"
+for _ncm in _NCM_MONOFASICO_HIGIENE:
+    _NCM_MONOFASICO_CATEGORIAS[_ncm] = "Higiene/Perfumaria (Lei 10.147/00)"
+for _ncm in _NCM_MONOFASICO_BEBIDAS:
+    _NCM_MONOFASICO_CATEGORIAS[_ncm] = "Bebida Fria (Lei 10.833/03)"
+for _ncm in _NCM_MONOFASICO_VEICULOS:
+    _NCM_MONOFASICO_CATEGORIAS[_ncm] = "Veiculo (Lei 10.485/02)"
+for _ncm in _NCM_MONOFASICO_AUTOPECAS:
+    _NCM_MONOFASICO_CATEGORIAS[_ncm] = "Autopeca (Lei 10.485/02)"
+for _ncm in _NCM_MONOFASICO_PAPEL:
+    _NCM_MONOFASICO_CATEGORIAS[_ncm] = "Papel Imune (Lei 10.865/04)"
+
+
+def _ncm_is_monofasico(ncm: str) -> str | None:
+    """Verifica se um NCM pertence a categoria monofásica.
+
+    Compara os 4 primeiros dígitos do NCM (posição/capítulo).
+    Retorna a categoria se monofásico, None caso contrário.
+    """
+    if not ncm or len(ncm) < 4:
+        return None
+    prefixo = ncm[:4]
+    return _NCM_MONOFASICO_CATEGORIAS.get(prefixo)
 
 # ──────────────────────────────────────────────
 # Constantes — Famílias de CFOP
@@ -140,15 +308,26 @@ def validate_fiscal_semantics(records: list[SpedRecord]) -> list[ValidationError
     Regras implementadas:
     - Classificação de cenário alíquota zero (ICMS, IPI, PIS/COFINS)
     - Cruzamento CST x CFOP
+    - Validação monofásica PIS/COFINS (CST 04 x NCM x alíquota)
     """
     groups = group_by_register(records)
     errors: list[ValidationError] = []
+
+    # Construir mapa COD_ITEM → NCM a partir do cadastro 0200
+    # 0200: pos 1=COD_ITEM, pos 7=COD_NCM (pode variar; campo NCM é posição 7)
+    item_ncm: dict[str, str] = {}
+    for r in groups.get("0200", []):
+        cod_item = _get(r, 1)
+        ncm = _get(r, 7)
+        if cod_item and ncm:
+            item_ncm[cod_item] = ncm
 
     for rec in groups.get("C170", []):
         errors.extend(_classify_zero_rate_icms(rec))
         errors.extend(_classify_zero_rate_ipi(rec))
         errors.extend(_classify_zero_rate_pis_cofins(rec))
         errors.extend(_validate_cst_cfop(rec))
+        errors.extend(_validate_monofasico(rec, item_ncm))
 
     return errors
 
@@ -371,6 +550,158 @@ def _validate_cst_cfop(record: SpedRecord) -> list[ValidationError]:
             ),
             field_no=10,
             value=f"CST={cst_icms} CFOP={cfop} ALIQ={aliq:.2f}",
+        ))
+
+    return errors
+
+
+# ──────────────────────────────────────────────
+# Validação Monofásica PIS/COFINS
+# ──────────────────────────────────────────────
+
+def _validate_monofasico(
+    record: SpedRecord,
+    item_ncm: dict[str, str],
+) -> list[ValidationError]:
+    """Valida regras monofásicas PIS/COFINS cruzando CST x NCM x alíquota.
+
+    Regras implementadas:
+    1. CST 04 (monofásico) com alíquota > 0 → erro
+    2. CST 04 em item cujo NCM não é monofásico → alerta
+    3. NCM monofásico com CST tributável (01/02/03) em saída → alerta
+    4. CST 04 com VL_PIS/VL_COFINS > 0 → erro (imposto já recolhido na origem)
+    5. CST 04 em operação de entrada → alerta (monofásico se aplica à revenda)
+
+    Legislação: Lei 10.147/00, Lei 10.485/02, Lei 10.833/03, Lei 10.865/04.
+    """
+    errors: list[ValidationError] = []
+
+    cst_pis = _get(record, 24)
+    cst_cofins = _get(record, 30)
+    cfop = _get(record, 10)
+
+    # Obter NCM via COD_ITEM → 0200
+    cod_item = _get(record, 2)
+    ncm = item_ncm.get(cod_item, "")
+    categoria = _ncm_is_monofasico(ncm) if ncm else None
+
+    # Determinar se é operação de entrada (CFOP 1/2/3xxx)
+    is_entrada = cfop[:1] in ("1", "2", "3") if cfop else False
+
+    # ── PIS ──
+    errors.extend(_validate_monofasico_tributo(
+        record, cst_pis, "PIS", 25, 26, 29,
+        ncm, categoria, is_entrada,
+    ))
+
+    # ── COFINS ──
+    errors.extend(_validate_monofasico_tributo(
+        record, cst_cofins, "COFINS", 31, 32, 35,
+        ncm, categoria, is_entrada,
+    ))
+
+    return errors
+
+
+def _validate_monofasico_tributo(
+    record: SpedRecord,
+    cst: str,
+    tributo: str,
+    pos_bc: int,
+    pos_aliq: int,
+    pos_valor: int,
+    ncm: str,
+    categoria: str | None,
+    is_entrada: bool,
+) -> list[ValidationError]:
+    """Valida regras monofásicas para um tributo (PIS ou COFINS)."""
+    errors: list[ValidationError] = []
+    if not cst:
+        return errors
+
+    aliq = _float(_get(record, pos_aliq))
+    valor = _float(_get(record, pos_valor))
+    field_name = f"CST_{tributo}"
+    cod_item = _get(record, 2)
+
+    # ── REGRA 1: CST 04 com alíquota > 0 → erro ──
+    # Monofásico na revenda = alíquota zero obrigatoriamente
+    if cst in _CST_PIS_COFINS_MONOFASICO and aliq > 0:
+        errors.append(_make_error(
+            record, field_name, "MONOFASICO_ALIQ_INVALIDA",
+            (
+                f"CST_{tributo} {cst} indica operação monofásica (revenda a "
+                f"alíquota zero), mas ALIQ_{tributo}={aliq:.2f}%. Na revenda "
+                f"de produto monofásico, a alíquota deve ser zero pois o "
+                f"tributo já foi recolhido pelo fabricante/importador."
+            ),
+            field_no=pos_aliq + 1,
+            value=f"CST_{tributo}={cst} ALIQ={aliq:.2f}%",
+        ))
+
+    # ── REGRA 2: CST 04 com valor de tributo > 0 → erro ──
+    if cst in _CST_PIS_COFINS_MONOFASICO and valor > 0:
+        errors.append(_make_error(
+            record, field_name, "MONOFASICO_VALOR_INDEVIDO",
+            (
+                f"CST_{tributo} {cst} indica operação monofásica, mas "
+                f"VL_{tributo}={valor:.2f}. O valor deve ser zero na revenda, "
+                f"pois o {tributo} já foi recolhido na etapa anterior "
+                f"(fabricante ou importador)."
+            ),
+            field_no=pos_valor + 1,
+            value=f"CST_{tributo}={cst} VL={valor:.2f}",
+        ))
+
+    # ── REGRA 3: CST 04 em NCM não monofásico → alerta ──
+    if cst in _CST_PIS_COFINS_MONOFASICO and ncm and not categoria:
+        errors.append(_make_error(
+            record, field_name, "MONOFASICO_NCM_INCOMPATIVEL",
+            (
+                f"CST_{tributo} {cst} indica operação monofásica, mas o "
+                f"NCM {ncm} (item {cod_item}) não consta na lista de "
+                f"produtos sujeitos à incidência monofásica. Verifique se "
+                f"o CST deveria ser 01 (tributação normal), 06 (alíquota "
+                f"zero) ou outro, ou se o NCM do produto está correto."
+            ),
+            field_no=pos_aliq + 1,
+            value=f"CST_{tributo}={cst} NCM={ncm}",
+        ))
+
+    # ── REGRA 4: NCM monofásico com CST tributável normal em saída → alerta ──
+    if (categoria
+            and cst in _CST_PIS_COFINS_TRIBUTAVEL
+            and not is_entrada):
+        errors.append(_make_error(
+            record, field_name, "MONOFASICO_CST_INCORRETO",
+            (
+                f"O item {cod_item} possui NCM {ncm} ({categoria}), sujeito "
+                f"à incidência monofásica de {tributo}. Na revenda, o "
+                f"CST_{tributo} deveria ser 04 (monofásico - revenda a "
+                f"alíquota zero), mas está informado como {cst} (operação "
+                f"tributável). Verifique a classificação fiscal."
+            ),
+            field_no=pos_aliq + 1,
+            value=f"CST_{tributo}={cst} NCM={ncm}",
+        ))
+
+    # ── REGRA 5: CST 04 em operação de entrada → alerta informativo ──
+    # Na entrada de mercadoria monofásica, o CST depende do contexto:
+    # industrializador usa crédito (CST 50-56), revendedor não tem crédito.
+    # CST 04 na entrada pode indicar erro de classificação.
+    if cst in _CST_PIS_COFINS_MONOFASICO and is_entrada:
+        errors.append(_make_error(
+            record, field_name, "MONOFASICO_ENTRADA_CST04",
+            (
+                f"CST_{tributo} {cst} (monofásico) informado em operação de "
+                f"entrada (CFOP {_get(record, 10)}). Na entrada, o CST "
+                f"monofásico se aplica à aquisição para revenda sem direito a "
+                f"crédito. Se a empresa for industrializadora com direito a "
+                f"crédito, o CST deveria ser 50-56. Verifique a natureza "
+                f"da operação e o regime da empresa."
+            ),
+            field_no=pos_aliq + 1,
+            value=f"CST_{tributo}={cst} CFOP={_get(record, 10)}",
         ))
 
     return errors

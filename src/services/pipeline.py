@@ -129,7 +129,7 @@ def run_pipeline(
         cross_errors.extend(validate_cst_and_exemptions(records))
         progress.stage_progress = 65
 
-        progress.detail = "Analise semantica: CST x CFOP, aliquota zero, IPI, PIS/COFINS"
+        progress.detail = "Analise semantica: CST x CFOP, aliquota zero, monofasicos"
         cross_errors.extend(validate_fiscal_semantics(records))
         progress.stage_progress = 100
 

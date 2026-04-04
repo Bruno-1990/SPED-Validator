@@ -12,7 +12,7 @@ Este sistema resolve isso automatizando:
 
 1. **Conversao** de PDFs/DOCX/TXT da documentacao oficial para Markdown estruturado
 2. **Indexacao** com Full-Text Search (FTS5) + embeddings vetoriais para busca semantica
-3. **Validacao** em 5 camadas dos arquivos SPED contra as definicoes extraidas da documentacao
+3. **Validacao** em 7 camadas dos arquivos SPED (estrutural, semantica fiscal, monofasicos) contra as definicoes extraidas da documentacao
 4. **Busca automatica** da documentacao relevante para cada erro encontrado
 5. **API REST** (FastAPI) com endpoints para upload, validacao, correcao e exportacao
 6. **Frontend React** com interface para upload, visualizacao de erros e relatorios
@@ -154,12 +154,16 @@ SPED/
 |   |   |-- cross_block_validator.py     # Cruzamento 0 vs C/D, C vs E, bloco 9
 |   |   |-- tax_recalc.py               # Recalculo ICMS, ICMS-ST, IPI, PIS/COFINS, E110
 |   |   |-- cst_validator.py            # CSTs ICMS, isencoes, Bloco H estoque
+|   |   |-- fiscal_semantics.py         # Semantica fiscal: CST x CFOP, aliquota zero, monofasicos
 |   |-- services/
 |   |   |-- __init__.py
 |   |   |-- database.py                 # Schema SQLite de auditoria (6 tabelas)
-|   |   |-- file_service.py             # Upload, hash, parse, metadados, CRUD
-|   |   |-- validation_service.py       # Orquestrador de validacao completa
-|   |   |-- correction_service.py       # Aplicar/desfazer correcoes
+|   |   |-- file_service.py             # Upload, hash, parse, metadados, CRUD, clear_audit
+|   |   |-- validation_service.py       # Orquestrador de validacao (7 camadas, 4 severidades)
+|   |   |-- pipeline.py                 # Pipeline estagiado com SSE (progresso em tempo real)
+|   |   |-- error_messages.py           # 30+ tipos de erro com mensagens amigaveis e orientacao
+|   |   |-- auto_correction_service.py  # Correcoes automaticas deterministicas
+|   |   |-- correction_service.py       # Aplicar/desfazer correcoes manuais
 |   |   |-- export_service.py           # Exportar SPED, relatorio MD/CSV/JSON
 |
 |-- api/
@@ -209,6 +213,7 @@ SPED/
 |   |-- test_indexer.py             # Testes do indexador (chunking, fields, FTS, index_all)
 |   |-- test_searcher.py            # Testes do buscador (FTS, semantico, RRF, search_for_error)
 |   |-- test_embeddings.py          # Testes de embeddings (blob roundtrip, mock model)
+|   |-- test_fiscal_semantics.py    # Testes semantica fiscal: aliquota zero, CST x CFOP, monofasicos (73 testes)
 |   |-- fixtures/
 |   |   |-- sped_minimal.txt        # SPED minimo (0000 + blocos vazios + 9999)
 |   |   |-- sped_valid.txt          # SPED completo com NFs, itens, apuracao (57 registros)
@@ -374,7 +379,7 @@ FastAPI com 5 routers e banco SQLite de auditoria.
 
 | Router | Endpoints | Funcao |
 |--------|-----------|--------|
-| `files.py` | `POST /api/files/upload`, `GET /api/files`, `GET /api/files/{id}`, `DELETE /api/files/{id}` | Upload, listagem, detalhe e exclusao de arquivos SPED |
+| `files.py` | `POST /api/files/upload`, `GET /api/files`, `GET /api/files/{id}`, `DELETE /api/files/{id}`, `DELETE /api/files/{id}/audit` | Upload, listagem, detalhe, exclusao e limpeza de audit |
 | `validation.py` | `POST /api/files/{id}/validate`, `GET /api/files/{id}/errors`, `GET /api/files/{id}/summary` | Validacao completa, listagem de erros, resumo por tipo |
 | `records.py` | `GET /api/files/{id}/records`, `PATCH /api/records/{id}` | Listagem de registros, correcao de campos |
 | `report.py` | `GET /api/files/{id}/report` | Relatorio em MD/CSV/JSON, download do SPED corrigido |
@@ -827,8 +832,9 @@ Estes testes garantem que a infraestrutura funciona: parser le arquivos, validat
 | `cross_block_validator.py` | 96% | Cruzamento entre blocos: 0 vs C/D (COD_PART/COD_ITEM existem no cadastro), C vs E (soma ICMS dos C190 = debitos/creditos do E110), bloco 9 (contagem de registros e total de linhas) |
 | `tax_recalc.py` | 95% | Recalculo tributario: ICMS (BC×ALIQ/100), ICMS-ST, IPI, PIS/COFINS, totalizacao E110 (soma C190+D690 vs declarado) |
 | `cst_validator.py` | 95% | Validacao de CSTs ICMS (Tabela A+B, CSOSN), consistencia isencoes (CST isento com valor>0), Bloco H (estoque vs cadastro 0200) |
+| `fiscal_semantics.py` | **NOVO** | Validacao semantica fiscal: CST x CFOP, classificador de aliquota zero, monofasicos PIS/COFINS x NCM |
 
-Cinco camadas de validacao fiscal:
+Sete camadas de validacao fiscal:
 
 | Camada | Pergunta que responde | Exemplo de erro detectado |
 |--------|----------------------|--------------------------|
@@ -837,6 +843,63 @@ Cinco camadas de validacao fiscal:
 | **Cruzamento** | Os blocos sao coerentes entre si? | Debitos do E110 ≠ soma dos C190 |
 | **Recalculo** | Os tributos foram calculados certo? | IPI recalculado diverge do declarado |
 | **CST/Isencoes** | Os codigos tributarios sao consistentes? | CST isento mas ICMS > 0 |
+| **Semantica Fiscal** | O tratamento tributario faz sentido? | CFOP de venda + CST isento sem beneficio |
+| **Monofasicos** | PIS/COFINS monofasico esta correto? | NCM farmaceutico com CST 01 na revenda |
+
+### Validacao Semantica Fiscal (`fiscal_semantics.py`)
+
+Camada 3 do motor — vai alem da consistencia numerica e verifica se o tratamento tributario informado faz sentido fiscalmente.
+
+**Classificador de aliquota zero (substitui o skip condition cego):**
+
+| Cenario | Resultado | error_type |
+|---------|-----------|------------|
+| CST tributado + BC > 0 + ALIQ = 0 | Warning | `CST_ALIQ_ZERO_FORTE` |
+| CST tributado + tudo zero | Info | `CST_ALIQ_ZERO_MODERADO` |
+| CST isento/NT/suspensao + tudo zero | OK | — |
+| CST diferimento (51) + tudo zero | OK | — |
+| Exportacao/remessa + aliquota zero | OK | — |
+| CST_IPI tributado + tudo zero | Info | `IPI_CST_ALIQ_ZERO` |
+| CST_PIS/COFINS tributavel + tudo zero | Info | `PIS_CST_ALIQ_ZERO` / `COFINS_CST_ALIQ_ZERO` |
+
+**Cruzamento CST x CFOP:**
+
+| Regra | Deteccao | error_type |
+|-------|----------|------------|
+| CFOP de venda + CST isento/NT | Warning | `CST_CFOP_INCOMPATIVEL` |
+| CFOP interestadual + CST tributado + ALIQ=0 | Warning | `CST_CFOP_INCOMPATIVEL` |
+| CFOP exportacao + CST tributado + ALIQ > 0 | Warning | `CST_CFOP_INCOMPATIVEL` |
+
+**Monofasicos PIS/COFINS (5 regras x NCM x CST x CFOP):**
+
+| # | Regra | Severidade | error_type |
+|---|-------|------------|------------|
+| 1 | CST 04 (monofasico) com aliquota > 0 | Error | `MONOFASICO_ALIQ_INVALIDA` |
+| 2 | CST 04 com valor PIS/COFINS > 0 | Error | `MONOFASICO_VALOR_INDEVIDO` |
+| 3 | CST 04 em NCM nao monofasico | Warning | `MONOFASICO_NCM_INCOMPATIVEL` |
+| 4 | NCM monofasico + CST tributavel na saida | Warning | `MONOFASICO_CST_INCORRETO` |
+| 5 | CST 04 em operacao de entrada | Info | `MONOFASICO_ENTRADA_CST04` |
+
+**NCMs monofasicos cobertos (por legislacao):**
+
+| Categoria | Prefixos NCM | Legislacao |
+|-----------|-------------|------------|
+| Combustiveis/Lubrificantes | 2207, 2710, 2711, 2713, 2714, 3403, 3811, 3826 | Lei 10.865/04 |
+| Farmaceuticos | 3001-3006 | Lei 10.147/00 |
+| Higiene/Perfumaria | 3303-3307 | Lei 10.147/00 |
+| Bebidas Frias | 2106, 2201, 2202 | Lei 10.833/03 |
+| Veiculos | 8429, 8432, 8433, 8701-8706, 8711 | Lei 10.485/02 |
+| Autopecas | 54 posicoes NCM (4011, 8407-8708, etc.) | Lei 10.485/02 |
+| Papel Imune | 4801, 4802 | Lei 10.865/04 |
+
+**4 niveis de severidade:**
+
+| Nivel | Uso | Exemplos |
+|-------|-----|----------|
+| `critical` | Calculo divergente, cruzamento inconsistente | `CALCULO_DIVERGENTE`, `SOMA_DIVERGENTE` |
+| `error` | Inconsistencia fiscal concreta | `MONOFASICO_ALIQ_INVALIDA`, `CST_INVALIDO` |
+| `warning` | Situacao suspeita que precisa revisao | `CST_CFOP_INCOMPATIVEL`, `MONOFASICO_CST_INCORRETO` |
+| `info` | Cenario aceitavel mas merece atencao | `CST_ALIQ_ZERO_MODERADO`, `MONOFASICO_ENTRADA_CST04` |
 
 ### Correcoes de Indexacao (Abril 2026)
 
@@ -977,7 +1040,10 @@ Correcoes de lint aplicadas:
 |--------|-----------|
 | `database.py` | Schema SQLite com 6 tabelas: sped_files (metadados), sped_records (registros parseados), validation_errors (erros com severidade), cross_validations (cruzamentos), corrections (historico de correcoes), audit_log (rastreabilidade) |
 | `file_service.py` | Upload com hash SHA-256 (detecta duplicata), parse, extracao de metadados do 0000 (empresa, CNPJ, periodo), persistencia dos registros, delete cascade, listagem |
-| `validation_service.py` | Orquestrador: executa as 6 camadas de validacao em sequencia, classifica severidade (critical/warning/error), persiste erros, permite revalidacao sem duplicar |
+| `validation_service.py` | Orquestrador: executa as 7 camadas de validacao em sequencia, classifica severidade (critical/error/warning/info), persiste erros, permite revalidacao sem duplicar |
+| `fiscal_semantics.py` | Validacao semantica: CST x CFOP (3 regras), classificador aliquota zero (7 cenarios), monofasicos PIS/COFINS x NCM (5 regras, 100+ NCMs) |
+| `pipeline.py` | Pipeline estagiado com progresso em tempo real via SSE: 4 estagios (estrutural, cruzamento+semantica, enriquecimento, auto-correcao) com detalhes por sub-passo |
+| `error_messages.py` | 30+ tipos de erro com template amigavel, orientacao de correcao e icone. Cobre monofasicos, CST x CFOP, aliquota zero |
 | `correction_service.py` | Aplica correcao em campo especifico (atualiza fields_json + raw_line), salva historico (old_value → new_value), marca erro como corrigido, undo que restaura valor original |
 | `export_service.py` | 4 formatos: SPED corrigido (.txt pipe-delimited), relatorio Markdown (resumo + erros + correcoes), CSV, JSON |
 

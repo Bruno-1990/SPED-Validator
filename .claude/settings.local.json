@@ -34,7 +34,8 @@
       "Bash(grep -n \"ALIQ\\\\|aliq\\\\|ICMS\\\\|icms\\\\|zero\\\\|rate\" /mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED/src/validators/*.py)",
       "Bash(sqlite3:*)",
       "Bash(/mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED/.venv/bin/python3 -m pytest tests/ -v --tb=short)",
-      "Bash(.venv/bin/ruff check:*)"
+      "Bash(.venv/bin/ruff check:*)",
+      "Bash(find:*)"
     ]
   }
 }

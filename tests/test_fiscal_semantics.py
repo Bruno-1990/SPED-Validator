@@ -7,7 +7,9 @@ from src.validators.fiscal_semantics import (
     _classify_zero_rate_icms,
     _classify_zero_rate_ipi,
     _classify_zero_rate_pis_cofins,
+    _ncm_is_monofasico,
     _validate_cst_cfop,
+    _validate_monofasico,
     validate_fiscal_semantics,
 )
 
@@ -357,3 +359,206 @@ class TestValidateFiscalSemantics:
         assert "IPI_CST_ALIQ_ZERO" in types
         assert "PIS_CST_ALIQ_ZERO" in types
         assert "COFINS_CST_ALIQ_ZERO" in types
+
+    def test_monofasico_with_cadastro(self) -> None:
+        """Produto monofásico (NCM 3004) com CST 01 na saída → alerta."""
+        records = [
+            # Cadastro 0200: COD_ITEM=PROD001, NCM na posição 7
+            rec("0200", ["0200", "PROD001", "Desc", "UN", "", "", "", "30049099"], line=1),
+            c170(
+                cst="000", cfop="5102",
+                vl_bc="1000,00", aliq="18,00", vl_icms="180,00",
+                cst_pis="01", vl_bc_pis="1000,00", aliq_pis="1,65", vl_pis="16,50",
+                cst_cofins="01", vl_bc_cofins="1000,00", aliq_cofins="7,60", vl_cofins="76,00",
+                line=2,
+            ),
+        ]
+        errors = validate_fiscal_semantics(records)
+        types = {e.error_type for e in errors}
+        assert "MONOFASICO_CST_INCORRETO" in types
+
+
+# ──────────────────────────────────────────────
+# NCM Monofásico — lookup
+# ──────────────────────────────────────────────
+
+class TestNcmIsMonofasico:
+    def test_combustivel(self) -> None:
+        assert _ncm_is_monofasico("27101259") is not None
+        assert "Combustivel" in (_ncm_is_monofasico("27101259") or "")
+
+    def test_farmaceutico(self) -> None:
+        assert _ncm_is_monofasico("30049099") is not None
+        assert "Farmaceutico" in (_ncm_is_monofasico("30049099") or "")
+
+    def test_higiene(self) -> None:
+        assert _ncm_is_monofasico("33049900") is not None
+        assert "Higiene" in (_ncm_is_monofasico("33049900") or "")
+
+    def test_bebida(self) -> None:
+        assert _ncm_is_monofasico("22021000") is not None
+        assert "Bebida" in (_ncm_is_monofasico("22021000") or "")
+
+    def test_veiculo(self) -> None:
+        assert _ncm_is_monofasico("87032100") is not None
+        assert "Veiculo" in (_ncm_is_monofasico("87032100") or "")
+
+    def test_autopeca(self) -> None:
+        assert _ncm_is_monofasico("87089990") is not None
+        assert "Autopeca" in (_ncm_is_monofasico("87089990") or "")
+
+    def test_pneu(self) -> None:
+        assert _ncm_is_monofasico("40111000") is not None
+        assert "Autopeca" in (_ncm_is_monofasico("40111000") or "")
+
+    def test_papel(self) -> None:
+        assert _ncm_is_monofasico("48010000") is not None
+        assert "Papel" in (_ncm_is_monofasico("48010000") or "")
+
+    def test_nao_monofasico(self) -> None:
+        assert _ncm_is_monofasico("94036000") is None  # Móveis
+
+    def test_ncm_vazio(self) -> None:
+        assert _ncm_is_monofasico("") is None
+
+    def test_ncm_curto(self) -> None:
+        assert _ncm_is_monofasico("27") is None
+
+
+# ──────────────────────────────────────────────
+# Monofásico — Regras de validação
+# ──────────────────────────────────────────────
+
+class TestValidateMonofasico:
+    """Testes das 5 regras monofásicas PIS/COFINS."""
+
+    # Mapa COD_ITEM → NCM para testes
+    NCM_FARMA = {"PROD001": "30049099"}     # Farmacêutico
+    NCM_MOVEL = {"PROD001": "94036000"}     # Móvel (não monofásico)
+    NCM_VAZIO: dict[str, str] = {}
+
+    def test_regra1_cst04_aliq_positiva_erro(self) -> None:
+        """CST 04 (monofásico) com alíquota > 0 → erro."""
+        r = c170(cst_pis="04", vl_bc_pis="0", aliq_pis="1,65", vl_pis="0")
+        errors = _validate_monofasico(r, self.NCM_FARMA)
+        assert any(e.error_type == "MONOFASICO_ALIQ_INVALIDA" for e in errors)
+
+    def test_regra1_cst04_aliq_zero_ok(self) -> None:
+        """CST 04 com alíquota zero → sem erro de alíquota."""
+        r = c170(cst_pis="04", vl_bc_pis="0", aliq_pis="0", vl_pis="0")
+        errors = _validate_monofasico(r, self.NCM_FARMA)
+        assert not any(e.error_type == "MONOFASICO_ALIQ_INVALIDA" for e in errors)
+
+    def test_regra2_cst04_valor_positivo_erro(self) -> None:
+        """CST 04 com valor de PIS > 0 → erro."""
+        r = c170(cst_pis="04", vl_bc_pis="0", aliq_pis="0", vl_pis="16,50")
+        errors = _validate_monofasico(r, self.NCM_FARMA)
+        assert any(e.error_type == "MONOFASICO_VALOR_INDEVIDO" for e in errors)
+
+    def test_regra2_cst04_valor_zero_ok(self) -> None:
+        """CST 04 com valor zero → sem erro de valor."""
+        r = c170(cst_pis="04", vl_bc_pis="0", aliq_pis="0", vl_pis="0")
+        errors = _validate_monofasico(r, self.NCM_FARMA)
+        assert not any(e.error_type == "MONOFASICO_VALOR_INDEVIDO" for e in errors)
+
+    def test_regra3_cst04_ncm_nao_monofasico_alerta(self) -> None:
+        """CST 04 com NCM de móvel (não monofásico) → alerta."""
+        r = c170(cst_pis="04", vl_bc_pis="0", aliq_pis="0", vl_pis="0")
+        errors = _validate_monofasico(r, self.NCM_MOVEL)
+        assert any(e.error_type == "MONOFASICO_NCM_INCOMPATIVEL" for e in errors)
+
+    def test_regra3_cst04_ncm_monofasico_ok(self) -> None:
+        """CST 04 com NCM farmacêutico → sem alerta de NCM."""
+        r = c170(cst_pis="04", vl_bc_pis="0", aliq_pis="0", vl_pis="0")
+        errors = _validate_monofasico(r, self.NCM_FARMA)
+        assert not any(e.error_type == "MONOFASICO_NCM_INCOMPATIVEL" for e in errors)
+
+    def test_regra3_cst04_sem_cadastro_sem_alerta_ncm(self) -> None:
+        """CST 04 sem cadastro 0200 → sem alerta de NCM (não tem como validar)."""
+        r = c170(cst_pis="04", vl_bc_pis="0", aliq_pis="0", vl_pis="0")
+        errors = _validate_monofasico(r, self.NCM_VAZIO)
+        assert not any(e.error_type == "MONOFASICO_NCM_INCOMPATIVEL" for e in errors)
+
+    def test_regra4_ncm_monofasico_cst_tributavel_saida_alerta(self) -> None:
+        """NCM farmacêutico + CST 01 (tributável) em saída → alerta."""
+        r = c170(
+            cfop="5102",
+            cst_pis="01", vl_bc_pis="1000,00", aliq_pis="1,65", vl_pis="16,50",
+        )
+        errors = _validate_monofasico(r, self.NCM_FARMA)
+        assert any(e.error_type == "MONOFASICO_CST_INCORRETO" for e in errors)
+
+    def test_regra4_ncm_monofasico_cst_tributavel_entrada_ok(self) -> None:
+        """NCM farmacêutico + CST 01 em entrada → sem alerta (regra 4 só saída)."""
+        r = c170(
+            cfop="1102",
+            cst_pis="01", vl_bc_pis="1000,00", aliq_pis="1,65", vl_pis="16,50",
+        )
+        errors = _validate_monofasico(r, self.NCM_FARMA)
+        assert not any(e.error_type == "MONOFASICO_CST_INCORRETO" for e in errors)
+
+    def test_regra4_ncm_nao_monofasico_cst_tributavel_ok(self) -> None:
+        """NCM não monofásico + CST 01 → sem alerta."""
+        r = c170(
+            cfop="5102",
+            cst_pis="01", vl_bc_pis="1000,00", aliq_pis="1,65", vl_pis="16,50",
+        )
+        errors = _validate_monofasico(r, self.NCM_MOVEL)
+        assert not any(e.error_type == "MONOFASICO_CST_INCORRETO" for e in errors)
+
+    def test_regra5_cst04_entrada_alerta(self) -> None:
+        """CST 04 em entrada → alerta informativo."""
+        r = c170(
+            cfop="1102",
+            cst_pis="04", vl_bc_pis="0", aliq_pis="0", vl_pis="0",
+        )
+        errors = _validate_monofasico(r, self.NCM_FARMA)
+        assert any(e.error_type == "MONOFASICO_ENTRADA_CST04" for e in errors)
+
+    def test_regra5_cst04_saida_sem_alerta_entrada(self) -> None:
+        """CST 04 em saída → sem alerta de entrada."""
+        r = c170(
+            cfop="5102",
+            cst_pis="04", vl_bc_pis="0", aliq_pis="0", vl_pis="0",
+        )
+        errors = _validate_monofasico(r, self.NCM_FARMA)
+        assert not any(e.error_type == "MONOFASICO_ENTRADA_CST04" for e in errors)
+
+    def test_cofins_mesmas_regras(self) -> None:
+        """COFINS aplica mesmas regras monofásicas que PIS."""
+        r = c170(
+            cfop="5102",
+            cst_cofins="04", vl_bc_cofins="0", aliq_cofins="1,00", vl_cofins="10,00",
+        )
+        errors = _validate_monofasico(r, self.NCM_FARMA)
+        cofins_types = {e.error_type for e in errors if "COFINS" in (e.field_name or "")}
+        assert "MONOFASICO_ALIQ_INVALIDA" in cofins_types
+        assert "MONOFASICO_VALOR_INDEVIDO" in cofins_types
+
+    def test_cst_vazio_sem_erros(self) -> None:
+        """CST PIS/COFINS vazios → sem validação monofásica."""
+        r = c170(cst_pis="", cst_cofins="")
+        errors = _validate_monofasico(r, self.NCM_FARMA)
+        assert errors == []
+
+    def test_cst06_nao_e_monofasico(self) -> None:
+        """CST 06 (alíquota zero) não é monofásico — sem alertas monofásicos."""
+        r = c170(
+            cfop="5102",
+            cst_pis="06", vl_bc_pis="0", aliq_pis="0", vl_pis="0",
+        )
+        errors = _validate_monofasico(r, self.NCM_FARMA)
+        # CST 06 não é monofásico nem tributável → nenhuma regra se aplica
+        assert errors == []
+
+    def test_multiplos_erros_combinados(self) -> None:
+        """CST 04 + alíq > 0 + valor > 0 + NCM não monofásico → múltiplos erros."""
+        r = c170(
+            cfop="5102",
+            cst_pis="04", vl_bc_pis="1000,00", aliq_pis="1,65", vl_pis="16,50",
+        )
+        errors = _validate_monofasico(r, self.NCM_MOVEL)
+        types = {e.error_type for e in errors}
+        assert "MONOFASICO_ALIQ_INVALIDA" in types
+        assert "MONOFASICO_VALOR_INDEVIDO" in types
+        assert "MONOFASICO_NCM_INCOMPATIVEL" in types
