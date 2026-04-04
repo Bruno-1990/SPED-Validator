@@ -158,23 +158,18 @@ def _get_c170_siblings(
 def _validate_c100(record: SpedRecord, context: SpedContext) -> list[ValidationError]:
     """Validações intra-registro do C100.
 
-    Campos C100 (posições 0-based):
+    Campos C100 (posições 0-based após strip de pipes):
     0:REG, 1:IND_OPER, 2:IND_EMIT, 3:COD_PART, 4:COD_MOD, 5:COD_SIT,
-    6:SER, 7:NUM_DOC, 8:CHV_NFE(depende do modelo), 9:DT_DOC, 10:DT_E_S,
-    ...campos de valor variam por modelo. Para modelo 55 (NFe):
-    8:DT_DOC, 9:DT_E_S, 10:VL_DOC, 11:IND_PGTO, 12:VL_DESC,
-    13:VL_ABAT_NT, 14:VL_MERC, ...
-
-    Nota: A posição exata dos campos pode variar. Usamos a estrutura padrão do Guia Prático.
-    Posições para modelo 55: 1:IND_OPER, 5:COD_SIT, 8:DT_DOC, 9:DT_E_S, 10:VL_DOC
+    6:SER, 7:NUM_DOC, 8:CHV_NFE, 9:DT_DOC, 10:DT_E_S, 11:VL_DOC,
+    12:IND_PGTO, 13:VL_DESC, 14:VL_ABAT_NT, 15:VL_MERC, ...
     """
     errors: list[ValidationError] = []
 
     ind_oper = _get_field(record, 1)
     cod_sit = _get_field(record, 5)
-    dt_doc = _get_field(record, 8)
-    dt_e_s = _get_field(record, 9)
-    vl_doc = _to_float(_get_field(record, 10))
+    dt_doc = _get_field(record, 9)
+    dt_e_s = _get_field(record, 10)
+    vl_doc = _to_float(_get_field(record, 11))
 
     # Regra: Se IND_OPER=0 (entrada), DT_E_S deve existir
     if ind_oper == "0" and not dt_e_s:
@@ -250,14 +245,14 @@ def _validate_c170(
 ) -> list[ValidationError]:
     """Validações intra-registro do C170.
 
-    Campos C170 (posições 0-based):
+    Campos C170 (posições 0-based após strip de pipes):
     0:REG, 1:NUM_ITEM, 2:COD_ITEM, 3:DESCR_COMPL, 4:QTD, 5:UNID,
     6:VL_ITEM, 7:VL_DESC, 8:IND_MOV, 9:CST_ICMS, 10:CFOP, 11:COD_NAT,
     12:VL_BC_ICMS, 13:ALIQ_ICMS, 14:VL_ICMS, ...
     """
     errors: list[ValidationError] = []
 
-    cfop = _get_field(record, 9)
+    cfop = _get_field(record, 10)
     vl_bc_icms = _to_float(_get_field(record, 12))
     aliq_icms = _to_float(_get_field(record, 13))
     vl_icms = _to_float(_get_field(record, 14))
@@ -298,23 +293,23 @@ def _validate_c190(
 ) -> list[ValidationError]:
     """Validações do C190: soma dos C170 deve bater com C190.
 
-    Campos C190 (posições 0-based):
+    Campos C190 (posições 0-based após strip de pipes):
     0:REG, 1:CST_ICMS, 2:CFOP, 3:ALIQ_ICMS, 4:VL_OPR, 5:VL_BC_ICMS,
-    6:VL_ICMS, 7:VL_BC_ICMS_ST, 8:VL_ICMS_ST, 9:VL_RED_BC, 10:VL_IPI, 11:COD_OBS
+    6:VL_ICMS, 7:VL_BC_ICMS_ST, 8:VL_ICMS_ST, 9:VL_RED_BC, 10:VL_IPI
     """
     errors: list[ValidationError] = []
 
     if not c170_siblings:
         return errors
 
-    c190_cfop = _get_field(record, 2)
+    c190_cfop = _get_field(record, 2)  # CFOP na posição 2 (campo 03)
     c190_vl_opr = _to_float(_get_field(record, 4))
     c190_vl_bc = _to_float(_get_field(record, 5))
     c190_vl_icms = _to_float(_get_field(record, 6))
 
     # Filtrar C170 pelo CFOP correspondente
-    # No C170, CFOP está na posição 9 (campo 10)
-    matching_c170 = [c for c in c170_siblings if _get_field(c, 9) == c190_cfop]
+    # No C170, CFOP está na posição 10 (campo 11)
+    matching_c170 = [c for c in c170_siblings if _get_field(c, 10) == c190_cfop]
 
     if not matching_c170:
         return errors

@@ -22,7 +22,8 @@
       "Bash(curl -LsSf https://astral.sh/uv/install.sh)",
       "Bash(sh)",
       "Bash(rm -rf frontend)",
-      "Bash(mkdir -p frontend/src/components frontend/src/pages frontend/src/api frontend/src/types frontend/public)"
+      "Bash(mkdir -p frontend/src/components frontend/src/pages frontend/src/api frontend/src/types frontend/public)",
+      "Bash(sqlite3 /mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED/db/sped.db \"SELECT register, field_no, field_name, required FROM register_fields WHERE register = 'B001' ORDER BY field_no;\")"
     ]
   }
 }

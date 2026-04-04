@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 def init_audit_db(db_path: str | Path) -> sqlite3.Connection:
     """Cria o banco de auditoria com todas as tabelas."""
-    conn = sqlite3.connect(str(db_path))
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(_AUDIT_SCHEMA)
@@ -118,7 +118,7 @@ def init_audit_db(db_path: str | Path) -> sqlite3.Connection:
 
 def get_connection(db_path: str | Path) -> sqlite3.Connection:
     """Abre conexão com o banco de auditoria existente."""
-    conn = sqlite3.connect(str(db_path))
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
     conn.execute("PRAGMA foreign_keys=ON")
     conn.row_factory = sqlite3.Row
     return conn

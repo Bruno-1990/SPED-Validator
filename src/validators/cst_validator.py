@@ -107,11 +107,11 @@ def validate_cst_and_exemptions(records: list[SpedRecord]) -> list[ValidationErr
 def _validate_cst_c170(record: SpedRecord) -> list[ValidationError]:
     """Valida se CST_ICMS do C170 é um código válido.
 
-    Campos C170 (0-based): 11:CST_ICMS (posição padrão)
+    Campos C170 (0-based): 9:CST_ICMS
     O CST pode ter 2 dígitos (Tabela B) ou 3 dígitos (Origem + Tabela B).
     """
     errors: list[ValidationError] = []
-    cst_icms = _get(record, 11)
+    cst_icms = _get(record, 9)
 
     if not cst_icms:
         return errors
@@ -161,7 +161,7 @@ def _validate_exemptions_c170(record: SpedRecord) -> list[ValidationError]:
     Se CST indica tributação (00,10,20,70,90), BC e VL_ICMS devem existir.
     """
     errors: list[ValidationError] = []
-    cst_icms = _get(record, 11)
+    cst_icms = _get(record, 9)
 
     if not cst_icms:
         return errors

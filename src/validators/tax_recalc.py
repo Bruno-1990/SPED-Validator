@@ -151,9 +151,8 @@ def recalc_icms_st_item(record: SpedRecord) -> list[ValidationError]:
     """
     errors: list[ValidationError] = []
 
-    # CST_ICMS pode estar em posições diferentes dependendo do layout
-    # Usamos posição 11 (campo CST_ICMS no layout padrão C170)
-    cst_icms = _get(record, 11)
+    # CST_ICMS na posição 9 (campo 10 do C170)
+    cst_icms = _get(record, 9)
 
     # Só valida se CST indica ST
     if cst_icms not in _CST_ST:
@@ -205,10 +204,10 @@ def recalc_ipi_item(record: SpedRecord) -> list[ValidationError]:
     """
     errors: list[ValidationError] = []
 
-    # Posições do IPI no C170 (variam por layout)
-    vl_bc_ipi = _float_opt(_get(record, 19))
-    aliq_ipi = _float_opt(_get(record, 20))
-    vl_ipi = _float_opt(_get(record, 21))
+    # Posições do IPI no C170: campo 22=VL_BC_IPI, 23=ALIQ_IPI, 24=VL_IPI
+    vl_bc_ipi = _float_opt(_get(record, 21))
+    aliq_ipi = _float_opt(_get(record, 22))
+    vl_ipi = _float_opt(_get(record, 23))
 
     if vl_bc_ipi is None or aliq_ipi is None or vl_ipi is None:
         return errors
@@ -242,10 +241,10 @@ def recalc_pis_cofins_item(record: SpedRecord) -> list[ValidationError]:
     """
     errors: list[ValidationError] = []
 
-    # PIS
-    vl_bc_pis = _float_opt(_get(record, 22))
-    aliq_pis = _float_opt(_get(record, 23))
-    vl_pis = _float_opt(_get(record, 24))
+    # PIS: campo 26=VL_BC_PIS, 27=ALIQ_PIS(%), 30=VL_PIS
+    vl_bc_pis = _float_opt(_get(record, 25))
+    aliq_pis = _float_opt(_get(record, 26))
+    vl_pis = _float_opt(_get(record, 29))
 
     if (vl_bc_pis is not None and aliq_pis is not None and vl_pis is not None
             and vl_bc_pis > 0 and aliq_pis > 0):
@@ -258,10 +257,10 @@ def recalc_pis_cofins_item(record: SpedRecord) -> list[ValidationError]:
                 field_no=25,
             ))
 
-    # COFINS
-    vl_bc_cofins = _float_opt(_get(record, 25))
-    aliq_cofins = _float_opt(_get(record, 26))
-    vl_cofins = _float_opt(_get(record, 27))
+    # COFINS: campo 32=VL_BC_COFINS, 33=ALIQ_COFINS(%), 36=VL_COFINS
+    vl_bc_cofins = _float_opt(_get(record, 31))
+    aliq_cofins = _float_opt(_get(record, 32))
+    vl_cofins = _float_opt(_get(record, 35))
 
     if (vl_bc_cofins is not None and aliq_cofins is not None and vl_cofins is not None
             and vl_bc_cofins > 0 and aliq_cofins > 0):
