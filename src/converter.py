@@ -274,8 +274,23 @@ def _extract_text_outside_tables(
         return page.extract_text() or ""
 
     filtered = page
+    page_bbox = page.bbox  # (x0, top, x1, bottom)
     for bbox in table_bboxes:
-        filtered = filtered.outside_bbox(bbox)
+        # Clampar bbox dentro dos limites da pagina para evitar
+        # ValueError de bounding box fora dos limites
+        clamped = (
+            max(bbox[0], page_bbox[0]),
+            max(bbox[1], page_bbox[1]),
+            min(bbox[2], page_bbox[2]),
+            min(bbox[3], page_bbox[3]),
+        )
+        # Ignorar bbox invalido apos clamping
+        if clamped[2] <= clamped[0] or clamped[3] <= clamped[1]:
+            continue
+        try:
+            filtered = filtered.outside_bbox(clamped)
+        except (ValueError, Exception):  # noqa: S112
+            continue
 
     return filtered.extract_text() or ""
 

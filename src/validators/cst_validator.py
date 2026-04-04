@@ -1,16 +1,23 @@
-"""Validador de CSTs, isenções e Bloco H (estoque)."""
+"""Validador de CSTs, isencoes e Bloco H (estoque)."""
 
 from __future__ import annotations
 
 from ..models import SpedRecord, ValidationError
 from ..parser import group_by_register
+from .helpers import (
+    CST_ISENTO_NT,
+    CST_TRIBUTADO,
+    get_field,
+    make_error,
+    to_float,
+)
 
 # ──────────────────────────────────────────────
-# CSTs válidos por tipo de imposto
+# CSTs validos por tipo de imposto (locais)
 # ──────────────────────────────────────────────
 
-# ICMS - Tabela A (Origem) + Tabela B (Tributação)
-# Origem: 0-8, Tributação: 00,10,20,30,40,41,50,51,60,70,90
+# ICMS - Tabela A (Origem) + Tabela B (Tributacao)
+# Origem: 0-8, Tributacao: 00,10,20,30,40,41,50,51,60,70,90
 _CST_ICMS_TRIBUTACAO = {
     "00", "10", "20", "30", "40", "41", "50", "51", "60", "70", "90",
 }
@@ -20,12 +27,6 @@ _CSOSN_VALIDOS = {
     "101", "102", "103", "201", "202", "203",
     "300", "400", "500", "900",
 }
-
-# CSTs que indicam tributação integral de ICMS
-_CST_ICMS_TRIBUTADO = {"00", "10", "20", "70", "90"}
-
-# CSTs que indicam isenção/não-tributação de ICMS
-_CST_ICMS_ISENTO = {"40", "41", "50", "60"}
 
 # CSTs de IPI
 _CST_IPI_VALIDOS = {
@@ -43,49 +44,19 @@ _CST_PIS_COFINS_VALIDOS = {
     "98", "99",
 }
 
+# CSTs de IPI que indicam tributacao
+_CST_IPI_TRIBUTADO = {"00", "49", "50", "99"}
 
-# ──────────────────────────────────────────────
-# Helpers
-# ──────────────────────────────────────────────
-
-def _get(record: SpedRecord, idx: int) -> str:
-    if idx < len(record.fields):
-        return record.fields[idx].strip()
-    return ""
-
-
-def _float(value: str) -> float:
-    if not value:
-        return 0.0
-    try:
-        return float(value.replace(",", "."))
-    except ValueError:
-        return 0.0
-
-
-def _error(
-    record: SpedRecord,
-    field_name: str,
-    error_type: str,
-    message: str,
-) -> ValidationError:
-    return ValidationError(
-        line_number=record.line_number,
-        register=record.register,
-        field_no=0,
-        field_name=field_name,
-        value="",
-        error_type=error_type,
-        message=message,
-    )
+# CSTs de IPI isentos/NT/imune/suspenso
+_CST_IPI_SEM_IMPOSTO = {"02", "03", "04", "05", "52", "53", "54", "55"}
 
 
 # ──────────────────────────────────────────────
-# API pública
+# API publica
 # ──────────────────────────────────────────────
 
 def validate_cst_and_exemptions(records: list[SpedRecord]) -> list[ValidationError]:
-    """Valida CSTs, consistência de isenções e Bloco H."""
+    """Valida CSTs, consistencia de isencoes e Bloco H."""
     groups = group_by_register(records)
     errors: list[ValidationError] = []
 
@@ -93,6 +64,8 @@ def validate_cst_and_exemptions(records: list[SpedRecord]) -> list[ValidationErr
     for rec in groups.get("C170", []):
         errors.extend(_validate_cst_c170(rec))
         errors.extend(_validate_exemptions_c170(rec))
+        errors.extend(_validate_cst020_reducao(rec))
+        errors.extend(_validate_ipi_cst_campos(rec))
 
     # Validar Bloco H (estoque) vs cadastro
     errors.extend(_validate_bloco_h(groups))
@@ -101,91 +74,178 @@ def validate_cst_and_exemptions(records: list[SpedRecord]) -> list[ValidationErr
 
 
 # ──────────────────────────────────────────────
-# Validação de CST nos C170
+# Validacao de CST nos C170
 # ──────────────────────────────────────────────
 
 def _validate_cst_c170(record: SpedRecord) -> list[ValidationError]:
-    """Valida se CST_ICMS do C170 é um código válido.
+    """Valida se CST_ICMS do C170 e um codigo valido.
 
     Campos C170 (0-based): 9:CST_ICMS
-    O CST pode ter 2 dígitos (Tabela B) ou 3 dígitos (Origem + Tabela B).
+    O CST pode ter 2 digitos (Tabela B) ou 3 digitos (Origem + Tabela B).
     """
     errors: list[ValidationError] = []
-    cst_icms = _get(record, 9)
+    cst_icms = get_field(record, 9)
 
     if not cst_icms:
         return errors
 
-    # CST pode ser 3 dígitos (origem + tributação) ou 2 dígitos (só tributação)
+    # CST pode ser 3 digitos (origem + tributacao) ou 2 digitos (so tributacao)
     if len(cst_icms) == 3:
         origem = cst_icms[0]
         tributacao = cst_icms[1:]
-        # Verificar se é CSOSN (Simples Nacional)
+        # Verificar se e CSOSN (Simples Nacional)
         if cst_icms in _CSOSN_VALIDOS:
             return errors
         # Origem deve ser 0-8
         if origem not in "012345678":
-            errors.append(_error(
+            errors.append(make_error(
                 record, "CST_ICMS", "CST_INVALIDO",
-                f"Origem do CST ICMS '{origem}' inválida (deve ser 0-8).",
+                f"Origem do CST ICMS '{origem}' invalida (deve ser 0-8).",
             ))
         if tributacao not in _CST_ICMS_TRIBUTACAO:
-            errors.append(_error(
+            errors.append(make_error(
                 record, "CST_ICMS", "CST_INVALIDO",
-                f"Tributação do CST ICMS '{tributacao}' inválida.",
+                f"Tributacao do CST ICMS '{tributacao}' invalida.",
             ))
     elif len(cst_icms) == 2:
         if cst_icms not in _CST_ICMS_TRIBUTACAO:
-            errors.append(_error(
+            errors.append(make_error(
                 record, "CST_ICMS", "CST_INVALIDO",
-                f"CST ICMS '{cst_icms}' não é um código válido.",
+                f"CST ICMS '{cst_icms}' nao e um codigo valido.",
             ))
-    # CSTs com 1 dígito ou >3 dígitos são inválidos
+    # CSTs com 1 digito ou >3 digitos sao invalidos
     elif cst_icms not in _CSOSN_VALIDOS:
-        errors.append(_error(
+        errors.append(make_error(
             record, "CST_ICMS", "CST_INVALIDO",
-            f"CST ICMS '{cst_icms}' formato inválido (esperado 2 ou 3 dígitos).",
+            f"CST ICMS '{cst_icms}' formato invalido (esperado 2 ou 3 digitos).",
         ))
 
     return errors
 
 
 # ──────────────────────────────────────────────
-# Validação de isenções/exclusões
+# Validacao de isencoes/exclusoes
 # ──────────────────────────────────────────────
 
 def _validate_exemptions_c170(record: SpedRecord) -> list[ValidationError]:
-    """Valida consistência entre CST e valores de ICMS.
+    """Valida consistencia entre CST e valores de ICMS.
 
-    Se CST indica isenção (40,41,50), BC e VL_ICMS devem ser zero.
-    Se CST indica tributação (00,10,20,70,90), BC e VL_ICMS devem existir.
+    Se CST indica isencao (40,41,50), BC e VL_ICMS devem ser zero.
     """
     errors: list[ValidationError] = []
-    cst_icms = _get(record, 9)
+    cst_icms = get_field(record, 9)
 
     if not cst_icms:
         return errors
 
-    # Extrair parte da tributação (últimos 2 dígitos)
-    trib = cst_icms[-2:] if len(cst_icms) >= 2 else cst_icms
+    # Extrair parte da tributacao (ultimos 2 digitos)
+    t = cst_icms[-2:] if len(cst_icms) >= 2 else cst_icms
 
-    vl_bc_icms = _float(_get(record, 12))
-    vl_icms = _float(_get(record, 14))
+    vl_bc_icms = to_float(get_field(record, 12))
+    vl_icms = to_float(get_field(record, 14))
 
-    # CST isento/não-tributado: valores devem ser zero
-    if trib in _CST_ICMS_ISENTO and (vl_bc_icms > 0 or vl_icms > 0):
-        errors.append(_error(
+    # CST isento/nao-tributado: valores devem ser zero
+    if t in CST_ISENTO_NT and (vl_bc_icms > 0 or vl_icms > 0):
+        errors.append(make_error(
             record, "VL_ICMS", "ISENCAO_INCONSISTENTE",
-            f"CST {cst_icms} indica isenção/não-tributação, "
+            f"CST {cst_icms} indica isencao/nao-tributacao, "
             f"mas BC={vl_bc_icms:.2f} e ICMS={vl_icms:.2f} (deveriam ser zero).",
         ))
 
-    # CST tributado: se BC > 0, ICMS não pode ser zero
-    if trib in _CST_ICMS_TRIBUTADO and vl_bc_icms > 0 and vl_icms == 0:
-        errors.append(_error(
-            record, "VL_ICMS", "TRIBUTACAO_INCONSISTENTE",
-            f"CST {cst_icms} indica tributação, BC={vl_bc_icms:.2f} "
-            f"mas ICMS=0 (deveria ter valor).",
+    # NOTE: TRIBUTACAO_INCONSISTENTE check (CST tributado + BC > 0 + ICMS = 0)
+    # removed here -- it duplicates the CST_ALIQ_ZERO_FORTE rule in
+    # fiscal_semantics.py which provides a more detailed analysis.
+
+    return errors
+
+
+# ──────────────────────────────────────────────
+# CST_003: CST 020 sem reducao real de base
+# ──────────────────────────────────────────────
+
+def _validate_cst020_reducao(record: SpedRecord) -> list[ValidationError]:
+    """Detecta CST 020 sem reducao efetiva de base.
+
+    CST 020 indica reducao de base de calculo. Se VL_BC_ICMS ~= VL_ITEM - VL_DESC,
+    nao houve reducao real.
+    """
+    cst_icms = get_field(record, 9)
+    if not cst_icms:
+        return []
+
+    t = cst_icms[-2:] if len(cst_icms) >= 2 else cst_icms
+    if t != "20":
+        return []
+
+    vl_item = to_float(get_field(record, 6))
+    vl_desc = to_float(get_field(record, 7))
+    vl_bc_icms = to_float(get_field(record, 12))
+
+    if vl_item <= 0 or vl_bc_icms <= 0:
+        return []
+
+    base_esperada = vl_item - vl_desc
+    if base_esperada <= 0:
+        return []
+
+    # Se a base e >= 95% do valor do item, nao houve reducao real
+    ratio = vl_bc_icms / base_esperada
+    if ratio >= 0.95:
+        return [make_error(
+            record, "VL_BC_ICMS", "CST_020_SEM_REDUCAO",
+            (
+                f"CST {cst_icms} indica reducao de base, mas "
+                f"VL_BC_ICMS={vl_bc_icms:.2f} e {ratio:.0%} do valor "
+                f"tributavel ({base_esperada:.2f}). A base deveria estar "
+                f"efetivamente reduzida. Verifique se a reducao foi aplicada "
+                f"ou se o CST deveria ser 00 (tributacao integral)."
+            ),
+        )]
+
+    return []
+
+
+# ──────────────────────────────────────────────
+# IPI_003: CST IPI incompativel com campos monetarios
+# ──────────────────────────────────────────────
+
+def _validate_ipi_cst_campos(record: SpedRecord) -> list[ValidationError]:
+    """Detecta incompatibilidade entre CST IPI e campos monetarios.
+
+    - CST tributado sem base/valor -> erro
+    - CST isento/NT com base/valor > 0 -> erro
+    """
+    errors: list[ValidationError] = []
+    cst_ipi = get_field(record, 19)
+
+    if not cst_ipi:
+        return errors
+
+    vl_bc_ipi = to_float(get_field(record, 21))
+    aliq_ipi = to_float(get_field(record, 22))
+    vl_ipi = to_float(get_field(record, 23))
+
+    # CST tributado com tudo zero
+    if cst_ipi in _CST_IPI_TRIBUTADO and vl_bc_ipi == 0 and aliq_ipi == 0 and vl_ipi == 0:
+        errors.append(make_error(
+            record, "CST_IPI", "IPI_CST_INCOMPATIVEL",
+            (
+                f"CST_IPI {cst_ipi} indica tributacao, mas base, aliquota e "
+                f"valor estao zerados. O CST deveria ser 02 (isento), "
+                f"03 (nao tributado), 04 (imune) ou 05 (suspenso), ou os "
+                f"campos monetarios estao faltando."
+            ),
+        ))
+
+    # CST isento/NT com valores > 0
+    if cst_ipi in _CST_IPI_SEM_IMPOSTO and (vl_bc_ipi > 0 or vl_ipi > 0):
+        errors.append(make_error(
+            record, "CST_IPI", "IPI_CST_INCOMPATIVEL",
+            (
+                f"CST_IPI {cst_ipi} indica isencao/NT/imunidade/suspensao, "
+                f"mas BC_IPI={vl_bc_ipi:.2f} e VL_IPI={vl_ipi:.2f}. "
+                f"Esses valores deveriam ser zero para o CST informado."
+            ),
         ))
 
     return errors
@@ -196,12 +256,12 @@ def _validate_exemptions_c170(record: SpedRecord) -> list[ValidationError]:
 # ──────────────────────────────────────────────
 
 def _validate_bloco_h(groups: dict[str, list[SpedRecord]]) -> list[ValidationError]:
-    """Valida Bloco H (inventário).
+    """Valida Bloco H (inventario).
 
-    H010: itens do inventário
+    H010: itens do inventario
     - COD_ITEM do H010 deve existir no 0200 (cadastro de itens)
-    - VL_ITEM do H010 não pode ser negativo
-    - QTD do H010 não pode ser negativa
+    - VL_ITEM do H010 nao pode ser negativo
+    - QTD do H010 nao pode ser negativa
 
     H010 campos (0-based): 0:REG, 1:COD_ITEM, 2:UNID, 3:QTD, 4:VL_UNIT, 5:VL_ITEM
     """
@@ -214,34 +274,34 @@ def _validate_bloco_h(groups: dict[str, list[SpedRecord]]) -> list[ValidationErr
     # Cadastro de itens
     cod_items_cadastro = set()
     for rec in groups.get("0200", []):
-        cod = _get(rec, 1)
+        cod = get_field(rec, 1)
         if cod:
             cod_items_cadastro.add(cod)
 
     for rec in h010_records:
-        cod_item = _get(rec, 1)
-        qtd = _float(_get(rec, 3))
-        vl_item = _float(_get(rec, 5))
+        cod_item = get_field(rec, 1)
+        qtd = to_float(get_field(rec, 3))
+        vl_item = to_float(get_field(rec, 5))
 
         # Item deve existir no cadastro
         if cod_item and cod_items_cadastro and cod_item not in cod_items_cadastro:
-            errors.append(_error(
+            errors.append(make_error(
                 rec, "COD_ITEM", "REF_INEXISTENTE",
-                f"COD_ITEM '{cod_item}' no H010 não existe no cadastro 0200.",
+                f"COD_ITEM '{cod_item}' no H010 nao existe no cadastro 0200.",
             ))
 
-        # Quantidade não pode ser negativa
+        # Quantidade nao pode ser negativa
         if qtd < 0:
-            errors.append(_error(
+            errors.append(make_error(
                 rec, "QTD", "VALOR_NEGATIVO",
-                f"Quantidade negativa no inventário: {qtd}.",
+                f"Quantidade negativa no inventario: {qtd}.",
             ))
 
-        # Valor não pode ser negativo
+        # Valor nao pode ser negativo
         if vl_item < 0:
-            errors.append(_error(
+            errors.append(make_error(
                 rec, "VL_ITEM", "VALOR_NEGATIVO",
-                f"Valor negativo no inventário: {vl_item}.",
+                f"Valor negativo no inventario: {vl_item}.",
             ))
 
     return errors

@@ -130,6 +130,7 @@ Execute `git-push.bat` no Windows — pede a mensagem do commit, faz rebase na m
 ```
 SPED/
 |-- README.md                       # Este arquivo
+|-- rules.yaml                      # Catalogo de 63 regras de validacao (YAML)
 |-- pyproject.toml                  # Dependencias e metadados (v0.1.0)
 |-- config.py                       # Caminhos, modelo embedding, parametros
 |-- start.bat                       # Inicia API + Frontend (Windows)
@@ -147,6 +148,7 @@ SPED/
 |   |-- embeddings.py               # Wrapper do modelo sentence-transformers
 |   |-- validator.py                # Validacao campo a campo
 |   |-- searcher.py                 # Busca hibrida (FTS5 + vetorial + RRF)
+|   |-- rules.py                    # Loader/CLI do rules.yaml (--check, --pending, --block)
 |   |-- validators/
 |   |   |-- __init__.py
 |   |   |-- format_validator.py     # CNPJ, CPF, datas, CEP, CFOP, NCM, chave NFe
@@ -178,6 +180,7 @@ SPED/
 |   |   |-- validation.py              # Validar, erros, resumo
 |   |   |-- report.py                   # Relatorio MD/CSV/JSON, download SPED
 |   |   |-- search.py                   # Busca na documentacao
+|   |   |-- rules.py                    # Gerar, listar e implementar regras via API
 |
 |-- frontend/
 |   |-- package.json                    # React 18 + Vite + TailwindCSS + TypeScript
@@ -191,6 +194,7 @@ SPED/
 |   |   |   |-- UploadPage.tsx         # Upload de arquivos SPED
 |   |   |   |-- FilesPage.tsx          # Listagem de arquivos processados
 |   |   |   |-- FileDetailPage.tsx     # Detalhe: erros, resumo, relatorio
+|   |   |   |-- RulesPage.tsx          # Criador de regras: texto livre -> regra estruturada -> YAML
 |   |   |-- types/                     # Tipos TypeScript
 |
 |-- db/
@@ -384,6 +388,7 @@ FastAPI com 5 routers e banco SQLite de auditoria.
 | `records.py` | `GET /api/files/{id}/records`, `PATCH /api/records/{id}` | Listagem de registros, correcao de campos |
 | `report.py` | `GET /api/files/{id}/report` | Relatorio em MD/CSV/JSON, download do SPED corrigido |
 | `search.py` | `GET /api/search` | Busca na documentacao oficial |
+| `rules.py` | `GET /api/rules`, `POST /api/rules/generate`, `POST /api/rules/implement` | Listar, gerar e implementar regras de validacao |
 
 **Banco de auditoria (`db/audit.db`):**
 
@@ -407,6 +412,7 @@ Interface web em React 18 + TypeScript + TailwindCSS + Vite.
 | `UploadPage` | Upload de arquivos SPED via drag-and-drop |
 | `FilesPage` | Listagem de arquivos processados com status |
 | `FileDetailPage` | Detalhe do arquivo: erros por tipo, resumo, relatorio |
+| `RulesPage` | Criador de regras: texto livre, geracao automatica com base legal, implementacao no YAML |
 
 **Stack:** React 18, React Router 6, Vite 5, TailwindCSS 3, TypeScript 5.
 
@@ -900,6 +906,59 @@ Camada 3 do motor — vai alem da consistencia numerica e verifica se o tratamen
 | `error` | Inconsistencia fiscal concreta | `MONOFASICO_ALIQ_INVALIDA`, `CST_INVALIDO` |
 | `warning` | Situacao suspeita que precisa revisao | `CST_CFOP_INCOMPATIVEL`, `MONOFASICO_CST_INCORRETO` |
 | `info` | Cenario aceitavel mas merece atencao | `CST_ALIQ_ZERO_MODERADO`, `MONOFASICO_ENTRADA_CST04` |
+
+### Sistema de Regras (`rules.yaml` + `src/rules.py`)
+
+Catalogo centralizado de todas as regras de validacao em formato YAML. Permite rastrear, adicionar e auditar regras sem precisar ler o codigo.
+
+**Arquivo `rules.yaml`:** 63 regras em 10 blocos:
+
+| Bloco | Regras | Descricao |
+|-------|--------|-----------|
+| `formato` | 9 | CNPJ, CPF, datas, CEP, CFOP, NCM, chave NFe, cod municipio |
+| `campo_a_campo` | 4 | Obrigatoriedade, tipo, tamanho, valores validos |
+| `intra_registro` | 10 | C100 (datas, cancelamento), C170 (CFOP), C190 (somas), E110 (apuracao) |
+| `cruzamento` | 7 | 0150/0200 (referencias), E110 vs C190 (debitos/creditos), bloco 9 (contagem) |
+| `recalculo` | 8 | ICMS, ICMS-ST, IPI, PIS, COFINS, E110 totais |
+| `cst_isencoes` | 6 | CST invalido, isencao com valor, tributado sem ICMS, H010 estoque |
+| `semantica_aliquota_zero` | 5 | CST tributado com tudo zerado (ICMS, IPI, PIS, COFINS) |
+| `semantica_cst_cfop` | 3 | Venda+isento, interestadual+zero, exportacao+tributado |
+| `monofasicos` | 5 | CST 04 x NCM x aliquota x entrada/saida |
+| `pendentes` | 6 | Beneficio fiscal, desoneracao, devolucao, historico, interestadual, TIPI |
+
+**CLI (`python -m src.rules`):**
+
+| Comando | Descricao |
+|---------|-----------|
+| `python -m src.rules` | Resumo geral (total, por bloco, por severidade) |
+| `python -m src.rules --check` | Verifica implementacao vs definicao, lista pendencias |
+| `python -m src.rules --pending` | Lista apenas regras nao implementadas |
+| `python -m src.rules --block monofasicos` | Mostra regras de um bloco especifico |
+
+**Frontend (aba "Regras"):**
+
+Interface para criar novas regras sem editar codigo:
+
+1. Usuario escreve regra em texto livre (ex: "Quando NCM for farmaceutico e CST PIS for 01, alertar que deveria ser monofasico")
+2. Clica "Gerar Regra" — sistema busca base legal na documentacao (53k chunks) e estrutura a regra automaticamente
+3. Visualiza regra estruturada com ID, bloco, registro, campos, severidade, error_type, legislacao e fontes legais (somente leitura)
+4. Clica "Implementar Regra Fiscal" — salva no `rules.yaml` com status pendente
+
+**Endpoints da API:**
+
+| Endpoint | Metodo | Descricao |
+|----------|--------|-----------|
+| `GET /api/rules` | GET | Lista todas as regras do YAML |
+| `POST /api/rules/generate` | POST | Recebe texto livre, busca base legal, retorna regra estruturada |
+| `POST /api/rules/implement` | POST | Adiciona regra gerada ao `rules.yaml` |
+
+**Como adicionar regra manualmente:**
+
+1. Adicione entrada no bloco adequado do `rules.yaml` com `implemented: false`
+2. Execute `python -m src.rules --pending` para confirmar
+3. Implemente a logica no `module` indicado
+4. Mude para `implemented: true`
+5. Execute `python -m src.rules --check` para validar
 
 ### Correcoes de Indexacao (Abril 2026)
 

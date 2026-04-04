@@ -13,9 +13,19 @@ from src.services.export_service import (
     export_errors_csv,
     export_errors_json,
     export_report_markdown,
+    export_report_structured,
 )
 
 router = APIRouter(prefix="/api/files/{file_id}", tags=["report"])
+
+
+@router.get("/report/structured")
+def get_structured_report(
+    file_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    """Relatório estruturado para renderização no frontend."""
+    return export_report_structured(db, file_id)
 
 
 @router.get("/report")

@@ -21,6 +21,7 @@ class FileInfo(BaseModel):
     total_records: int = 0
     total_errors: int = 0
     status: str = "uploaded"
+    auto_corrections_applied: int = 0
 
 
 class FileUploadResponse(BaseModel):
@@ -61,6 +62,7 @@ class RecordUpdate(BaseModel):
 class ValidationErrorInfo(BaseModel):
     id: int
     file_id: int
+    record_id: int | None = None
     line_number: int
     register: str
     field_no: int | None = None

@@ -35,7 +35,18 @@
       "Bash(sqlite3:*)",
       "Bash(/mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED/.venv/bin/python3 -m pytest tests/ -v --tb=short)",
       "Bash(.venv/bin/ruff check:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Read(//tmp/**)",
+      "Bash(grep -r \"E110\\\\|E111\\\\|E112\\\\|E113\\\\|E200\\\\|E210\\\\|H005\\\\|H010\" /mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED/src/*.py)",
+      "Bash(grep -n \"E110\\\\|E111\\\\|E112\\\\|E113\\\\|E200\\\\|E210\\\\|H005\\\\|H010\" /mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED/src/validators/*.py)",
+      "Bash(grep -n \"groups.get\\\\|group_by_register\" /mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED/src/validators/*.py)",
+      "Bash(python -m pytest --co -q)",
+      "Bash(grep -A 5 \"def validate\" /mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED/src/validators/*.py)",
+      "Bash(python -m src.rules --pending)",
+      "Bash(pip3 install:*)",
+      "Bash(python:*)",
+      "Bash(grep -E \"\\\\.bat$|resposta\")",
+      "Bash(grep \"\\\\.bat$\")"
     ]
   }
 }

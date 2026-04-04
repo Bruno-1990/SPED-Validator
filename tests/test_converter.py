@@ -461,6 +461,7 @@ class TestExtractTextOutsideTables:
         mock_filtered.outside_bbox.return_value = mock_filtered
         mock_filtered.extract_text.return_value = "Texto filtrado"
         mock_page = MagicMock()
+        mock_page.bbox = (0, 0, 200, 200)
         mock_page.outside_bbox.return_value = mock_filtered
         result = _extract_text_outside_tables(mock_page, [(0, 0, 100, 100)])
         assert result == "Texto filtrado"
@@ -560,6 +561,7 @@ class TestProcessPage:
         mock_table.extract.return_value = [["H1", "H2"], ["V1", "V2"]]
 
         mock_page = MagicMock()
+        mock_page.bbox = (0, 0, 200, 200)
         mock_page.find_tables.return_value = [mock_table]
         mock_page.chars = [
             {"top": 80.0, "x0": 0, "text": "T", "size": 10.0},
@@ -597,6 +599,7 @@ class TestProcessPage:
         mock_table.extract.return_value = None
 
         mock_page = MagicMock()
+        mock_page.bbox = (0, 0, 200, 200)
         mock_page.find_tables.return_value = [mock_table]
         mock_page.chars = []
         mock_filtered = MagicMock()

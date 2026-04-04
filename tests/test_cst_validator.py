@@ -128,10 +128,12 @@ class TestValidateExemptions:
         r = c170(cst="000", vl_bc="1000,00", vl_icms="180,00")
         assert _validate_exemptions_c170(r) == []
 
-    def test_tributado_com_bc_sem_icms(self) -> None:
+    def test_tributado_com_bc_sem_icms_nao_duplica(self) -> None:
+        """TRIBUTACAO_INCONSISTENTE removido daqui (coberto por CST_ALIQ_ZERO_FORTE
+        no fiscal_semantics.py). Exemptions so checa CST isento."""
         r = c170(cst="000", vl_bc="1000,00", vl_icms="0")
         errors = _validate_exemptions_c170(r)
-        assert any(e.error_type == "TRIBUTACAO_INCONSISTENTE" for e in errors)
+        assert not any(e.error_type == "TRIBUTACAO_INCONSISTENTE" for e in errors)
 
     def test_tributado_sem_bc_ok(self) -> None:
         """Se BC é zero, não reporta erro mesmo com CST tributado."""

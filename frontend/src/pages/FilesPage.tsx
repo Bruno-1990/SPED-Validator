@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import type { FileInfo } from '../types/sped'
@@ -14,15 +14,39 @@ export default function FilesPage() {
   const [files, setFiles] = useState<FileInfo[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const loadFiles = useCallback(() => {
+    setLoading(true)
     api.listFiles().then(setFiles).finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => { loadFiles() }, [loadFiles])
+
+  const handleClearAllAudit = useCallback(async () => {
+    const totalErrors = files.reduce((sum, f) => sum + f.total_errors, 0)
+    if (!confirm(`Limpar TODA a auditoria de todos os arquivos? (${totalErrors} apontamentos serão removidos)`)) return
+    try {
+      await api.clearAllAudit()
+      loadFiles()
+    } catch {
+      alert('Erro ao limpar auditoria')
+    }
+  }, [files, loadFiles])
 
   if (loading) return <p className="text-gray-500">Carregando...</p>
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">Arquivos Processados</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold">Arquivos Processados</h2>
+        {files.length > 0 && (
+          <button
+            onClick={handleClearAllAudit}
+            className="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Limpar Toda Auditoria
+          </button>
+        )}
+      </div>
 
       {files.length === 0 ? (
         <p className="text-gray-500">Nenhum arquivo processado. <Link to="/" className="text-blue-600 underline">Faça upload</Link></p>

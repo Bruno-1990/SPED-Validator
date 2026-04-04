@@ -5,12 +5,12 @@ from __future__ import annotations
 import pytest
 
 from src.models import SpedRecord
+from src.validators.helpers import get_field as _get_field
 from src.validators.intra_register_validator import (
     SpedContext,
     _build_context,
     _build_parent_map,
     _get_c170_siblings,
-    _get_field,
     _to_float,
     _validate_c100,
     _validate_c170,
@@ -259,14 +259,16 @@ class TestValidateC190:
         errors = _validate_c190(c190, c170s)
         assert len(errors) == 0
 
-    def test_vl_opr_divergente(self) -> None:
+    def test_vl_opr_nao_validado_aqui(self) -> None:
+        """VL_OPR nao e validado no intra_register (requer C100 para rateio).
+        A validacao com rateio esta em c190_validator.py."""
         c170s = [
             rec("C170", ["C170", "1", "P1", "D", "100", "UN", "500,00",
                          "0", "0", "000", "1019", "001", "500,00", "18", "90,00"]),
         ]
         c190 = rec("C190", ["C190", "000", "1019", "18,00", "999,00", "500,00", "90,00"])
         errors = _validate_c190(c190, c170s)
-        assert any(e.field_name == "VL_OPR" for e in errors)
+        assert not any(e.field_name == "VL_OPR" for e in errors)
 
     def test_vl_bc_divergente(self) -> None:
         c170s = [

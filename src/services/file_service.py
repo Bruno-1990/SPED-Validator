@@ -104,6 +104,29 @@ def clear_audit(db: sqlite3.Connection, file_id: int) -> int:
     return removed
 
 
+def clear_all_audit(db: sqlite3.Connection) -> int:
+    """Limpa todos os dados de validação/audit de TODOS os arquivos.
+
+    Remove: validation_errors, cross_validations, corrections, audit_log.
+    Reseta status para 'parsed' e zera contadores.
+    Retorna quantidade total de erros removidos.
+    """
+    row = db.execute("SELECT COUNT(*) FROM validation_errors").fetchone()
+    removed = row[0] if row else 0
+
+    db.execute("DELETE FROM audit_log")
+    db.execute("DELETE FROM corrections")
+    db.execute("DELETE FROM cross_validations")
+    db.execute("DELETE FROM validation_errors")
+    db.execute(
+        "UPDATE sped_files SET status = 'parsed', total_errors = 0, "
+        "auto_corrections_applied = 0, validation_stage = NULL",
+    )
+    db.commit()
+
+    return removed
+
+
 def delete_file(db: sqlite3.Connection, file_id: int) -> bool:
     """Remove arquivo e todos os dados associados."""
     existing = db.execute("SELECT id FROM sped_files WHERE id = ?", (file_id,)).fetchone()

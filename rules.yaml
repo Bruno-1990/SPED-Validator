@@ -1,0 +1,1479 @@
+version: '1.0'
+tolerance: 0.02
+formato:
+- id: FMT_CNPJ
+  register: '*'
+  fields:
+  - CNPJ
+  error_type: FORMATO_INVALIDO
+  severity: error
+  description: CNPJ deve ter 14 digitos numericos com digitos verificadores validos (modulo 11)
+  condition: len(CNPJ) != 14 OR digitos iguais OR DV invalido
+  implemented: true
+  module: format_validator.py
+- id: FMT_CPF
+  register: '*'
+  fields:
+  - CPF
+  error_type: FORMATO_INVALIDO
+  severity: error
+  description: CPF deve ter 11 digitos numericos com digitos verificadores validos (modulo 11)
+  condition: len(CPF) != 11 OR digitos iguais OR DV invalido
+  implemented: true
+  module: format_validator.py
+- id: FMT_DATA
+  register: '*'
+  fields:
+  - DT_DOC
+  - DT_E_S
+  - DT_INI
+  - DT_FIN
+  error_type: INVALID_DATE
+  severity: error
+  description: Datas devem estar no formato DDMMAAAA com valores validos
+  condition: len != 8 OR ano < 1900 OR ano > 2100 OR dia/mes invalido
+  implemented: true
+  module: format_validator.py
+- id: FMT_DATA_PERIODO
+  register: C100, C170
+  fields:
+  - DT_DOC
+  - DT_E_S
+  error_type: DATE_OUT_OF_PERIOD
+  severity: warning
+  description: Data deve estar dentro do periodo DT_INI..DT_FIN do registro 0000
+  condition: data < DT_INI OR data > DT_FIN
+  implemented: true
+  module: format_validator.py
+- id: FMT_CEP
+  register: '*'
+  fields:
+  - CEP
+  error_type: FORMATO_INVALIDO
+  severity: error
+  description: CEP deve ter 8 digitos numericos e nao ser 00000000
+  condition: len(CEP) != 8 OR CEP == '00000000'
+  implemented: true
+  module: format_validator.py
+- id: FMT_CFOP
+  register: C170, D100
+  fields:
+  - CFOP
+  error_type: FORMATO_INVALIDO
+  severity: error
+  description: CFOP deve ter 4 digitos, primeiro digito entre 1 e 7
+  condition: nao bate com [1-7]\d{3}
+  implemented: true
+  module: format_validator.py
+- id: FMT_NCM
+  register: C170
+  fields:
+  - NCM
+  error_type: FORMATO_INVALIDO
+  severity: error
+  description: NCM deve ter 8 digitos numericos
+  condition: len(NCM) != 8 OR nao numerico
+  implemented: true
+  module: format_validator.py
+- id: FMT_CHAVE_NFE
+  register: C100
+  fields:
+  - CHV_NFE
+  error_type: FORMATO_INVALIDO
+  severity: error
+  description: Chave NFe deve ter 44 digitos com DV modulo 11 valido
+  condition: len != 44 OR DV invalido (pesos 2-9 ciclicos)
+  implemented: true
+  module: format_validator.py
+- id: FMT_COD_MUNICIPIO
+  register: '*'
+  fields:
+  - COD_MUN
+  error_type: FORMATO_INVALIDO
+  severity: error
+  description: Codigo municipio IBGE deve ter 7 digitos, primeiro digito 1-5
+  condition: len != 7 OR primeiro digito nao em (1-5)
+  implemented: true
+  module: format_validator.py
+campo_a_campo:
+- id: CAMPO_OBRIGATORIO
+  register: '*'
+  fields:
+  - '*'
+  error_type: MISSING_REQUIRED
+  severity: error
+  description: Campo marcado como obrigatorio (O) deve estar preenchido
+  condition: required='O' AND (campo ausente OR valor vazio)
+  implemented: true
+  module: validator.py
+- id: CAMPO_TIPO_NUMERICO
+  register: '*'
+  fields:
+  - '*'
+  error_type: WRONG_TYPE
+  severity: error
+  description: Campo tipo N (numerico) deve conter valor numerico valido
+  condition: field_type='N' AND valor nao parseavel como float
+  implemented: true
+  module: validator.py
+- id: CAMPO_TAMANHO
+  register: '*'
+  fields:
+  - '*'
+  error_type: WRONG_SIZE
+  severity: error
+  description: Valor do campo nao pode exceder tamanho maximo definido
+  condition: len(valor) > field_size
+  implemented: true
+  module: validator.py
+- id: CAMPO_VALOR_VALIDO
+  register: '*'
+  fields:
+  - '*'
+  error_type: INVALID_VALUE
+  severity: error
+  description: Valor deve estar na lista de valores permitidos
+  condition: valid_values definido AND valor nao esta na lista
+  implemented: true
+  module: validator.py
+intra_registro:
+- id: C100_DT_ES_OBRIGATORIA_ENTRADA
+  register: C100
+  fields:
+  - DT_E_S
+  - IND_OPER
+  - COD_SIT
+  error_type: MISSING_CONDITIONAL
+  severity: warning
+  description: Entrada (IND_OPER=0) com documento regular exige DT_E_S preenchida
+  condition: IND_OPER='0' AND COD_SIT in ('00','01','') AND DT_E_S vazio
+  implemented: true
+  module: intra_register_validator.py
+- id: C100_CANCELADA_VALOR_ZERO
+  register: C100
+  fields:
+  - VL_DOC
+  - COD_SIT
+  error_type: INCONSISTENCY
+  severity: error
+  description: Documento cancelado/inutilizado deve ter VL_DOC = 0
+  condition: COD_SIT in ('02','03','04') AND VL_DOC > 0
+  implemented: true
+  module: intra_register_validator.py
+- id: C100_ORDEM_DATAS
+  register: C100
+  fields:
+  - DT_DOC
+  - DT_E_S
+  error_type: DATE_ORDER
+  severity: warning
+  description: DT_DOC deve ser anterior ou igual a DT_E_S
+  condition: DT_DOC > DT_E_S (ambas preenchidas)
+  implemented: true
+  module: intra_register_validator.py
+- id: C170_CFOP_VS_OPERACAO
+  register: C170
+  fields:
+  - CFOP
+  - IND_OPER
+  error_type: CFOP_MISMATCH
+  severity: error
+  description: CFOP do item deve ser compativel com tipo de operacao do C100 pai
+  condition: IND_OPER=0 AND CFOP inicia com 5/6/7; OU IND_OPER=1 AND CFOP inicia com 1/2/3
+  implemented: true
+  module: intra_register_validator.py
+- id: C190_SOMA_VL_OPR
+  register: C190
+  fields:
+  - VL_OPR
+  error_type: SOMA_DIVERGENTE
+  severity: critical
+  description: VL_OPR do C190 deve ser igual a soma dos VL_ITEM dos C170 com mesmo CFOP
+  condition: '|soma(C170.VL_ITEM) - C190.VL_OPR| > tolerancia'
+  implemented: true
+  module: intra_register_validator.py
+- id: C190_SOMA_VL_BC_ICMS
+  register: C190
+  fields:
+  - VL_BC_ICMS
+  error_type: SOMA_DIVERGENTE
+  severity: critical
+  description: VL_BC_ICMS do C190 deve ser igual a soma dos C170 com mesmo CFOP
+  condition: '|soma(C170.VL_BC_ICMS) - C190.VL_BC_ICMS| > tolerancia'
+  implemented: true
+  module: intra_register_validator.py
+- id: C190_SOMA_VL_ICMS
+  register: C190
+  fields:
+  - VL_ICMS
+  error_type: SOMA_DIVERGENTE
+  severity: critical
+  description: VL_ICMS do C190 deve ser igual a soma dos C170 com mesmo CFOP
+  condition: '|soma(C170.VL_ICMS) - C190.VL_ICMS| > tolerancia'
+  implemented: true
+  module: intra_register_validator.py
+- id: E110_SALDO_APURADO
+  register: E110
+  fields:
+  - VL_SLD_APURADO
+  - VL_TOT_DEBITOS
+  - VL_TOT_CREDITOS
+  error_type: CALCULO_DIVERGENTE
+  severity: critical
+  description: VL_SLD_APURADO = (debitos + ajustes) - (creditos + ajustes + saldo anterior)
+  condition: '|calculado - declarado| > tolerancia'
+  implemented: true
+  module: intra_register_validator.py
+- id: E110_ICMS_RECOLHER
+  register: E110
+  fields:
+  - VL_ICMS_RECOLHER
+  - VL_SLD_APURADO
+  - VL_TOT_DED
+  error_type: CALCULO_DIVERGENTE
+  severity: critical
+  description: 'Se saldo > 0: VL_ICMS_RECOLHER = VL_SLD_APURADO - VL_TOT_DED'
+  condition: VL_SLD_APURADO > 0 AND |calculado - declarado| > tolerancia
+  implemented: true
+  module: intra_register_validator.py
+- id: E110_SALDO_CREDOR
+  register: E110
+  fields:
+  - VL_SLD_CREDOR_TRANSPORTAR
+  - VL_SLD_APURADO
+  error_type: CALCULO_DIVERGENTE
+  severity: critical
+  description: 'Se saldo <= 0: VL_SLD_CREDOR_TRANSPORTAR = abs(VL_SLD_APURADO)'
+  condition: VL_SLD_APURADO <= 0 AND |calculado - declarado| > tolerancia
+  implemented: true
+  module: intra_register_validator.py
+cruzamento:
+- id: REF_COD_PART_C100
+  register: C100
+  fields:
+  - COD_PART
+  error_type: REF_INEXISTENTE
+  severity: warning
+  description: COD_PART do C100 deve existir no cadastro 0150
+  condition: COD_PART nao encontrado em nenhum registro 0150
+  implemented: true
+  module: cross_block_validator.py
+- id: REF_COD_ITEM_C170
+  register: C170
+  fields:
+  - COD_ITEM
+  error_type: REF_INEXISTENTE
+  severity: warning
+  description: COD_ITEM do C170 deve existir no cadastro 0200
+  condition: COD_ITEM nao encontrado em nenhum registro 0200
+  implemented: true
+  module: cross_block_validator.py
+- id: REF_COD_PART_D100
+  register: D100
+  fields:
+  - COD_PART
+  error_type: REF_INEXISTENTE
+  severity: warning
+  description: COD_PART do D100 deve existir no cadastro 0150
+  condition: COD_PART nao encontrado em nenhum registro 0150
+  implemented: true
+  module: cross_block_validator.py
+- id: E110_VS_C190_DEBITOS
+  register: E110
+  fields:
+  - VL_TOT_DEBITOS
+  error_type: CRUZAMENTO_DIVERGENTE
+  severity: critical
+  description: VL_TOT_DEBITOS do E110 = soma VL_ICMS dos C190 com CFOP de saida (5/6/7xxx)
+  condition: '|soma(C190+D690 saida) - E110.VL_TOT_DEBITOS| > tolerancia'
+  implemented: true
+  module: cross_block_validator.py
+- id: E110_VS_C190_CREDITOS
+  register: E110
+  fields:
+  - VL_TOT_CREDITOS
+  error_type: CRUZAMENTO_DIVERGENTE
+  severity: critical
+  description: VL_TOT_CREDITOS do E110 = soma VL_ICMS dos C190 com CFOP de entrada (1/2/3xxx)
+  condition: '|soma(C190+D690 entrada) - E110.VL_TOT_CREDITOS| > tolerancia'
+  implemented: true
+  module: cross_block_validator.py
+- id: BLOCO9_CONTAGEM_REGISTROS
+  register: '9900'
+  fields:
+  - REG_NAME
+  - QTD_REG
+  error_type: CONTAGEM_DIVERGENTE
+  severity: critical
+  description: Quantidade declarada no 9900 deve bater com contagem real do registro
+  condition: contagem_real(REG_NAME) != QTD_REG
+  implemented: true
+  module: cross_block_validator.py
+- id: BLOCO9_TOTAL_LINHAS
+  register: '9999'
+  fields:
+  - QTD_LIN
+  error_type: CONTAGEM_DIVERGENTE
+  severity: critical
+  description: QTD_LIN do 9999 deve ser igual ao total de linhas do arquivo
+  condition: total_linhas_real != QTD_LIN
+  implemented: true
+  module: cross_block_validator.py
+recalculo:
+- id: RECALC_ICMS_BC
+  register: C170
+  fields:
+  - VL_BC_ICMS
+  - VL_ITEM
+  - VL_DESC
+  error_type: CALCULO_DIVERGENTE
+  severity: critical
+  description: BC ICMS = VL_ITEM - VL_DESC (quando tributado e BC declarada > 0)
+  condition: '|VL_ITEM - VL_DESC - VL_BC_ICMS| > tolerancia'
+  implemented: true
+  module: tax_recalc.py
+- id: RECALC_ICMS_VALOR
+  register: C170
+  fields:
+  - VL_ICMS
+  - VL_BC_ICMS
+  - ALIQ_ICMS
+  error_type: CALCULO_DIVERGENTE
+  severity: critical
+  description: VL_ICMS = VL_BC_ICMS * ALIQ_ICMS / 100
+  condition: '|VL_BC_ICMS * ALIQ_ICMS / 100 - VL_ICMS| > tolerancia'
+  implemented: true
+  module: tax_recalc.py
+- id: RECALC_ICMS_ST_FALTANTE
+  register: C170
+  fields:
+  - VL_ICMS_ST
+  - VL_BC_ICMS_ST
+  - CST_ICMS
+  error_type: CALCULO_DIVERGENTE
+  severity: critical
+  description: Para CSTs de ST (10,30,60,70), BC_ST > 0 exige VL_ICMS_ST > 0
+  condition: CST in ST AND VL_BC_ST > 0 AND VL_ICMS_ST = 0
+  implemented: true
+  module: tax_recalc.py
+- id: RECALC_ICMS_ST_VALOR
+  register: C170
+  fields:
+  - VL_ICMS_ST
+  - VL_BC_ICMS_ST
+  - ALIQ_ST
+  error_type: CALCULO_DIVERGENTE
+  severity: critical
+  description: VL_ICMS_ST = VL_BC_ICMS_ST * ALIQ_ST / 100
+  condition: '|calculado - declarado| > tolerancia (quando ALIQ_ST > 0)'
+  implemented: true
+  module: tax_recalc.py
+- id: RECALC_IPI
+  register: C170
+  fields:
+  - VL_IPI
+  - VL_BC_IPI
+  - ALIQ_IPI
+  error_type: CALCULO_DIVERGENTE
+  severity: critical
+  description: VL_IPI = VL_BC_IPI * ALIQ_IPI / 100
+  condition: '|calculado - declarado| > tolerancia'
+  implemented: true
+  module: tax_recalc.py
+- id: RECALC_PIS
+  register: C170
+  fields:
+  - VL_PIS
+  - VL_BC_PIS
+  - ALIQ_PIS
+  error_type: CALCULO_DIVERGENTE
+  severity: critical
+  description: VL_PIS = VL_BC_PIS * ALIQ_PIS / 100
+  condition: '|calculado - declarado| > tolerancia (quando BC > 0 e ALIQ > 0)'
+  implemented: true
+  module: tax_recalc.py
+- id: RECALC_COFINS
+  register: C170
+  fields:
+  - VL_COFINS
+  - VL_BC_COFINS
+  - ALIQ_COFINS
+  error_type: CALCULO_DIVERGENTE
+  severity: critical
+  description: VL_COFINS = VL_BC_COFINS * ALIQ_COFINS / 100
+  condition: '|calculado - declarado| > tolerancia (quando BC > 0 e ALIQ > 0)'
+  implemented: true
+  module: tax_recalc.py
+- id: RECALC_E110_TOTAIS
+  register: E110
+  fields:
+  - VL_TOT_DEBITOS
+  - VL_TOT_CREDITOS
+  error_type: CALCULO_DIVERGENTE
+  severity: critical
+  description: Totais E110 recalculados a partir de C190 + D690
+  condition: '|soma(C190+D690) - E110| > tolerancia'
+  implemented: true
+  module: tax_recalc.py
+cst_isencoes:
+- id: CST_ICMS_CODIGO_INVALIDO
+  register: C170
+  fields:
+  - CST_ICMS
+  error_type: CST_INVALIDO
+  severity: error
+  description: 'CST ICMS deve ser codigo valido: 2 digitos (Tabela B) ou 3 digitos (origem 0-8 + Tabela B) ou CSOSN'
+  condition: CST nao pertence a lista de codigos validos
+  implemented: true
+  module: cst_validator.py
+- id: CST_ICMS_ISENCAO_COM_VALOR
+  register: C170
+  fields:
+  - CST_ICMS
+  - VL_BC_ICMS
+  - VL_ICMS
+  error_type: ISENCAO_INCONSISTENTE
+  severity: error
+  description: CST isento/NT (40,41,50,60) deve ter BC e ICMS zerados
+  condition: CST in (40,41,50,60) AND (VL_BC_ICMS > 0 OR VL_ICMS > 0)
+  implemented: true
+  module: cst_validator.py
+- id: CST_ICMS_TRIBUTADO_SEM_ICMS
+  register: C170
+  fields:
+  - CST_ICMS
+  - VL_BC_ICMS
+  - VL_ICMS
+  error_type: TRIBUTACAO_INCONSISTENTE
+  severity: error
+  description: CST tributado (00,10,20,70,90) com BC > 0 deve ter ICMS > 0
+  condition: CST in (00,10,20,70,90) AND VL_BC_ICMS > 0 AND VL_ICMS = 0
+  implemented: true
+  module: cst_validator.py
+- id: H010_ITEM_INEXISTENTE
+  register: H010
+  fields:
+  - COD_ITEM
+  error_type: REF_INEXISTENTE
+  severity: warning
+  description: COD_ITEM do H010 deve existir no cadastro 0200
+  condition: COD_ITEM nao encontrado no 0200
+  implemented: true
+  module: cst_validator.py
+- id: H010_QTD_NEGATIVA
+  register: H010
+  fields:
+  - QTD
+  error_type: VALOR_NEGATIVO
+  severity: error
+  description: Quantidade do inventario nao pode ser negativa
+  condition: QTD < 0
+  implemented: true
+  module: cst_validator.py
+- id: H010_VALOR_NEGATIVO
+  register: H010
+  fields:
+  - VL_ITEM
+  error_type: VALOR_NEGATIVO
+  severity: error
+  description: Valor do item no inventario nao pode ser negativo
+  condition: VL_ITEM < 0
+  implemented: true
+  module: cst_validator.py
+semantica_aliquota_zero:
+- id: ICMS_CST_TRIBUTADO_BC_ALIQ_ZERO
+  register: C170
+  fields:
+  - CST_ICMS
+  - VL_BC_ICMS
+  - ALIQ_ICMS
+  error_type: CST_ALIQ_ZERO_FORTE
+  severity: warning
+  description: CST tributado com BC preenchida mas aliquota zero (provavel erro de parametrizacao)
+  condition: CST in (00,10,20,70,90) AND VL_BC > 0 AND ALIQ = 0 AND CFOP nao e exportacao/remessa
+  implemented: true
+  module: fiscal_semantics.py
+- id: ICMS_CST_TRIBUTADO_TUDO_ZERO
+  register: C170
+  fields:
+  - CST_ICMS
+  - VL_BC_ICMS
+  - ALIQ_ICMS
+  - VL_ICMS
+  error_type: CST_ALIQ_ZERO_MODERADO
+  severity: info
+  description: CST tributado com base, aliquota e imposto todos zerados (classificacao possivelmente incorreta)
+  condition: CST in (00,10,20,70,90) AND BC=0 AND ALIQ=0 AND ICMS=0 AND CFOP nao e exportacao/remessa
+  implemented: true
+  module: fiscal_semantics.py
+- id: IPI_CST_TRIBUTADO_TUDO_ZERO
+  register: C170
+  fields:
+  - CST_IPI
+  - VL_BC_IPI
+  - ALIQ_IPI
+  - VL_IPI
+  error_type: IPI_CST_ALIQ_ZERO
+  severity: info
+  description: CST_IPI tributado com base, aliquota e valor todos zerados
+  condition: CST_IPI in (00,01,49,50,99) AND BC=0 AND ALIQ=0 AND VL=0
+  implemented: true
+  module: fiscal_semantics.py
+- id: PIS_CST_TRIBUTAVEL_TUDO_ZERO
+  register: C170
+  fields:
+  - CST_PIS
+  - VL_BC_PIS
+  - ALIQ_PIS
+  - VL_PIS
+  error_type: PIS_CST_ALIQ_ZERO
+  severity: info
+  description: CST_PIS tributavel com base, aliquota e valor todos zerados
+  condition: CST_PIS in (01,02,03,49) AND BC=0 AND ALIQ=0 AND VL=0
+  implemented: true
+  module: fiscal_semantics.py
+- id: COFINS_CST_TRIBUTAVEL_TUDO_ZERO
+  register: C170
+  fields:
+  - CST_COFINS
+  - VL_BC_COFINS
+  - ALIQ_COFINS
+  - VL_COFINS
+  error_type: COFINS_CST_ALIQ_ZERO
+  severity: info
+  description: CST_COFINS tributavel com base, aliquota e valor todos zerados
+  condition: CST_COFINS in (01,02,03,49) AND BC=0 AND ALIQ=0 AND VL=0
+  implemented: true
+  module: fiscal_semantics.py
+semantica_cst_cfop:
+- id: CFOP_VENDA_CST_ISENTO
+  register: C170
+  fields:
+  - CST_ICMS
+  - CFOP
+  error_type: CST_CFOP_INCOMPATIVEL
+  severity: warning
+  description: CFOP de venda com CST isento/NT sem justificativa
+  condition: CFOP in CFOPs_venda AND CST in (40,41,50,60)
+  implemented: true
+  module: fiscal_semantics.py
+- id: CFOP_INTERESTADUAL_ALIQ_ZERO
+  register: C170
+  fields:
+  - CST_ICMS
+  - CFOP
+  - ALIQ_ICMS
+  error_type: CST_CFOP_INCOMPATIVEL
+  severity: warning
+  description: Operacao interestadual com CST tributado e aliquota zero (deveria ser 4%, 7% ou 12%)
+  condition: CFOP inicia com 2/6 AND CST tributado AND ALIQ=0 AND nao e remessa/devolucao
+  implemented: true
+  module: fiscal_semantics.py
+- id: CFOP_EXPORTACAO_CST_TRIBUTADO
+  register: C170
+  fields:
+  - CST_ICMS
+  - CFOP
+  - ALIQ_ICMS
+  error_type: CST_CFOP_INCOMPATIVEL
+  severity: warning
+  description: Exportacao com CST tributado e aliquota > 0 (exportacao tem imunidade)
+  condition: CFOP in CFOPs_exportacao AND CST tributado AND ALIQ > 0
+  implemented: true
+  module: fiscal_semantics.py
+monofasicos:
+- id: MONO_ALIQ_INVALIDA
+  register: C170
+  fields:
+  - CST_PIS
+  - CST_COFINS
+  - ALIQ_PIS
+  - ALIQ_COFINS
+  error_type: MONOFASICO_ALIQ_INVALIDA
+  severity: error
+  description: CST 04 (monofasico) na revenda exige aliquota zero (tributo ja recolhido na origem)
+  condition: CST_PIS=04 AND ALIQ_PIS > 0; OU CST_COFINS=04 AND ALIQ_COFINS > 0
+  implemented: true
+  module: fiscal_semantics.py
+  legislation: Lei 10.147/00, Lei 10.485/02, Lei 10.833/03 Arts. 49-52
+- id: MONO_VALOR_INDEVIDO
+  register: C170
+  fields:
+  - CST_PIS
+  - CST_COFINS
+  - VL_PIS
+  - VL_COFINS
+  error_type: MONOFASICO_VALOR_INDEVIDO
+  severity: error
+  description: CST 04 (monofasico) na revenda exige valor zero de PIS/COFINS
+  condition: CST_PIS=04 AND VL_PIS > 0; OU CST_COFINS=04 AND VL_COFINS > 0
+  implemented: true
+  module: fiscal_semantics.py
+  legislation: Lei 10.147/00, Lei 10.485/02
+- id: MONO_NCM_INCOMPATIVEL
+  register: C170
+  fields:
+  - CST_PIS
+  - CST_COFINS
+  - NCM
+  error_type: MONOFASICO_NCM_INCOMPATIVEL
+  severity: warning
+  description: CST 04 informado mas NCM do produto nao consta na lista de monofasicos
+  condition: CST=04 AND NCM (via 0200) nao pertence a nenhuma categoria monofasica
+  implemented: true
+  module: fiscal_semantics.py
+  legislation: Lei 10.147/00, Lei 10.485/02, Lei 10.833/03, Lei 10.865/04
+- id: MONO_CST_INCORRETO
+  register: C170
+  fields:
+  - CST_PIS
+  - CST_COFINS
+  - NCM
+  - CFOP
+  error_type: MONOFASICO_CST_INCORRETO
+  severity: warning
+  description: NCM monofasico na revenda (saida) deveria usar CST 04, mas esta com CST tributavel
+  condition: NCM monofasico AND CST in (01,02,03) AND CFOP de saida
+  implemented: true
+  module: fiscal_semantics.py
+  legislation: Lei 10.147/00, Lei 10.485/02
+- id: MONO_ENTRADA_CST04
+  register: C170
+  fields:
+  - CST_PIS
+  - CST_COFINS
+  - CFOP
+  error_type: MONOFASICO_ENTRADA_CST04
+  severity: info
+  description: CST 04 em entrada pode indicar revenda sem credito ou erro de classificacao
+  condition: CST=04 AND CFOP inicia com 1/2/3
+  implemented: true
+  module: fiscal_semantics.py
+  legislation: Lei 10.147/00 Art. 3
+pendentes:
+- id: PEND_BENEFICIO_FISCAL
+  register: C170
+  fields:
+  - CST_ICMS
+  - COD_BEN
+  error_type: BENEFICIO_NAO_VINCULADO
+  severity: warning
+  description: CST tributado com aliquota zero deveria ter beneficio fiscal vinculado
+  condition: CST tributado AND ALIQ=0 AND sem codigo de beneficio
+  implemented: true
+  module: pendentes_validator.py
+- id: PEND_DESONERACAO_MOTIVO
+  register: C170
+  fields:
+  - VL_ICMS_DESON
+  - MOT_DES_ICMS
+  error_type: DESONERACAO_SEM_MOTIVO
+  severity: error
+  description: Desoneracao de ICMS exige motivo (MOT_DES_ICMS) preenchido
+  condition: VL_ICMS_DESON > 0 AND MOT_DES_ICMS vazio
+  implemented: true
+  module: pendentes_validator.py
+- id: PEND_DEVOLUCAO_VS_ORIGEM
+  register: C170
+  fields:
+  - CFOP
+  - CST_ICMS
+  - CHV_NFE_REF
+  error_type: DEVOLUCAO_INCONSISTENTE
+  severity: warning
+  description: Devolucao deve ter tributacao coerente com documento de origem
+  condition: CFOP de devolucao AND CST diverge do documento referenciado
+  implemented: true
+  module: pendentes_validator.py
+- id: PEND_PERFIL_HISTORICO
+  register: C170
+  fields:
+  - COD_ITEM
+  - CST_ICMS
+  - ALIQ_ICMS
+  error_type: ANOMALIA_HISTORICA
+  severity: info
+  description: Item historicamente tributado aparecendo com aliquota zero (anomalia)
+  condition: Item tem historico de CST tributado e agora esta zerado
+  implemented: true
+  module: pendentes_validator.py
+- id: PEND_ALIQ_INTERESTADUAL
+  register: C170
+  fields:
+  - CFOP
+  - ALIQ_ICMS
+  - UF_DEST
+  error_type: ALIQ_INTERESTADUAL_INVALIDA
+  severity: warning
+  description: Aliquota interestadual deve ser 4%, 7% ou 12% conforme Resolucao Senado 13/2012
+  condition: CFOP interestadual AND ALIQ nao in (4, 7, 12)
+  implemented: true
+  module: aliquota_validator.py
+  legislation: Resolucao Senado 13/2012
+- id: PEND_NCM_VS_TIPI_ALIQ
+  register: C170
+  fields:
+  - NCM
+  - ALIQ_IPI
+  error_type: IPI_ALIQ_NCM_DIVERGENTE
+  severity: warning
+  description: Aliquota IPI informada diverge da prevista na TIPI para o NCM
+  condition: ALIQ_IPI != TIPI[NCM].aliquota
+  implemented: true
+  module: pendentes_validator.py
+  legislation: Decreto 11.158/2022 (TIPI)
+auditoria_beneficios:
+- id: AUD_COMPETE_DEBITO_INTEGRAL
+  register: E110, E111, C190
+  fields:
+  - VL_TOT_DEBITOS
+  - VL_ICMS
+  - COD_AJ_APUR
+  error_type: BENEFICIO_DEBITO_NAO_INTEGRAL
+  severity: critical
+  description: Debito de ICMS das saidas nao esta integral na apuracao; beneficio pode ter sido reduzido no documento em vez
+    de tratado no E111
+  condition: soma(C190.VL_ICMS saida) diverge de E110.VL_TOT_DEBITOS E nao ha E111 com ajuste de beneficio
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: risco_fiscal
+  depende_validacao_externa: true
+  validar_externamente: ato concessivo, memoria de calculo do beneficio
+- id: AUD_BENEFICIO_REDUZIDO_NA_NOTA
+  register: C170, C190
+  fields:
+  - ALIQ_ICMS
+  - VL_BC_ICMS
+  - CST_ICMS
+  error_type: BENEFICIO_CARGA_REDUZIDA_DOCUMENTO
+  severity: critical
+  description: Operacao interestadual tributavel com aliquota efetiva reduzida no documento sem ajuste correspondente no E111
+  condition: CFOP interestadual AND ALIQ_ICMS < aliquota interestadual esperada (4/7/12%) AND sem E111 de beneficio
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: indicio_forte
+- id: AUD_E111_SEM_RASTREABILIDADE
+  register: E111, E112, E113
+  fields:
+  - COD_AJ_APUR
+  - VL_AJ_APUR
+  - NUM_PROC
+  - CHV_DOC
+  error_type: AJUSTE_SEM_LASTRO_DOCUMENTAL
+  severity: critical
+  description: Ajuste de beneficio no E111 sem detalhamento em E112/E113 quando exigivel
+  condition: E111.VL_AJ_APUR > 0 AND nao existe E112 ou E113 vinculado
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: risco_fiscal
+  depende_validacao_externa: true
+  validar_externamente: processos, documentos fiscais, memoria do ajuste
+- id: AUD_E111_SOMA_VS_E110
+  register: E110, E111
+  fields:
+  - VL_TOT_AJ_CREDITOS
+  - VL_AJ_APUR
+  error_type: AJUSTE_SOMA_DIVERGENTE
+  severity: critical
+  description: Soma dos ajustes do E111 nao bate com os campos totalizadores do E110
+  condition: soma(E111.VL_AJ_APUR por natureza) != E110.VL_TOT_AJ_CREDITOS ou VL_TOT_AJ_DEBITOS
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: erro_objetivo
+- id: AUD_DEVOLUCAO_SEM_REVERSAO_BENEFICIO
+  register: C170, C190, E111
+  fields:
+  - CFOP
+  - VL_ICMS
+  - COD_AJ_APUR
+  error_type: DEVOLUCAO_BENEFICIO_NAO_REVERTIDO
+  severity: critical
+  description: Devolucao de venda beneficiada sem reversao proporcional do ajuste de beneficio no E111
+  condition: CFOP devolucao AND E111 do periodo nao reflete reducao proporcional ao volume devolvido
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: inconsistencia
+  depende_validacao_externa: true
+  validar_externamente: nota original, memoria de calculo do beneficio
+- id: AUD_CFOP_INTERESTADUAL_UF_INTERNA
+  register: C170, 0150
+  fields:
+  - CFOP
+  - UF
+  error_type: CFOP_INTERESTADUAL_DESTINO_INTERNO
+  severity: critical
+  description: CFOP 6xxx com destinatario da mesma UF do declarante (operacao interna mascarada como interestadual)
+  condition: CFOP inicia com 6 AND 0150.UF do COD_PART == 0000.UF
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: indicio_forte
+- id: AUD_SALDO_CREDOR_RECORRENTE
+  register: E110
+  fields:
+  - VL_SLD_CREDOR_TRANSPORTAR
+  error_type: SALDO_CREDOR_RECORRENTE
+  severity: warning
+  description: Saldo credor recorrente em empresa com volume relevante de saidas tributadas
+  condition: VL_SLD_CREDOR_TRANSPORTAR > 0 em multiplos periodos consecutivos AND soma(C190 saidas tributadas) > 0
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: indicio
+  depende_validacao_externa: true
+  validar_externamente: razao fiscal, historico de apuracao
+- id: AUD_CREDITO_ENTRADA_USO_CONSUMO
+  register: C170, 0200
+  fields:
+  - CFOP
+  - COD_ITEM
+  - NCM
+  error_type: CREDITO_USO_CONSUMO_INDEVIDO
+  severity: warning
+  description: Entrada com CFOP de comercializacao (1102/2102) para item que parece ser uso/consumo (NCM de limpeza, escritorio,
+    etc.)
+  condition: CFOP in (1102,2102) AND NCM indica uso/consumo AND item nunca aparece em saidas
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: indicio
+- id: AUD_SOBREPOSICAO_BENEFICIOS
+  register: C170, E111
+  fields:
+  - CST_ICMS
+  - VL_BC_ICMS
+  - COD_AJ_APUR
+  error_type: SOBREPOSICAO_BENEFICIOS
+  severity: critical
+  description: Mesma operacao com reducao de base no documento (CST 020) e credito presumido no E111
+  condition: CST 020 (base reduzida) em C170 AND E111 com ajuste de credito presumido sobre mesma operacao
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: risco_fiscal
+  depende_validacao_externa: true
+  validar_externamente: ato concessivo, parecer normativo
+- id: AUD_BENEFICIO_DESPROPORCIONAL
+  register: E111, C190
+  fields:
+  - VL_AJ_APUR
+  - VL_ICMS
+  error_type: BENEFICIO_VALOR_DESPROPORCIONAL
+  severity: critical
+  description: Valor do ajuste de beneficio no E111 desproporcional ao volume de operacoes elegiveis no C190
+  condition: E111.VL_AJ_APUR > soma(C190.VL_ICMS de operacoes interestaduais tributadas)
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: risco_fiscal
+- id: AUD_CST_VOLUME_ISENTO_ATIPICO
+  register: C190
+  fields:
+  - CST_ICMS
+  - VL_OPR
+  error_type: VOLUME_ISENTO_ATIPICO
+  severity: warning
+  description: Volume excessivo de operacoes com CST isento/NT/suspenso incompativel com perfil do contribuinte
+  condition: soma(C190.VL_OPR com CST 040/041/050/060) / soma(C190.VL_OPR total) > 50%
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: indicio
+- id: AUD_REMESSA_SEM_RETORNO
+  register: C170
+  fields:
+  - CFOP
+  - COD_ITEM
+  error_type: REMESSA_SEM_RETORNO
+  severity: warning
+  description: Remessa (CFOP 5901/6901) sem retorno correspondente no mesmo periodo ou seguinte
+  condition: CFOP de remessa AND nao ha CFOP de retorno para mesmo COD_ITEM no periodo
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: indicio
+  depende_validacao_externa: true
+  validar_externamente: prazo legal, documentos de retorno
+- id: AUD_CST051_DEBITO_INDEVIDO
+  register: C170, C190
+  fields:
+  - CST_ICMS
+  - VL_ICMS
+  error_type: DIFERIMENTO_COM_DEBITO
+  severity: warning
+  description: CST 051 (diferimento) gerando debito de ICMS quando deveria ser diferido
+  condition: CST 051 AND VL_ICMS > 0 no C170/C190
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: inconsistencia
+- id: AUD_ST_NOTA_OK_APURACAO_ERRADA
+  register: C170, C190, E200, E210
+  fields:
+  - CST_ICMS
+  - VL_ICMS_ST
+  - VL_SLD_APURADO_ST
+  error_type: ST_APURACAO_INCONSISTENTE
+  severity: critical
+  description: Item com ST correto no C170 mas apuracao ICMS-ST (E200/E210) inconsistente
+  condition: CST indica ST (010/030/060/070) AND soma(VL_ICMS_ST) diverge de E210
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: inconsistencia
+- id: AUD_INVENTARIO_ITEM_SEM_MOVIMENTO
+  register: H010, C170
+  fields:
+  - COD_ITEM
+  - QTD
+  - VL_ITEM
+  error_type: INVENTARIO_ITEM_PARADO
+  severity: info
+  description: Item no inventario sem movimento (entrada ou saida) no periodo
+  condition: COD_ITEM no H010 AND COD_ITEM nao aparece em nenhum C170 do periodo
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: indicio
+- id: AUD_E111_CODIGO_GENERICO
+  register: E111
+  fields:
+  - COD_AJ_APUR
+  - VL_AJ_APUR
+  error_type: AJUSTE_CODIGO_GENERICO
+  severity: warning
+  description: Ajuste no E111 usando codigo generico (outros) em vez de codigo especifico do beneficio
+  condition: COD_AJ_APUR termina com '999' ou '000' AND VL_AJ_APUR > 0
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: risco_fiscal
+- id: AUD_PARAMETRIZACAO_SISTEMICA
+  register: C170, 0200
+  fields:
+  - CST_ICMS
+  - CST_PIS
+  - CFOP
+  - NCM
+  error_type: PARAMETRIZACAO_SISTEMICA_INCORRETA
+  severity: critical
+  description: Padrao repetitivo de CST/CFOP incompativel no mesmo produto indica erro de ERP
+  condition: Mesmo COD_ITEM com CST incompativel em > 80% das ocorrencias
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: erro_objetivo
+- id: AUD_XML_SPED_DIVERGENCIA
+  register: C170, C100
+  fields:
+  - VL_BC_ICMS
+  - ALIQ_ICMS
+  - VL_ICMS
+  - CST_ICMS
+  error_type: ESCRITURACAO_DIVERGE_DOCUMENTO
+  severity: critical
+  description: Valores escriturados no SPED divergem do documento fiscal de origem (XML)
+  condition: Requer cruzamento com XML externo — no SPED, detectavel por inconsistencias internas C170 vs C190
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: erro_objetivo
+  depende_validacao_externa: true
+  validar_externamente: XML da NF-e
+- id: AUD_CHECKLIST_AUDITORIA_MINIMA
+  register: 0150, 0200, C170, C190, E110, E111, H010, 9900
+  fields:
+  - '*'
+  error_type: CHECKLIST_INCOMPLETO
+  severity: info
+  description: 'Checklist minimo de auditoria: cadastral, CST/CFOP, recalculo, C170xC190, E110xC190, E111, monofasicos, beneficio,
+    inventario, integridade'
+  condition: Verificacao de cobertura dos 10 pontos minimos de auditoria
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: metarregra
+- id: AUD_TRILHA_BENEFICIO_INCOMPLETA
+  register: C190, E110, E111, E112, E113
+  fields:
+  - VL_ICMS
+  - VL_AJ_APUR
+  - NUM_PROC
+  - CHV_DOC
+  error_type: TRILHA_BENEFICIO_INCOMPLETA
+  severity: critical
+  description: Beneficio relevante sem ligacao transparente entre operacao tributada, base original e ajuste efetuado
+  condition: E111 com ajuste > tolerancia AND sem E112/E113 AND sem correspondencia proporcional com C190
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: risco_fiscal
+  depende_validacao_externa: true
+  validar_externamente: memoria de calculo, planilhas auxiliares, ato concessivo
+- id: AUD_ICMS_EFETIVO_SEM_TRILHA
+  register: C170, C190, E110, E111
+  fields:
+  - ALIQ_ICMS
+  - VL_ICMS
+  - COD_AJ_APUR
+  error_type: ICMS_EFETIVO_SEM_TRILHA
+  severity: critical
+  description: Debito interestadual nao integral no documento ou ausencia de ajuste para compor carga efetiva final
+  condition: CFOP interestadual AND (ALIQ < esperada OR sem E111 de beneficio)
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: inconsistencia
+  depende_validacao_externa: true
+  validar_externamente: regra do beneficio, memoria de calculo
+- id: AUD_CFOP_OK_CST_ERRADO
+  register: C170, C190
+  fields:
+  - CFOP
+  - CST_ICMS
+  error_type: CFOP_CORRETO_CST_INCORRETO
+  severity: critical
+  description: CFOP compativel com a operacao mas CST incompativel com tributacao esperada
+  condition: 'CFOP de venda/compra normal AND CST incompativel (ex: venda com CST isento)'
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: erro_objetivo
+- id: AUD_CFOP_6XXX_DESTINO_MESMO_UF
+  register: C170, 0150
+  fields:
+  - CFOP
+  - UF
+  error_type: CFOP_INTERESTADUAL_DESTINO_INTERNO
+  severity: critical
+  description: CFOP 6xxx com participante da mesma UF do declarante
+  condition: CFOP inicia com 6 AND 0150.UF == 0000.UF
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: indicio_forte
+- id: AUD_REGISTROS_ESSENCIAIS_AUSENTES
+  register: C100, C170, C190, E110, E111, 0150, 0200, H010
+  fields:
+  - '*'
+  error_type: REGISTROS_ESSENCIAIS_AUSENTES
+  severity: info
+  description: Ausencia de registros essenciais para auditoria fiscal robusta
+  condition: Um ou mais registros criticos (E111, H010, 0150) nao presentes no arquivo
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: metarregra
+- id: AUD_CST_ESPECIAIS_VOLUME_ATIPICO
+  register: C190
+  fields:
+  - CST_ICMS
+  - VL_OPR
+  error_type: VOLUME_ISENTO_ATIPICO
+  severity: warning
+  description: Volume excessivo de CST 040/041/050/060 incompativel com perfil do contribuinte
+  condition: soma(VL_OPR CST especiais) / soma(VL_OPR total) > 50%
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: indicio
+- id: AUD_BENEFICIO_FORA_ESCOPO
+  register: C170, C190, 0150, E111, 0200
+  fields:
+  - CFOP
+  - UF
+  - COD_AJ_APUR
+  error_type: BENEFICIO_FORA_ESCOPO
+  severity: critical
+  description: Ajuste de beneficio calculado sobre operacoes nao elegiveis
+  condition: E111 com ajuste AND operacoes internas/NT/excluidas na base aparente
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: risco_fiscal
+  depende_validacao_externa: true
+  validar_externamente: ato concessivo, exclusoes legais
+- id: AUD_DIAGNOSTICO_CAUSA_RAIZ
+  register: C170, C190, E110, E111
+  fields:
+  - VL_BC_ICMS
+  - ALIQ_ICMS
+  - VL_ICMS
+  - CST_ICMS
+  error_type: DIVERGENCIA_DOCUMENTO_ESCRITURACAO
+  severity: warning
+  description: Divergencia entre item, consolidado e apuracao indica quebra entre documento, escrituracao e calculo interno
+  condition: C170 vs C190 vs E110 com divergencias em cascata
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: metarregra
+- id: AUD_AJUSTE_SEM_LASTRO
+  register: E111, E112, E113
+  fields:
+  - COD_AJ_APUR
+  - VL_AJ_APUR
+  - NUM_PROC
+  - CHV_DOC
+  error_type: AJUSTE_SEM_LASTRO_DOCUMENTAL
+  severity: critical
+  description: Ajuste relevante sem detalhamento complementar ou documento vinculado
+  condition: E111.VL_AJ_APUR > tolerancia AND sem E112/E113
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: risco_fiscal
+- id: AUD_CST051_TRATAMENTO_INCORRETO
+  register: C170, C190, E110
+  fields:
+  - CST_ICMS
+  - VL_ICMS
+  error_type: DIFERIMENTO_COM_DEBITO
+  severity: warning
+  description: CST 051 (diferimento) gerando debito/credito indevido
+  condition: CST 051 AND VL_ICMS > 0 no C170/C190
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: inconsistencia
+- id: AUD_ST_APURACAO_DIVERGE
+  register: C170, C190, E200, E210
+  fields:
+  - CST_ICMS
+  - VL_ICMS_ST
+  error_type: ST_APURACAO_INCONSISTENTE
+  severity: critical
+  description: ST correto no item mas apuracao ICMS-ST inconsistente
+  condition: CST ST AND soma(VL_ICMS_ST) diverge de E210
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: inconsistencia
+- id: AUD_C190_MISTURA_CST
+  register: C170, C190
+  fields:
+  - CST_ICMS
+  - CFOP
+  - ALIQ_ICMS
+  - VL_ICMS
+  error_type: C190_CONSOLIDACAO_INDEVIDA
+  severity: critical
+  description: C190 consolidando itens com combinacoes indevidas de CST/CFOP/ALIQ
+  condition: soma(C170) != C190 ou VL_ICMS/VL_BC_ICMS diverge da ALIQ declarada
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: erro_objetivo
+- id: AUD_CREDITO_SEM_SAIDA
+  register: C170, H010, 0200
+  fields:
+  - COD_ITEM
+  - CFOP
+  error_type: CREDITO_ENTRADA_SEM_SAIDA
+  severity: warning
+  description: Item creditado na entrada sem historico de saida compativel
+  condition: COD_ITEM com CFOP entrada creditada AND sem CFOP saida no periodo
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: indicio
+- id: AUD_INVENTARIO_REFLEXO_TRIBUTARIO
+  register: H005, H010, H020, 0200
+  fields:
+  - COD_ITEM
+  - QTD
+  - VL_ITEM
+  error_type: INVENTARIO_INCONSISTENTE_TRIBUTARIO
+  severity: warning
+  description: Inventario com inconsistencias que afetam creditos e beneficios
+  condition: H010 inconsistente com cadastro, valores ou contexto de beneficios
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: indicio
+- id: AUD_OPERACAO_ESPECIAL_CONTAMINACAO
+  register: C170, C190
+  fields:
+  - CFOP
+  error_type: OPERACAO_ESPECIAL_CONTAMINANDO
+  severity: warning
+  description: Remessa/retorno/conserto/demonstracao contaminando apuracao como venda
+  condition: CFOP de remessa sem retorno ou classificacao incorreta como venda
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: indicio
+- id: AUD_BENEFICIO_SEM_GOVERNANCA
+  register: E111, E112, E113
+  fields:
+  - COD_AJ_APUR
+  - VL_AJ_APUR
+  - TXT_COMPL
+  error_type: BENEFICIO_SEM_GOVERNANCA
+  severity: critical
+  description: Beneficio relevante sem documentacao de apoio ou coerencia historica
+  condition: E111 com ajuste > tolerancia AND sem E112 AND sem TXT_COMPL
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: risco_fiscal
+- id: AUD_TOTALIZACAO_BENEFICIADA
+  register: C190, E110, 0150
+  fields:
+  - VL_ICMS
+  - VL_TOT_DEBITOS
+  - UF
+  error_type: TOTALIZACAO_BENEFICIO_DIVERGENTE
+  severity: warning
+  description: Saidas beneficiadas nao refletidas coerentemente nos totais por UF/CFOP/CST
+  condition: Perfil das saidas no C190 incompativel com E110 totais
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: inconsistencia
+- id: AUD_MISTURA_INSTITUTOS
+  register: C170, C190, E111
+  fields:
+  - CST_ICMS
+  - VL_BC_ICMS
+  - COD_AJ_APUR
+  error_type: MISTURA_INSTITUTOS_TRIBUTARIOS
+  severity: critical
+  description: Mistura de credito presumido, reducao de base e isencao na mesma operacao
+  condition: CST 020 + E111 credito presumido sobre mesma base
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: risco_fiscal
+- id: AUD_PERFIL_OPERACIONAL_BENEFICIO
+  register: 0000, 0200, C170, C190, E111
+  fields:
+  - COD_VER
+  - NCM
+  - CFOP
+  - COD_AJ_APUR
+  error_type: BENEFICIO_PERFIL_INCOMPATIVEL
+  severity: warning
+  description: Beneficio sem aderencia ao perfil operacional (CNAE, NCM, tipo de operacao)
+  condition: E111 com beneficio AND operacoes incompativeis com escopo esperado
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: indicio
+- id: AUD_BENEFICIO_PARAMETRIZACAO_ERRADA
+  register: C170, C190, E111
+  fields:
+  - CST_ICMS
+  - ALIQ_ICMS
+  - COD_AJ_APUR
+  error_type: BENEFICIO_EXECUCAO_INCORRETA
+  severity: critical
+  description: Beneficio autorizado mas executado com parametrizacao incompativel no SPED
+  condition: E111 presente mas CST/ALIQ/CFOP incompativeis com modelo do regime
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: risco_fiscal
+- id: AUD_DESTINATARIO_SEGREGACAO
+  register: C170, 0150, E111
+  fields:
+  - COD_PART
+  - UF
+  - IE
+  error_type: BENEFICIO_SEM_SEGREGACAO_DESTINATARIO
+  severity: warning
+  description: Calculo do beneficio sem segregacao por tipo de destinatario
+  condition: E111 com beneficio AND mistura de contribuintes/nao contribuintes/filiais na base
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: indicio
+- id: AUD_BASE_BENEFICIO_INFLADA
+  register: C100, C170, C190, E111
+  fields:
+  - CFOP
+  - COD_SIT
+  - VL_AJ_APUR
+  error_type: BASE_BENEFICIO_INFLADA
+  severity: critical
+  description: Base do beneficio com devolucoes, remessas, cancelamentos ou operacoes excluidas
+  condition: E111 ajuste desproporcional ao volume de operacoes elegiveis liquidas
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: risco_fiscal
+- id: AUD_SPED_VS_CONTRIBUICOES
+  register: C170, C190
+  fields:
+  - CST_PIS
+  - CST_COFINS
+  - VL_PIS
+  - VL_COFINS
+  error_type: SPED_CONTRIBUICOES_DIVERGENTE
+  severity: warning
+  description: Inconsistencia entre SPED Fiscal e EFD-Contribuicoes no tratamento de receitas
+  condition: CSTs PIS/COFINS divergentes entre obrigacoes OU faturamento incompativel
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: inconsistencia
+  depende_validacao_externa: true
+  validar_externamente: EFD-Contribuicoes
+- id: AUD_FORMA_VS_SUBSTANCIA
+  register: C170, 0200
+  fields:
+  - CFOP
+  - COD_ITEM
+  - CST_ICMS
+  error_type: CREDITO_FORMA_SEM_SUBSTANCIA
+  severity: warning
+  description: Escrituracao formalmente correta mas credito incompativel com destinacao real do item
+  condition: CFOP comercializacao AND item nunca vendido AND NCM indica uso/consumo
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: indicio
+- id: AUD_E111_NUMERICO_JURIDICO
+  register: E111, E112, E113
+  fields:
+  - COD_AJ_APUR
+  - VL_AJ_APUR
+  error_type: AJUSTE_NUMERICO_SEM_VALIDADE_JURIDICA
+  severity: critical
+  description: Ajuste fecha numericamente mas usa codigo inadequado ou sem fundamento
+  condition: E111 fecha com E110 mas COD_AJ_APUR generico ou expirado
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: risco_fiscal
+- id: AUD_IPI_REFLEXO_CUSTO_BC
+  register: C170
+  fields:
+  - VL_IPI
+  - VL_BC_ICMS
+  - CST_IPI
+  error_type: IPI_REFLEXO_INCORRETO
+  severity: warning
+  description: IPI tratado incorretamente no credito, custo ou BC do ICMS
+  condition: IPI nao recuperavel nao incluido na BC ICMS ou vice-versa
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: inconsistencia
+- id: AUD_CODIGO_AJUSTE_INCOMPATIVEL
+  register: E111, E112
+  fields:
+  - COD_AJ_APUR
+  error_type: CODIGO_AJUSTE_INCOMPATIVEL
+  severity: critical
+  description: Codigo de ajuste incompativel com beneficio, natureza ou vigencia
+  condition: COD_AJ_APUR nao corresponde ao beneficio autorizado ou esta expirado
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: risco_fiscal
+- id: AUD_TRILHA_BENEFICIO_AUSENTE
+  register: C190, E110, E111, E112, E113
+  fields:
+  - VL_ICMS
+  - VL_AJ_APUR
+  - CHV_DOC
+  error_type: TRILHA_BENEFICIO_AUSENTE
+  severity: critical
+  description: Beneficio sem trilha de auditoria entre operacao, base e ajuste
+  condition: E111 com ajuste relevante AND sem vinculo documental E112/E113
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: risco_fiscal
+- id: AUD_CLASSIFICACAO_ERRO
+  register: '*'
+  fields:
+  - '*'
+  error_type: CLASSIFICACAO_TIPO_ERRO
+  severity: info
+  description: 'Meta-regra: classificar achado como erro material, parametrizacao ou tese fiscal'
+  condition: Padrao do erro indica natureza pontual, sistemica ou interpretativa
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: metarregra
+- id: AUD_ESCOPO_APENAS_SPED
+  register: C170, C190, E110, E111, 0150, 0200, H010, 9900
+  fields:
+  - '*'
+  error_type: ACHADO_LIMITADO_AO_SPED
+  severity: info
+  description: 'Meta-regra: informar que achado depende apenas do SPED.txt sem documentos externos'
+  condition: Regra sustentavel apenas por dados internos do arquivo
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: metarregra
+- id: AUD_CHECKLIST_MESTRE
+  register: 0150, 0200, C170, C190, E110, E111, H010, 9900
+  fields:
+  - '*'
+  error_type: CHECKLIST_AUDITORIA_INCOMPLETO
+  severity: critical
+  description: 'Checklist mestre: 10 pontos minimos de auditoria SPED'
+  condition: Ausencia de conferencia nos pilares minimos (cadastral, CST/CFOP, recalculo, C170xC190, E110, E111, monofasicos,
+    beneficio, inventario, integridade)
+  implemented: true
+  module: audit_rules.py
+  tipo_achado: metarregra
+aliquotas:
+- id: ALIQ_001
+  register: C170
+  fields:
+  - CFOP
+  - ALIQ_ICMS
+  error_type: ALIQ_INTERESTADUAL_INVALIDA
+  severity: critical
+  description: Operacao interestadual com aliquota fora do padrao (4/7/12)
+  condition: CFOP 6xxx AND CST tributado AND ALIQ not in {4,7,12}
+  implemented: true
+  module: aliquota_validator.py
+  legislation: Resolucao Senado 22/1989, RS 13/2012
+- id: ALIQ_002
+  register: C170
+  fields:
+  - CFOP
+  - ALIQ_ICMS
+  error_type: ALIQ_INTERNA_EM_INTERESTADUAL
+  severity: critical
+  description: Aliquota interna usada em operacao interestadual (>= 17%)
+  condition: CFOP 6xxx AND ALIQ >= 17
+  implemented: true
+  module: aliquota_validator.py
+- id: ALIQ_003
+  register: C170
+  fields:
+  - CFOP
+  - ALIQ_ICMS
+  - UF
+  error_type: ALIQ_INTERESTADUAL_EM_INTERNA
+  severity: warning
+  description: Aliquota interestadual usada em operacao interna
+  condition: CFOP 5xxx AND ALIQ in {4,7,12} AND mesma UF
+  implemented: true
+  module: aliquota_validator.py
+- id: ALIQ_007
+  register: C190
+  fields:
+  - ALIQ_ICMS
+  - CST_ICMS
+  - CFOP
+  error_type: ALIQ_MEDIA_INDEVIDA
+  severity: critical
+  description: Aliquota media indevida no C190 nao suportada pelos itens
+  condition: C190.ALIQ intermediaria entre min e max dos C170 do documento
+  implemented: true
+  module: aliquota_validator.py
+c190_consolidacao:
+- id: C190_001
+  register: C190
+  fields:
+  - VL_OPR
+  - VL_BC_ICMS
+  - VL_ICMS
+  error_type: C190_DIVERGE_C170
+  severity: critical
+  description: C190 nao fecha com soma dos C170 por CST+CFOP+ALIQ
+  condition: sum(C170 por CST+CFOP+ALIQ) != C190
+  implemented: true
+  module: c190_validator.py
+- id: C190_002
+  register: C190
+  fields:
+  - CST_ICMS
+  - CFOP
+  - ALIQ_ICMS
+  error_type: C190_COMBINACAO_INCOMPATIVEL
+  severity: warning
+  description: Combinacao incompativel de CST+CFOP+ALIQ no C190
+  condition: CST isento com ALIQ>0, CST tributado com ALIQ=0, CFOP inter com ALIQ interna
+  implemented: true
+  module: c190_validator.py
+cst_expandido:
+- id: CST_003
+  register: C170
+  fields:
+  - CST_ICMS
+  - VL_BC_ICMS
+  - VL_ITEM
+  error_type: CST_020_SEM_REDUCAO
+  severity: warning
+  description: CST 020 sem reducao real de base de calculo
+  condition: CST 020 AND VL_BC_ICMS >= 95% de VL_ITEM
+  implemented: true
+  module: cst_validator.py
+- id: IPI_003
+  register: C170
+  fields:
+  - CST_IPI
+  - VL_BC_IPI
+  - ALIQ_IPI
+  - VL_IPI
+  error_type: IPI_CST_INCOMPATIVEL
+  severity: error
+  description: CST IPI incompativel com campos monetarios
+  condition: CST tributado com tudo zero OU CST isento com valores > 0
+  implemented: true
+  module: cst_validator.py

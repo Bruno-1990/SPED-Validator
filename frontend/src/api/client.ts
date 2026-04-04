@@ -1,4 +1,4 @@
-import type { ErrorSummary, FileInfo, PipelineEvent, RecordInfo, ValidationError, ValidationResponse } from '../types/sped'
+import type { ErrorSummary, FileInfo, GeneratedRule, PipelineEvent, RecordInfo, RuleSummary, StructuredReport, ValidationError, ValidationResponse } from '../types/sped'
 
 const BASE = '/api'
 
@@ -22,6 +22,7 @@ export const api = {
   getFile: (id: number) => request<FileInfo>(`/files/${id}`),
   deleteFile: (id: number) => request<{ deleted: boolean }>(`/files/${id}`, { method: 'DELETE' }),
   clearAudit: (id: number) => request<{ cleared: boolean; removed: number }>(`/files/${id}/audit`, { method: 'DELETE' }),
+  clearAllAudit: () => request<{ cleared: boolean; removed: number }>('/files/audit', { method: 'DELETE' }),
 
   // Validation
   validate: (fileId: number) => request<ValidationResponse>(`/files/${fileId}/validate`, { method: 'POST' }),
@@ -76,7 +77,21 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  // Rules
+  listRules: () => request<RuleSummary[]>('/rules'),
+  generateRule: (description: string) => request<GeneratedRule>('/rules/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description }),
+  }),
+  implementRule: (rule: GeneratedRule) => request<{ added: boolean; rule_id: string }>('/rules/implement', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rule }),
+  }),
+
   // Report
+  getStructuredReport: (fileId: number) => request<StructuredReport>(`/files/${fileId}/report/structured`),
   getReport: async (fileId: number, format: string = 'md'): Promise<string> => {
     const res = await fetch(`${BASE}/files/${fileId}/report?format=${format}`)
     return res.text()

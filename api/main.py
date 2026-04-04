@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+import warnings
+
+# Pydantic emite UserWarning quando um campo se chama "register", pois
+# ABCMeta.register existe em BaseModel. O campo é intencional (registro SPED).
+warnings.filterwarnings(
+    "ignore",
+    message='Field name "register".*shadows an attribute',
+    category=UserWarning,
+)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import files, records, report, search, validation
+from api.routers import files, records, report, rules, search, validation
 
 app = FastAPI(
     title="SPED EFD Audit API",
@@ -28,6 +38,7 @@ app.include_router(records.router)
 app.include_router(validation.router)
 app.include_router(report.router)
 app.include_router(search.router)
+app.include_router(rules.router)
 
 
 @app.get("/api/health")

@@ -332,6 +332,214 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
         ),
         "icon": "info",
     },
+    # ── Regras de auditoria (audit_rules.py) ──
+    "CFOP_INTERESTADUAL_DESTINO_INTERNO": {
+        "friendly": (
+            "CFOP interestadual com destinatário da mesma UF no "
+            "registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "CFOP da série 6xxx indica operação interestadual, mas o "
+            "participante é da mesma UF do declarante. Verifique se o "
+            "CFOP deveria ser da série 5xxx (interna)."
+        ),
+        "icon": "alert-octagon",
+    },
+    "DIFERIMENTO_COM_DEBITO": {
+        "friendly": (
+            "CST de diferimento gerando débito de ICMS no "
+            "registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "No diferimento (CST 051), o ICMS é adiado e não deve gerar "
+            "débito no período corrente, salvo diferimento parcial."
+        ),
+        "icon": "alert-triangle",
+    },
+    "IPI_REFLEXO_INCORRETO": {
+        "friendly": (
+            "IPI não recuperável parece não estar incluído na base do "
+            "ICMS no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Para contribuintes que não recuperam IPI (CST IPI 02-05), "
+            "o valor do IPI deve integrar a base de cálculo do ICMS."
+        ),
+        "icon": "calculator",
+    },
+    "BENEFICIO_CARGA_REDUZIDA_DOCUMENTO": {
+        "friendly": (
+            "Operação interestadual com alíquota que não corresponde às "
+            "alíquotas padrão (4%/7%/12%) no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Benefícios por crédito presumido devem ser tratados na "
+            "apuração (E111), não como redução direta no documento. "
+            "O destaque na NF-e deve ser integral."
+        ),
+        "icon": "shield-alert",
+    },
+    "VOLUME_ISENTO_ATIPICO": {
+        "friendly": (
+            "Percentual de operações isentas/NT acima de 50% do total."
+        ),
+        "guidance": (
+            "Um volume elevado de operações com CST isento, não tributado "
+            "ou suspenso é atípico para a maioria dos contribuintes. "
+            "Revise se as classificações estão corretas."
+        ),
+        "icon": "alert-triangle",
+    },
+    "REMESSA_SEM_RETORNO": {
+        "friendly": (
+            "Remessa sem retorno correspondente no período no "
+            "registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Operações de remessa devem ter retorno dentro do prazo "
+            "legal. Remessa sem retorno pode indicar venda disfarçada."
+        ),
+        "icon": "arrows-cross",
+    },
+    "INVENTARIO_ITEM_PARADO": {
+        "friendly": (
+            "Item no inventário sem movimentação no período."
+        ),
+        "guidance": (
+            "Itens no H010 sem nenhum C170 no período podem indicar "
+            "estoque obsoleto ou erro de inventário."
+        ),
+        "icon": "info",
+    },
+    "PARAMETRIZACAO_SISTEMICA_INCORRETA": {
+        "friendly": (
+            "Padrão repetitivo de CST incompatível com CFOP detectado "
+            "no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "O mesmo item apresenta CST incompatível com o CFOP na "
+            "maioria das ocorrências, indicando erro sistêmico no "
+            "cadastro fiscal do ERP."
+        ),
+        "icon": "alert-octagon",
+    },
+    "CREDITO_USO_CONSUMO_INDEVIDO": {
+        "friendly": (
+            "Item com entrada para comercialização mas sem saída e sem "
+            "estoque no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "O item foi creditado como compra para revenda mas nunca "
+            "aparece em saídas nem no inventário. Pode ser material "
+            "de uso/consumo com crédito indevido de ICMS."
+        ),
+        "icon": "shield-x",
+    },
+    "REGISTROS_ESSENCIAIS_AUSENTES": {
+        "friendly": (
+            "O arquivo SPED não contém registros essenciais para auditoria."
+        ),
+        "guidance": (
+            "Registros como 0150, 0200, C100, C170, C190, E110 e H010 "
+            "são necessários para uma auditoria fiscal completa."
+        ),
+        "icon": "info",
+    },
+    # ── Fase 1 — Alíquotas ──
+    "ALIQ_INTERESTADUAL_INVALIDA": {
+        "friendly": (
+            "Operação interestadual com alíquota fora do padrão esperado "
+            "(4%/7%/12%) no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Revise UF de origem, UF de destino, origem da mercadoria "
+            "e regra de tributação. Resolução Senado 22/1989 e 13/2012."
+        ),
+        "icon": "alert-octagon",
+    },
+    "ALIQ_INTERNA_EM_INTERESTADUAL": {
+        "friendly": (
+            "Alíquota interna usada em operação interestadual "
+            "no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Operações interestaduais usam 4%, 7% ou 12%. Alíquota >= 17% "
+            "é típica de operação interna. Confirme UF do destinatário "
+            "e parametrização do ERP."
+        ),
+        "icon": "alert-octagon",
+    },
+    "ALIQ_INTERESTADUAL_EM_INTERNA": {
+        "friendly": (
+            "Alíquota interestadual usada em operação interna "
+            "no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Operações internas não devem usar alíquotas interestaduais "
+            "(4%/7%/12%). Revise cadastro do cliente e UF do participante."
+        ),
+        "icon": "alert-triangle",
+    },
+    "ALIQ_MEDIA_INDEVIDA": {
+        "friendly": (
+            "C190 com alíquota intermediária não suportada pelos itens "
+            "no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Cada item deve ser tratado com sua própria alíquota. "
+            "O C190 não deve conter alíquota média. Reprocesse o "
+            "agrupamento item a item."
+        ),
+        "icon": "calculator",
+    },
+    # ── Fase 1 — C190 ──
+    "C190_DIVERGE_C170": {
+        "friendly": (
+            "C190 não fecha com a soma dos itens C170 "
+            "no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "O C190 deve refletir exatamente os agrupamentos dos C170 "
+            "por CST+CFOP+ALIQ. Reprocesse o analítico da nota."
+        ),
+        "icon": "sigma",
+    },
+    "C190_COMBINACAO_INCOMPATIVEL": {
+        "friendly": (
+            "Combinação atípica de CST/CFOP/ALIQ no C190 "
+            "no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Verifique se o CST é coerente com a alíquota e o CFOP. "
+            "CST isento não deveria ter alíquota; CST tributado deveria "
+            "ter alíquota positiva."
+        ),
+        "icon": "alert-triangle",
+    },
+    # ── Fase 1 — CST/IPI expandidos ──
+    "CST_020_SEM_REDUCAO": {
+        "friendly": (
+            "CST 020 informado sem redução real de base "
+            "no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "CST 020 indica redução de base de cálculo. Se a base é "
+            "praticamente integral, verifique se deveria ser CST 00 "
+            "ou se a redução não foi aplicada corretamente."
+        ),
+        "icon": "alert-triangle",
+    },
+    "IPI_CST_INCOMPATIVEL": {
+        "friendly": (
+            "CST IPI incompatível com campos monetários "
+            "no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "CST de IPI tributado deve ter base/valor; CST isento/NT "
+            "deve ter base/valor zerados. Revise a tributação do IPI."
+        ),
+        "icon": "shield-alert",
+    },
 }
 
 # Mensagem padrão para tipos não mapeados

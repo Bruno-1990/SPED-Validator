@@ -8,10 +8,15 @@ from dataclasses import dataclass, field
 
 from ..models import SpedRecord, ValidationError
 from ..validator import load_field_definitions, validate_records
+from ..validators.aliquota_validator import validate_aliquotas
+from ..validators.audit_rules import validate_audit_rules
+from ..validators.beneficio_audit_validator import validate_beneficio_audit
+from ..validators.c190_validator import validate_c190
 from ..validators.cross_block_validator import validate_cross_blocks
 from ..validators.cst_validator import validate_cst_and_exemptions
 from ..validators.fiscal_semantics import validate_fiscal_semantics
 from ..validators.intra_register_validator import validate_intra_register
+from ..validators.pendentes_validator import validate_pendentes
 from ..validators.tax_recalc import recalculate_taxes
 from .error_messages import format_friendly_message, get_guidance
 from .validation_service import _load_records, _severity_for
@@ -131,6 +136,20 @@ def run_pipeline(
 
         progress.detail = "Analise semantica: CST x CFOP, aliquota zero, monofasicos"
         cross_errors.extend(validate_fiscal_semantics(records))
+        progress.stage_progress = 85
+
+        progress.detail = "Auditoria fiscal: CFOP x UF, parametrizacao, remessas, inventario"
+        cross_errors.extend(validate_audit_rules(records))
+        progress.stage_progress = 90
+
+        progress.detail = "Validando aliquotas e consolidacao C190"
+        cross_errors.extend(validate_aliquotas(records))
+        cross_errors.extend(validate_c190(records))
+        progress.stage_progress = 93
+
+        progress.detail = "Auditoria de beneficios fiscais e regras pendentes"
+        cross_errors.extend(validate_beneficio_audit(records))
+        cross_errors.extend(validate_pendentes(records))
         progress.stage_progress = 100
 
         _persist_stage_errors(db, file_id, cross_errors)

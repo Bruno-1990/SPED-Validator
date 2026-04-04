@@ -3,6 +3,15 @@
 from __future__ import annotations
 
 import sqlite3
+import warnings
+
+# Pydantic emite UserWarning quando um campo se chama "register"
+# (ABCMeta.register). O campo é intencional — é o registro SPED.
+warnings.filterwarnings(
+    "ignore",
+    message='Field name "register".*shadows an attribute',
+    category=UserWarning,
+)
 from pathlib import Path
 
 import pytest

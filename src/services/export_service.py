@@ -8,6 +8,119 @@ import json
 import sqlite3
 
 
+def export_report_structured(db: sqlite3.Connection, file_id: int) -> dict:
+    """Gera relatório estruturado para renderização no frontend."""
+    file_info = db.execute("SELECT * FROM sped_files WHERE id = ?", (file_id,)).fetchone()
+    if not file_info:
+        return {"error": "Arquivo não encontrado"}
+
+    # Metadata
+    metadata = {
+        "filename": file_info[1],
+        "cnpj": file_info[7] or None,
+        "uf": file_info[8] or None,
+        "period_start": file_info[3] or None,
+        "period_end": file_info[4] or None,
+        "company_name": file_info[5] or None,
+    }
+
+    total_records = file_info[9] or 0
+    total_all_errors = file_info[10] or 0
+    auto_corrected = file_info[12] or 0
+
+    # Counts by severity
+    sev_rows = db.execute(
+        """SELECT severity, COUNT(*) FROM validation_errors
+           WHERE file_id = ? AND status = 'open'
+           GROUP BY severity""",
+        (file_id,),
+    ).fetchall()
+    sev_counts = {r[0]: r[1] for r in sev_rows}
+
+    total_errors = sev_counts.get("critical", 0) + sev_counts.get("error", 0)
+    total_warnings = sev_counts.get("warning", 0) + sev_counts.get("info", 0)
+    compliance_pct = round(
+        ((total_records - total_all_errors) / total_records * 100) if total_records > 0 else 100.0,
+        1,
+    )
+
+    summary = {
+        "total_records": total_records,
+        "total_errors": total_errors,
+        "total_warnings": total_warnings,
+        "compliance_pct": compliance_pct,
+        "auto_corrected": auto_corrected,
+    }
+
+    # Top findings
+    findings_rows = db.execute(
+        """SELECT error_type, severity, COUNT(*) as cnt,
+                  MIN(friendly_message) as sample_msg
+           FROM validation_errors
+           WHERE file_id = ? AND status = 'open'
+           GROUP BY error_type, severity
+           ORDER BY cnt DESC LIMIT 10""",
+        (file_id,),
+    ).fetchall()
+
+    top_findings = []
+    for r in findings_rows:
+        desc = r[3] or r[0]  # friendly_message or error_type
+        # Truncar para uma linha
+        if desc and len(desc) > 120:
+            desc = desc[:117] + "..."
+        top_findings.append({
+            "error_type": r[0],
+            "severity": r[1],
+            "count": r[2],
+            "description": desc,
+        })
+
+    # Corrections
+    corr_rows = db.execute(
+        """SELECT c.record_id, r.register, c.field_name, c.old_value, c.new_value,
+                  c.applied_by, c.applied_at
+           FROM corrections c
+           LEFT JOIN sped_records r ON r.id = c.record_id
+           WHERE c.file_id = ?
+           ORDER BY c.applied_at""",
+        (file_id,),
+    ).fetchall()
+
+    corrections = []
+    for c in corr_rows:
+        corrections.append({
+            "register": c[1] or "-",
+            "field_name": c[2] or "-",
+            "old_value": c[3] or "",
+            "new_value": c[4] or "",
+            "applied_by": c[5] or "auto",
+            "applied_at": c[6] or "",
+        })
+
+    # Conclusion
+    parts = [f"Foram analisados {total_records:,} registros."]
+    if total_errors > 0:
+        parts.append(f"Identificados {total_errors} erros que necessitam correção.")
+    if total_warnings > 0:
+        parts.append(f"{total_warnings} alertas para revisão.")
+    if auto_corrected > 0:
+        parts.append(f"{auto_corrected} correções foram aplicadas automaticamente.")
+    if total_errors == 0 and total_warnings == 0:
+        parts.append("Nenhuma irregularidade identificada.")
+    parts.append(f"Conformidade geral: {compliance_pct}%.")
+
+    conclusion = " ".join(parts)
+
+    return {
+        "metadata": metadata,
+        "summary": summary,
+        "top_findings": top_findings,
+        "corrections": corrections,
+        "conclusion": conclusion,
+    }
+
+
 def export_corrected_sped(db: sqlite3.Connection, file_id: int) -> str:
     """Gera arquivo SPED corrigido (pipe-delimited) a partir dos registros no banco."""
     rows = db.execute(

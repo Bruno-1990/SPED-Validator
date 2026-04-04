@@ -6,10 +6,15 @@ import sqlite3
 
 from ..models import SpedRecord, ValidationError
 from ..validator import load_field_definitions, validate_records
+from ..validators.aliquota_validator import validate_aliquotas
+from ..validators.audit_rules import validate_audit_rules
+from ..validators.beneficio_audit_validator import validate_beneficio_audit
+from ..validators.c190_validator import validate_c190
 from ..validators.cross_block_validator import validate_cross_blocks
 from ..validators.cst_validator import validate_cst_and_exemptions
 from ..validators.fiscal_semantics import validate_fiscal_semantics
 from ..validators.intra_register_validator import validate_intra_register
+from ..validators.pendentes_validator import validate_pendentes
 from ..validators.tax_recalc import recalculate_taxes
 
 
@@ -55,6 +60,21 @@ def run_full_validation(
 
     # 7. Validação semântica fiscal (CST x alíquota zero, CST x CFOP)
     all_errors.extend(validate_fiscal_semantics(records))
+
+    # 8. Regras de auditoria fiscal (cruzamentos avançados)
+    all_errors.extend(validate_audit_rules(records))
+
+    # 9. Validação de alíquotas
+    all_errors.extend(validate_aliquotas(records))
+
+    # 10. Consolidação C190
+    all_errors.extend(validate_c190(records))
+
+    # 11. Auditoria de benefícios fiscais
+    all_errors.extend(validate_beneficio_audit(records))
+
+    # 12. Regras pendentes
+    all_errors.extend(validate_pendentes(records))
 
     # Persistir erros
     _persist_errors(db, file_id, all_errors)
@@ -160,17 +180,75 @@ def _severity_for(error_type: str) -> str:
     critical = {
         "CALCULO_DIVERGENTE", "CRUZAMENTO_DIVERGENTE",
         "SOMA_DIVERGENTE", "CONTAGEM_DIVERGENTE",
+        "CFOP_INTERESTADUAL_DESTINO_INTERNO",
+        "PARAMETRIZACAO_SISTEMICA_INCORRETA",
+        "BENEFICIO_CARGA_REDUZIDA_DOCUMENTO",
+        # Fase 1 — alíquotas e C190
+        "ALIQ_INTERESTADUAL_INVALIDA",
+        "ALIQ_INTERNA_EM_INTERESTADUAL",
+        "ALIQ_MEDIA_INDEVIDA",
+        "C190_DIVERGE_C170",
+        # Auditoria benefícios — critical
+        "BENEFICIO_DEBITO_NAO_INTEGRAL",
+        "AJUSTE_SEM_LASTRO_DOCUMENTAL",
+        "AJUSTE_SOMA_DIVERGENTE",
+        "DEVOLUCAO_BENEFICIO_NAO_REVERTIDO",
+        "SOBREPOSICAO_BENEFICIOS",
+        "BENEFICIO_VALOR_DESPROPORCIONAL",
+        "ST_APURACAO_INCONSISTENTE",
+        "ESCRITURACAO_DIVERGE_DOCUMENTO",
+        "TRILHA_BENEFICIO_INCOMPLETA",
+        "ICMS_EFETIVO_SEM_TRILHA",
+        "BENEFICIO_FORA_ESCOPO",
+        "MISTURA_INSTITUTOS_TRIBUTARIOS",
+        "BENEFICIO_EXECUCAO_INCORRETA",
+        "BASE_BENEFICIO_INFLADA",
+        "AJUSTE_NUMERICO_SEM_VALIDADE_JURIDICA",
+        "CODIGO_AJUSTE_INCOMPATIVEL",
+        "TRILHA_BENEFICIO_AUSENTE",
+        "BENEFICIO_SEM_GOVERNANCA",
+        "C190_CONSOLIDACAO_INDEVIDA",
+        # Pendentes — error
+        "DESONERACAO_SEM_MOTIVO",
     }
     warning = {
         "DATE_OUT_OF_PERIOD", "DATE_ORDER", "MISSING_CONDITIONAL",
         "REF_INEXISTENTE",
         "CST_ALIQ_ZERO_FORTE", "CST_CFOP_INCOMPATIVEL",
         "MONOFASICO_NCM_INCOMPATIVEL", "MONOFASICO_CST_INCORRETO",
+        "DIFERIMENTO_COM_DEBITO", "VOLUME_ISENTO_ATIPICO",
+        "REMESSA_SEM_RETORNO", "CREDITO_USO_CONSUMO_INDEVIDO",
+        "IPI_REFLEXO_INCORRETO",
+        # Fase 1 — alíquotas, CST e C190
+        "ALIQ_INTERESTADUAL_EM_INTERNA",
+        "C190_COMBINACAO_INCOMPATIVEL",
+        "CST_020_SEM_REDUCAO",
+        # Auditoria benefícios — warning
+        "SALDO_CREDOR_RECORRENTE",
+        "AJUSTE_CODIGO_GENERICO",
+        "DIVERGENCIA_DOCUMENTO_ESCRITURACAO",
+        "CREDITO_ENTRADA_SEM_SAIDA",
+        "INVENTARIO_INCONSISTENTE_TRIBUTARIO",
+        "TOTALIZACAO_BENEFICIO_DIVERGENTE",
+        "BENEFICIO_PERFIL_INCOMPATIVEL",
+        "BENEFICIO_SEM_SEGREGACAO_DESTINATARIO",
+        "SPED_CONTRIBUICOES_DIVERGENTE",
+        # Pendentes — warning
+        "BENEFICIO_NAO_VINCULADO",
+        "DEVOLUCAO_INCONSISTENTE",
+        "IPI_ALIQ_NCM_DIVERGENTE",
     }
     info = {
         "CST_ALIQ_ZERO_MODERADO", "CST_ALIQ_ZERO_INFO",
         "IPI_CST_ALIQ_ZERO", "PIS_CST_ALIQ_ZERO", "COFINS_CST_ALIQ_ZERO",
         "MONOFASICO_ENTRADA_CST04",
+        "INVENTARIO_ITEM_PARADO", "REGISTROS_ESSENCIAIS_AUSENTES",
+        # Auditoria benefícios — info
+        "CHECKLIST_INCOMPLETO",
+        "CLASSIFICACAO_TIPO_ERRO",
+        "ACHADO_LIMITADO_AO_SPED",
+        # Pendentes — info
+        "ANOMALIA_HISTORICA",
     }
     # MONOFASICO_ALIQ_INVALIDA e MONOFASICO_VALOR_INDEVIDO caem no default "error"
     if error_type in critical:

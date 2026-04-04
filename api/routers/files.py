@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
 from api.deps import get_db
 from api.schemas.models import FileInfo, FileUploadResponse
-from src.services.file_service import clear_audit, delete_file, get_file, list_files, upload_file
+from src.services.file_service import clear_all_audit, clear_audit, delete_file, get_file, list_files, upload_file
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
@@ -43,6 +43,13 @@ def list_all(db: sqlite3.Connection = Depends(get_db)) -> list[FileInfo]:
     """Lista todos os arquivos processados."""
     files = list_files(db)
     return [FileInfo(**f) for f in files]
+
+
+@router.delete("/audit")
+def clear_all_audits(db: sqlite3.Connection = Depends(get_db)) -> dict:
+    """Limpa todos os dados de validação/audit de TODOS os arquivos."""
+    removed = clear_all_audit(db)
+    return {"cleared": True, "removed": removed}
 
 
 @router.get("/{file_id}", response_model=FileInfo)

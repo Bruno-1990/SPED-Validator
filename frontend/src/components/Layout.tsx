@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation } from 'react-router-dom'
 const navItems = [
   { path: '/', label: 'Upload', icon: '📤' },
   { path: '/files', label: 'Arquivos', icon: '📁' },
+  { path: '/rules', label: 'Regras', icon: '📋' },
 ]
 
 export default function Layout() {
