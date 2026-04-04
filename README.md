@@ -1,6 +1,6 @@
 # SPED EFD - Sistema de Conversao, Validacao e Busca na Documentacao
 
-Sistema local para converter documentacao fiscal brasileira (PDFs, DOCX, TXT) em texto estruturado, indexar em banco de dados com busca hibrida (exata + semantica), e validar arquivos SPED EFD detectando erros com sugestoes automaticas de correcao baseadas na documentacao oficial.
+Sistema local com API REST + Frontend React para converter documentacao fiscal brasileira (PDFs, DOCX, TXT) em texto estruturado, indexar em banco de dados com busca hibrida (exata + semantica), e validar arquivos SPED EFD detectando erros com sugestoes automaticas de correcao baseadas na documentacao oficial (Guia Pratico EFD v3.2.2).
 
 ---
 
@@ -12,8 +12,42 @@ Este sistema resolve isso automatizando:
 
 1. **Conversao** de PDFs/DOCX/TXT da documentacao oficial para Markdown estruturado
 2. **Indexacao** com Full-Text Search (FTS5) + embeddings vetoriais para busca semantica
-3. **Validacao** campo a campo dos arquivos SPED contra as definicoes extraidas da documentacao
+3. **Validacao** em 5 camadas dos arquivos SPED contra as definicoes extraidas da documentacao
 4. **Busca automatica** da documentacao relevante para cada erro encontrado
+5. **API REST** (FastAPI) com endpoints para upload, validacao, correcao e exportacao
+6. **Frontend React** com interface para upload, visualizacao de erros e relatorios
+
+---
+
+## Como Executar
+
+### Opcao 1: start.bat (Windows - recomendado)
+
+Duplo clique em `start.bat` — inicia API + Frontend automaticamente.
+
+### Opcao 2: Manual (PowerShell)
+
+**Terminal 1 (API):**
+```powershell
+cd "C:\Users\bmb19\OneDrive\Documentos\work\SPED"
+.\.venv-win\Scripts\Activate.ps1
+$env:PYTHONPATH = (Get-Location).Path
+python -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+**Terminal 2 (Frontend):**
+```powershell
+cd "C:\Users\bmb19\OneDrive\Documentos\work\SPED\frontend"
+npm run dev
+```
+
+**Acessar:**
+- App: http://localhost:3000
+- API Docs: http://localhost:8000/docs
+
+### Git Push
+
+Execute `git-push.bat` no Windows — pede a mensagem do commit, faz rebase na main e push.
 
 ---
 
@@ -98,6 +132,10 @@ SPED/
 |-- README.md                       # Este arquivo
 |-- pyproject.toml                  # Dependencias e metadados (v0.1.0)
 |-- config.py                       # Caminhos, modelo embedding, parametros
+|-- start.bat                       # Inicia API + Frontend (Windows)
+|-- start-api.bat                   # Inicia apenas a API (porta 8000)
+|-- start-frontend.bat              # Inicia apenas o Frontend (porta 3000)
+|-- git-push.bat                    # Commit + rebase + push automatizado
 |-- cli.py                          # Interface de linha de comando (argparse)
 |
 |-- src/
@@ -137,12 +175,27 @@ SPED/
 |   |   |-- report.py                   # Relatorio MD/CSV/JSON, download SPED
 |   |   |-- search.py                   # Busca na documentacao
 |
+|-- frontend/
+|   |-- package.json                    # React 18 + Vite + TailwindCSS + TypeScript
+|   |-- src/
+|   |   |-- main.tsx                    # Ponto de entrada React
+|   |   |-- api/
+|   |   |   |-- client.ts              # Cliente HTTP para a API
+|   |   |-- components/
+|   |   |   |-- Layout.tsx             # Layout principal da aplicacao
+|   |   |-- pages/
+|   |   |   |-- UploadPage.tsx         # Upload de arquivos SPED
+|   |   |   |-- FilesPage.tsx          # Listagem de arquivos processados
+|   |   |   |-- FileDetailPage.tsx     # Detalhe: erros, resumo, relatorio
+|   |   |-- types/                     # Tipos TypeScript
+|
 |-- db/
 |   |-- sped.db                     # Banco SQLite (126 MB, criado em runtime)
+|   |-- audit.db                    # Banco de auditoria (arquivos, erros, correcoes)
 |
 |-- data/
 |   |-- markdown/
-|   |   |-- guia/                   # 4 arquivos convertidos do Guia Pratico
+|   |   |-- guia/                   # Guia Pratico EFD v3.2.2 + cabecalhos + exemplos
 |   |   |-- legislacao/             # 78 arquivos convertidos da legislacao
 |   |-- sped_files/                 # Arquivos SPED EFD para validar
 |
@@ -162,12 +215,7 @@ SPED/
 |   |   |-- sped_errors.txt         # SPED com erros conhecidos (tipo, valor, malformed)
 ```
 
-**Fonte dos documentos originais:**
-```
-C:\Users\bmb19\OneDrive\Area de Trabalho\SPED2.0\
-|-- guia pratico\                   # Guia Pratico EFD v3.2.2, cabecalhos, descricoes
-|-- legislaacao\                    # ~90 arquivos (AJUSTE SINIEF, CONVENIO ICMS, etc.)
-```
+**Repositorio remoto:** https://github.com/Bruno-1990/SPED-Validator.git
 
 ---
 
@@ -318,7 +366,46 @@ Query: "indicador emitente C100"
 
 **Otimizacao:** Quando o registro e conhecido (ex: C100), a busca vetorial filtra apenas chunks daquele registro (~50-200 vetores em vez de 53.784), levando microsegundos.
 
-### 7. Validador (`src/validator.py`)
+### 7. API REST (`api/`)
+
+FastAPI com 5 routers e banco SQLite de auditoria.
+
+**Endpoints:**
+
+| Router | Endpoints | Funcao |
+|--------|-----------|--------|
+| `files.py` | `POST /api/files/upload`, `GET /api/files`, `GET /api/files/{id}`, `DELETE /api/files/{id}` | Upload, listagem, detalhe e exclusao de arquivos SPED |
+| `validation.py` | `POST /api/files/{id}/validate`, `GET /api/files/{id}/errors`, `GET /api/files/{id}/summary` | Validacao completa, listagem de erros, resumo por tipo |
+| `records.py` | `GET /api/files/{id}/records`, `PATCH /api/records/{id}` | Listagem de registros, correcao de campos |
+| `report.py` | `GET /api/files/{id}/report` | Relatorio em MD/CSV/JSON, download do SPED corrigido |
+| `search.py` | `GET /api/search` | Busca na documentacao oficial |
+
+**Banco de auditoria (`db/audit.db`):**
+
+| Tabela | Funcao |
+|--------|--------|
+| `sped_files` | Metadados dos arquivos (hash, periodo, empresa, CNPJ, status) |
+| `sped_records` | Registros parseados (line_number, register, fields_json) |
+| `validation_errors` | Erros encontrados (tipo, severidade, mensagem, sugestao) |
+| `cross_validations` | Cruzamentos entre blocos (expected vs actual, diferenca) |
+| `corrections` | Historico de correcoes aplicadas (old/new value, audit trail) |
+| `audit_log` | Log de acoes (upload, validacao, correcao) |
+
+**Configuracao:** SQLite com `check_same_thread=False` para compatibilidade com FastAPI (endpoints rodam em threads diferentes).
+
+### 8. Frontend React (`frontend/`)
+
+Interface web em React 18 + TypeScript + TailwindCSS + Vite.
+
+| Pagina | Funcao |
+|--------|--------|
+| `UploadPage` | Upload de arquivos SPED via drag-and-drop |
+| `FilesPage` | Listagem de arquivos processados com status |
+| `FileDetailPage` | Detalhe do arquivo: erros por tipo, resumo, relatorio |
+
+**Stack:** React 18, React Router 6, Vite 5, TailwindCSS 3, TypeScript 5.
+
+### 10. Validador (`src/validator.py`)
 
 Valida cada campo de cada registro SPED contra as definicoes extraidas da documentacao.
 
@@ -342,11 +429,11 @@ Valida cada campo de cada registro SPED contra as definicoes extraidas da docume
 - Agrupado por tipo de erro
 - Inclui valor encontrado, mensagem de erro, e trecho da documentacao relevante
 
-### 8. Configuracao (`config.py`)
+### 11. Configuracao (`config.py`)
 
 ```python
 # Fonte dos documentos
-DOCS_ROOT = "C:\Users\bmb19\OneDrive\Area de Trabalho\SPED2.0"
+DOCS_ROOT = "C:\Users\bmb19\OneDrive\Documentos\work\SPED"
 GUIA_DIR = DOCS_ROOT / "guia pratico"
 LEGISLACAO_DIR = DOCS_ROOT / "legislaacao"
 
@@ -368,7 +455,9 @@ RRF_K = 60                               # parametro do Reciprocal Rank Fusion
 
 ---
 
-## Schema do Banco de Dados
+## Schema dos Bancos de Dados
+
+### Banco de Documentacao (`db/sped.db`)
 
 ```sql
 -- Chunks de documentacao (texto + embedding)
@@ -416,6 +505,55 @@ CREATE TABLE indexed_files (
 -- Triggers para manter FTS sincronizado automaticamente
 CREATE TRIGGER chunks_ai AFTER INSERT ON chunks ...
 CREATE TRIGGER chunks_ad AFTER DELETE ON chunks ...
+```
+
+---
+
+### Banco de Auditoria (`db/audit.db`)
+
+```sql
+-- Arquivos SPED processados
+CREATE TABLE sped_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename TEXT NOT NULL,
+    hash_sha256 TEXT NOT NULL,
+    upload_date TEXT DEFAULT (datetime('now')),
+    period_start TEXT, period_end TEXT,
+    company_name TEXT, cnpj TEXT, uf TEXT,
+    total_records INTEGER DEFAULT 0,
+    total_errors INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'uploaded'
+);
+
+-- Registros parseados
+CREATE TABLE sped_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id INTEGER NOT NULL,
+    line_number INTEGER, register TEXT, block TEXT,
+    fields_json TEXT NOT NULL, raw_line TEXT NOT NULL,
+    FOREIGN KEY (file_id) REFERENCES sped_files(id)
+);
+
+-- Erros de validacao
+CREATE TABLE validation_errors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id INTEGER NOT NULL,
+    line_number INTEGER, register TEXT,
+    field_no INTEGER, field_name TEXT, value TEXT,
+    error_type TEXT NOT NULL, severity TEXT DEFAULT 'error',
+    message TEXT NOT NULL, doc_suggestion TEXT,
+    FOREIGN KEY (file_id) REFERENCES sped_files(id)
+);
+
+-- Correcoes aplicadas (audit trail)
+CREATE TABLE corrections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id INTEGER, record_id INTEGER,
+    field_no INTEGER, field_name TEXT,
+    old_value TEXT, new_value TEXT,
+    applied_by TEXT DEFAULT 'user',
+    applied_at TEXT DEFAULT (datetime('now'))
+);
 ```
 
 ---
@@ -579,31 +717,50 @@ Bloco K: K001, K200, K210, K215, K220, K230, K235, K250-K292
 
 **Requisitos:**
 - Python >= 3.10
-- Windows (arquivos acessados via WSL em `/mnt/c/`)
+- Node.js >= 18
+- Windows 10/11 (desenvolvimento via WSL2 ou PowerShell)
 
-**Dependencias principais:**
+**Dependencias Backend:**
 
 | Biblioteca | Versao | Uso |
 |-----------|--------|-----|
+| `fastapi` | >= 0.100.0 | API REST |
+| `uvicorn` | >= 0.23.0 | Servidor ASGI |
 | `pdfplumber` | >= 0.10.0 | Extracao de texto e tabelas de PDFs |
-| `python-docx` | >= 1.0.0 | Leitura de arquivos DOCX |
 | `sentence-transformers` | >= 2.2.0 | Embeddings vetoriais (all-MiniLM-L6-v2) |
 | `numpy` | >= 1.24.0 | Operacoes vetoriais para busca semantica |
 | `tqdm` | >= 4.65.0 | Barras de progresso |
-| `torch` | (dependencia do sentence-transformers) | Backend de inferencia |
+| `python-multipart` | >= 0.0.6 | Upload de arquivos na API |
+
+**Dependencias Frontend:**
+
+| Biblioteca | Versao | Uso |
+|-----------|--------|-----|
+| `react` | ^18.2.0 | Interface de usuario |
+| `react-router-dom` | ^6.20.0 | Navegacao SPA |
+| `vite` | ^5.0.0 | Build tool e dev server |
+| `tailwindcss` | ^3.4.0 | Estilizacao |
+| `typescript` | ^5.3.0 | Tipagem estatica |
 
 **Instalacao:**
 
-```bash
-pip install pdfplumber python-docx sentence-transformers numpy tqdm
+```powershell
+# Backend
+cd "C:\Users\bmb19\OneDrive\Documentos\work\SPED"
+python -m venv .venv-win
+.\.venv-win\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+# Frontend
+cd frontend
+npm install
 ```
 
 **Primeiro uso:**
 
-```bash
-python cli.py convert    # Converter documentos -> Markdown
-python cli.py index      # Indexar no banco com embeddings
-python cli.py search "teste"  # Verificar que funciona
+```powershell
+# Ou simplesmente:
+start.bat
 ```
 
 ---
@@ -680,6 +837,87 @@ Cinco camadas de validacao fiscal:
 | **Cruzamento** | Os blocos sao coerentes entre si? | Debitos do E110 ≠ soma dos C190 |
 | **Recalculo** | Os tributos foram calculados certo? | IPI recalculado diverge do declarado |
 | **CST/Isencoes** | Os codigos tributarios sao consistentes? | CST isento mas ICMS > 0 |
+
+### Correcoes de Indexacao (Abril 2026)
+
+Correcoes criticas nos indices de campos dos validadores, alinhando com o Guia Pratico EFD v3.2.2:
+
+**Validadores corrigidos:**
+
+| Arquivo | Registro | Campo | Antes (errado) | Depois (correto) |
+|---------|----------|-------|-----------------|-------------------|
+| `intra_register_validator.py` | C100 | DT_DOC | `fields[8]` | `fields[9]` |
+| `intra_register_validator.py` | C100 | DT_E_S | `fields[9]` | `fields[10]` |
+| `intra_register_validator.py` | C100 | VL_DOC | `fields[10]` | `fields[11]` |
+| `intra_register_validator.py` | C170 | CFOP | `fields[9]` | `fields[10]` |
+| `cst_validator.py` | C170 | CST_ICMS | `fields[11]` | `fields[9]` |
+| `tax_recalc.py` | C170 | CST_ICMS | `fields[11]` | `fields[9]` |
+| `tax_recalc.py` | C170 | VL_BC_IPI | `fields[19]` | `fields[21]` |
+| `tax_recalc.py` | C170 | ALIQ_IPI | `fields[20]` | `fields[22]` |
+| `tax_recalc.py` | C170 | VL_IPI | `fields[21]` | `fields[23]` |
+| `tax_recalc.py` | C170 | VL_BC_PIS | `fields[22]` | `fields[25]` |
+| `tax_recalc.py` | C170 | ALIQ_PIS | `fields[23]` | `fields[26]` |
+| `tax_recalc.py` | C170 | VL_PIS | `fields[24]` | `fields[29]` |
+| `tax_recalc.py` | C170 | VL_BC_COFINS | `fields[25]` | `fields[31]` |
+| `tax_recalc.py` | C170 | ALIQ_COFINS | `fields[26]` | `fields[32]` |
+| `tax_recalc.py` | C170 | VL_COFINS | `fields[27]` | `fields[35]` |
+
+**Banco de definicoes (`sped.db`) corrigido:**
+
+| Registro | Problema | Correcao |
+|----------|----------|----------|
+| B001 | 4 campos (REG, QTD_LIN_0, COD_CCUS, CCUS) | 2 campos (REG, IND_MOV) |
+| H001 | Campo QTD_LIN_G em vez de IND_MOV | Campo IND_MOV |
+
+**Base de referencia (`SPED-cabecalho.md`) corrigida:**
+
+| Registro | Problema | Correcao |
+|----------|----------|----------|
+| 0000 | Faltava campo COD_FIN | Adicionado COD_FIN na posicao 03 |
+| C190 | CFOP e CST_ICMS invertidos | Ordem correta: CST_ICMS (02), CFOP (03) |
+
+### Regras de Validacao Implementadas
+
+O sistema valida arquivos SPED EFD seguindo rigorosamente o **Guia Pratico EFD v3.2.2** como fonte de autoridade maxima. Quando o codigo ou banco de definicoes diverge do Guia, o Guia prevalece.
+
+**Registros de abertura/fechamento de bloco:**
+- IND_MOV = 0: bloco com dados — registros analiticos obrigatorios
+- IND_MOV = 1: bloco sem movimento — apenas abertura (xx01) + fechamento (xx90), nenhum registro interno permitido
+
+**C100 - Nota Fiscal:**
+- IND_OPER define o tipo da operacao (entrada/saida) — todos os filhos herdam
+- COD_SIT cancelado (02/03/04): apenas campos minimos + CHV_NFE, sem registros filhos (C170/C190)
+- CHV_NFE obrigatoria para COD_MOD 55/65, tamanho fixo 44 digitos
+- DT_DOC e DT_E_S devem estar dentro do periodo DT_INI..DT_FIN do 0000
+- VL_DOC deve ser zero para documentos cancelados
+
+**C170 - Itens da NF:**
+- COD_ITEM deve existir no 0200
+- CFOP deve ser coerente com IND_OPER do C100 pai (entrada: 1/2/3xxx, saida: 5/6/7xxx)
+- QTD deve ser > 0 (exceto COD_SIT 06/07)
+- VL_BC_ICMS x ALIQ_ICMS / 100 deve bater com VL_ICMS (tolerancia R$ 0,02)
+- CST isento (40/41/50/60): VL_BC_ICMS e VL_ICMS devem ser zero
+- CST tributado (00/10/20/70/90) com BC > 0: VL_ICMS nao pode ser zero
+
+**C190 - Totalizador:**
+- VL_OPR deve bater com soma dos VL_ITEM dos C170 com mesmo CFOP
+- VL_BC_ICMS deve bater com soma dos VL_BC_ICMS dos C170
+- VL_ICMS deve bater com soma dos VL_ICMS dos C170
+
+**E110 - Apuracao ICMS:**
+- VL_TOT_DEBITOS = soma ICMS dos C190 de saida (CFOP 5/6/7xxx)
+- VL_TOT_CREDITOS = soma ICMS dos C190 de entrada (CFOP 1/2/3xxx)
+- VL_SLD_APURADO = debitos - creditos (formula completa)
+- VL_ICMS_RECOLHER = VL_SLD_APURADO - VL_TOT_DED (se saldo > 0)
+
+**Referencias cruzadas:**
+- COD_PART do C100/D100 deve existir no 0150
+- COD_ITEM do C170 deve existir no 0200
+- UNID do C170 deve existir no 0190
+- UNID diferente da UNID_INV do 0200 exige 0220 (exceto TIPO_ITEM = 07)
+- Bloco 9: contagem de cada registro (9900) e total de linhas (9999) deve bater com contagem real
+
+**Tolerancia de calculo:** R$ 0,02 para todos os recalculos (ICMS, ICMS-ST, IPI, PIS, COFINS).
 
 ### Qualidade de codigo (lint)
 
