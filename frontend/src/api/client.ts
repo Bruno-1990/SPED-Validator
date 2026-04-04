@@ -21,6 +21,7 @@ export const api = {
   listFiles: () => request<FileInfo[]>('/files'),
   getFile: (id: number) => request<FileInfo>(`/files/${id}`),
   deleteFile: (id: number) => request<{ deleted: boolean }>(`/files/${id}`, { method: 'DELETE' }),
+  clearAudit: (id: number) => request<{ cleared: boolean; removed: number }>(`/files/${id}/audit`, { method: 'DELETE' }),
 
   // Validation
   validate: (fileId: number) => request<ValidationResponse>(`/files/${fileId}/validate`, { method: 'POST' }),

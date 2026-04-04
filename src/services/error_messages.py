@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 # Template de mensagens por error_type.
 # Variáveis disponíveis: {field_name}, {register}, {line}, {value},
 # {expected}, {valid_values}, {difference}
@@ -187,6 +186,86 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
         ),
         "guidance": "Verifique o formato esperado conforme o Guia Prático EFD.",
         "icon": "file-x",
+    },
+    "CST_ALIQ_ZERO_FORTE": {
+        "friendly": (
+            "O CST indica tributação, mas a alíquota está zerada com base "
+            "de cálculo preenchida no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Verifique se o item deveria usar CST de isenção (40), "
+            "não-tributação (41), suspensão (50) ou diferimento (51). "
+            "Se houver benefício fiscal, parametrize-o no sistema."
+        ),
+        "icon": "shield-alert",
+    },
+    "CST_ALIQ_ZERO_MODERADO": {
+        "friendly": (
+            "O CST indica tributação integral, mas base, alíquota e imposto "
+            "estão todos zerados no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Verifique se há classificação fiscal incorreta ou lançamento "
+            "incompleto. Se a operação for isenta, use CST 40; se não "
+            "tributada, CST 41; se suspensa, CST 50."
+        ),
+        "icon": "alert-triangle",
+    },
+    "CST_ALIQ_ZERO_INFO": {
+        "friendly": (
+            "Operação com alíquota zero aceita no contexto fiscal "
+            "do registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Nenhuma ação necessária. A alíquota zero é compatível "
+            "com o contexto da operação (exportação, remessa, etc.)."
+        ),
+        "icon": "info",
+    },
+    "IPI_CST_ALIQ_ZERO": {
+        "friendly": (
+            "O CST_IPI indica tributação, mas base, alíquota e valor "
+            "de IPI estão zerados no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Verifique se o CST_IPI deveria ser 02 (isento), "
+            "03 (não tributado), 04 (imune) ou 05 (suspenso)."
+        ),
+        "icon": "alert-triangle",
+    },
+    "PIS_CST_ALIQ_ZERO": {
+        "friendly": (
+            "O CST_PIS indica operação tributável, mas base, alíquota "
+            "e valor estão zerados no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Verifique se o CST_PIS deveria ser 04 (não tributado), "
+            "06 (alíquota zero), 07 (isento) ou 08 (sem incidência)."
+        ),
+        "icon": "alert-triangle",
+    },
+    "COFINS_CST_ALIQ_ZERO": {
+        "friendly": (
+            "O CST_COFINS indica operação tributável, mas base, alíquota "
+            "e valor estão zerados no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Verifique se o CST_COFINS deveria ser 04 (não tributado), "
+            "06 (alíquota zero), 07 (isento) ou 08 (sem incidência)."
+        ),
+        "icon": "alert-triangle",
+    },
+    "CST_CFOP_INCOMPATIVEL": {
+        "friendly": (
+            "Incompatibilidade entre CST e CFOP detectada "
+            "no registro {register} (linha {line}): {value}."
+        ),
+        "guidance": (
+            "Verifique se o CST está coerente com a natureza da operação "
+            "indicada pelo CFOP. Vendas tributadas normalmente usam CST de "
+            "tributação; exportações normalmente têm imunidade."
+        ),
+        "icon": "arrows-cross",
     },
 }
 

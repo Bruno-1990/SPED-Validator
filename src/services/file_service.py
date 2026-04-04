@@ -73,6 +73,37 @@ def list_files(db: sqlite3.Connection) -> list[dict]:
     return [dict(r) if hasattr(r, "keys") else _row_to_dict(r) for r in rows]
 
 
+def clear_audit(db: sqlite3.Connection, file_id: int) -> int:
+    """Limpa todos os dados de validação/audit de um arquivo, mantendo o arquivo e registros.
+
+    Remove: validation_errors, cross_validations, corrections, audit_log.
+    Reseta status para 'parsed' e zera contadores.
+    Retorna quantidade de erros removidos.
+    """
+    existing = db.execute("SELECT id FROM sped_files WHERE id = ?", (file_id,)).fetchone()
+    if not existing:
+        return -1
+
+    row = db.execute(
+        "SELECT COUNT(*) FROM validation_errors WHERE file_id = ?", (file_id,),
+    ).fetchone()
+    removed = row[0] if row else 0
+
+    db.execute("DELETE FROM audit_log WHERE file_id = ?", (file_id,))
+    db.execute("DELETE FROM corrections WHERE file_id = ?", (file_id,))
+    db.execute("DELETE FROM cross_validations WHERE file_id = ?", (file_id,))
+    db.execute("DELETE FROM validation_errors WHERE file_id = ?", (file_id,))
+    db.execute(
+        "UPDATE sped_files SET status = 'parsed', total_errors = 0, "
+        "auto_corrections_applied = 0, validation_stage = NULL WHERE id = ?",
+        (file_id,),
+    )
+    db.commit()
+
+    _log(db, file_id, "clear_audit", f"Audit limpo: {removed} apontamentos removidos.")
+    return removed
+
+
 def delete_file(db: sqlite3.Connection, file_id: int) -> bool:
     """Remove arquivo e todos os dados associados."""
     existing = db.execute("SELECT id FROM sped_files WHERE id = ?", (file_id,)).fetchone()

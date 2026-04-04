@@ -17,6 +17,7 @@ const SEVERITY_LABELS: Record<string, string> = {
   critical: 'Critico',
   error: 'Erro',
   warning: 'Aviso',
+  info: 'Info',
 }
 
 export default function FileDetailPage() {
@@ -95,6 +96,20 @@ export default function FileDetailPage() {
     handleValidateStream()
   }, [handleValidateStream])
 
+  const handleClearAudit = useCallback(async () => {
+    const total = file?.total_errors ?? 0
+    if (!confirm(`Limpar toda a validação e audit deste arquivo? (${total} apontamentos serão removidos)`)) return
+    try {
+      await api.clearAudit(id)
+      setSummary(null)
+      setErrors([])
+      setTab('summary')
+      loadData()
+    } catch {
+      // silently fail
+    }
+  }, [id, file, loadData])
+
   if (!file) return <p className="text-gray-500">Carregando...</p>
 
   const conformidade = file.total_records > 0
@@ -135,6 +150,15 @@ export default function FileDetailPage() {
             >
               Baixar SPED
             </a>
+          )}
+          {file.status === 'validated' && (
+            <button
+              onClick={handleClearAudit}
+              disabled={validating}
+              className="text-sm text-red-600 px-4 py-2 rounded border border-red-300 hover:bg-red-50 disabled:opacity-50"
+            >
+              Limpar Audit
+            </button>
           )}
         </div>
       </div>
@@ -222,33 +246,40 @@ function PipelineProgressPanel({ event }: { event: PipelineEvent }) {
           const errorsForStage = event.errors_by_stage?.[stage]
 
           return (
-            <div key={stage} className="flex items-center gap-3">
-              {/* Icon */}
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                isDone ? 'bg-green-500 text-white' :
-                isCurrent ? 'bg-blue-500 text-white animate-pulse' :
-                'bg-gray-200 text-gray-400'
-              }`}>
-                {isDone ? '\u2713' : isCurrent ? '\u25CF' : (idx + 1)}
+            <div key={stage}>
+              <div className="flex items-center gap-3">
+                {/* Icon */}
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                  isDone ? 'bg-green-500 text-white' :
+                  isCurrent ? 'bg-blue-500 text-white animate-pulse' :
+                  'bg-gray-200 text-gray-400'
+                }`}>
+                  {isDone ? '\u2713' : isCurrent ? '\u25CF' : (idx + 1)}
+                </div>
+
+                {/* Label */}
+                <span className={`flex-1 text-sm ${isCurrent ? 'font-semibold' : isDone ? 'text-gray-600' : 'text-gray-400'}`}>
+                  {STAGE_LABELS[stage]}
+                </span>
+
+                {/* Progress or count */}
+                <span className="text-sm text-gray-500 w-32 text-right">
+                  {isDone && errorsForStage !== undefined && (
+                    <span className={errorsForStage > 0 ? 'text-red-600 font-semibold' : 'text-green-600'}>
+                      {errorsForStage} apontamento{errorsForStage !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                  {isCurrent && event.stage_progress !== undefined && (
+                    <span className="text-blue-600">{event.stage_progress}%</span>
+                  )}
+                  {!isDone && !isCurrent && '\u2014'}
+                </span>
               </div>
-
-              {/* Label */}
-              <span className={`flex-1 text-sm ${isCurrent ? 'font-semibold' : isDone ? 'text-gray-600' : 'text-gray-400'}`}>
-                {STAGE_LABELS[stage]}
-              </span>
-
-              {/* Progress or count */}
-              <span className="text-sm text-gray-500 w-32 text-right">
-                {isDone && errorsForStage !== undefined && (
-                  <span className={errorsForStage > 0 ? 'text-red-600 font-semibold' : 'text-green-600'}>
-                    {errorsForStage} apontamento{errorsForStage !== 1 ? 's' : ''}
-                  </span>
-                )}
-                {isCurrent && event.stage_progress !== undefined && (
-                  <span className="text-blue-600">{event.stage_progress}%</span>
-                )}
-                {!isDone && !isCurrent && '\u2014'}
-              </span>
+              {isCurrent && event.detail && (
+                <div className="ml-9 mt-1">
+                  <span className="text-xs text-gray-400 italic">{event.detail}</span>
+                </div>
+              )}
             </div>
           )
         })}
@@ -436,6 +467,7 @@ function ErrorCard({
       isCorrected ? 'border-green-400 opacity-60' :
       error.severity === 'critical' ? 'border-red-500' :
       error.severity === 'warning' ? 'border-yellow-500' :
+      error.severity === 'info' ? 'border-blue-400' :
       'border-orange-500'
     }`}>
       {/* Header - always visible */}
@@ -548,6 +580,7 @@ function SeverityBadge({ severity }: { severity: string }) {
     <span className={`px-2 py-0.5 rounded text-xs ${
       severity === 'critical' ? 'bg-red-100 text-red-700' :
       severity === 'warning' ? 'bg-yellow-100 text-yellow-700' :
+      severity === 'info' ? 'bg-blue-100 text-blue-700' :
       'bg-orange-100 text-orange-700'
     }`}>
       {label}

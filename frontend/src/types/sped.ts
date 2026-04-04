@@ -65,6 +65,7 @@ export interface PipelineEvent {
   type: 'progress' | 'stage_complete' | 'auto_correction' | 'done' | 'error'
   stage?: string
   stage_progress?: number
+  detail?: string
   total_errors?: number
   errors_by_stage?: Record<string, number>
   errors_found?: number

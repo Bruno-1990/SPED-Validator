@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
 from api.deps import get_db
 from api.schemas.models import FileInfo, FileUploadResponse
-from src.services.file_service import delete_file, get_file, list_files, upload_file
+from src.services.file_service import clear_audit, delete_file, get_file, list_files, upload_file
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
@@ -60,3 +60,12 @@ def delete(file_id: int, db: sqlite3.Connection = Depends(get_db)) -> dict:
     if not delete_file(db, file_id):
         raise HTTPException(status_code=404, detail="Arquivo não encontrado")
     return {"deleted": True}
+
+
+@router.delete("/{file_id}/audit")
+def clear_file_audit(file_id: int, db: sqlite3.Connection = Depends(get_db)) -> dict:
+    """Limpa todos os dados de validação/audit, mantendo o arquivo e registros."""
+    removed = clear_audit(db, file_id)
+    if removed < 0:
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+    return {"cleared": True, "removed": removed}

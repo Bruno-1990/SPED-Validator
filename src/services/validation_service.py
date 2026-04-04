@@ -8,6 +8,7 @@ from ..models import SpedRecord, ValidationError
 from ..validator import load_field_definitions, validate_records
 from ..validators.cross_block_validator import validate_cross_blocks
 from ..validators.cst_validator import validate_cst_and_exemptions
+from ..validators.fiscal_semantics import validate_fiscal_semantics
 from ..validators.intra_register_validator import validate_intra_register
 from ..validators.tax_recalc import recalculate_taxes
 
@@ -51,6 +52,9 @@ def run_full_validation(
 
     # 6. CST + isenções + Bloco H
     all_errors.extend(validate_cst_and_exemptions(records))
+
+    # 7. Validação semântica fiscal (CST x alíquota zero, CST x CFOP)
+    all_errors.extend(validate_fiscal_semantics(records))
 
     # Persistir erros
     _persist_errors(db, file_id, all_errors)
@@ -153,12 +157,25 @@ def _load_records(db: sqlite3.Connection, file_id: int) -> list[SpedRecord]:
 
 def _severity_for(error_type: str) -> str:
     """Determina severidade com base no tipo de erro."""
-    critical = {"CALCULO_DIVERGENTE", "CRUZAMENTO_DIVERGENTE", "SOMA_DIVERGENTE", "CONTAGEM_DIVERGENTE"}
-    warning = {"DATE_OUT_OF_PERIOD", "DATE_ORDER", "MISSING_CONDITIONAL", "REF_INEXISTENTE"}
+    critical = {
+        "CALCULO_DIVERGENTE", "CRUZAMENTO_DIVERGENTE",
+        "SOMA_DIVERGENTE", "CONTAGEM_DIVERGENTE",
+    }
+    warning = {
+        "DATE_OUT_OF_PERIOD", "DATE_ORDER", "MISSING_CONDITIONAL",
+        "REF_INEXISTENTE",
+        "CST_ALIQ_ZERO_FORTE", "CST_CFOP_INCOMPATIVEL",
+    }
+    info = {
+        "CST_ALIQ_ZERO_MODERADO", "CST_ALIQ_ZERO_INFO",
+        "IPI_CST_ALIQ_ZERO", "PIS_CST_ALIQ_ZERO", "COFINS_CST_ALIQ_ZERO",
+    }
     if error_type in critical:
         return "critical"
     if error_type in warning:
         return "warning"
+    if error_type in info:
+        return "info"
     return "error"
 
 

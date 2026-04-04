@@ -10,6 +10,7 @@ from ..models import SpedRecord, ValidationError
 from ..validator import load_field_definitions, validate_records
 from ..validators.cross_block_validator import validate_cross_blocks
 from ..validators.cst_validator import validate_cst_and_exemptions
+from ..validators.fiscal_semantics import validate_fiscal_semantics
 from ..validators.intra_register_validator import validate_intra_register
 from ..validators.tax_recalc import recalculate_taxes
 from .error_messages import format_friendly_message, get_guidance
@@ -26,6 +27,7 @@ class PipelineProgress:
     file_id: int
     stage: str = "pending"
     stage_progress: int = 0
+    detail: str = ""
     total_errors: int = 0
     errors_by_stage: dict[str, int] = field(default_factory=dict)
     auto_corrected: int = 0
@@ -36,6 +38,7 @@ class PipelineProgress:
             "file_id": self.file_id,
             "stage": self.stage,
             "stage_progress": self.stage_progress,
+            "detail": self.detail,
             "total_errors": self.total_errors,
             "errors_by_stage": self.errors_by_stage,
             "auto_corrected": self.auto_corrected,
@@ -90,10 +93,12 @@ def run_pipeline(
 
         structural_errors: list[ValidationError] = []
         if doc_db_path:
+            progress.detail = "Validando campos: tipo, tamanho, obrigatoriedade"
             field_defs = load_field_definitions(doc_db_path)
             structural_errors.extend(validate_records(records, field_defs))
         progress.stage_progress = 50
 
+        progress.detail = "Validando formatos: CNPJ, datas, CFOP, C100, C170"
         structural_errors.extend(validate_intra_register(records))
         progress.stage_progress = 100
 
@@ -112,13 +117,20 @@ def run_pipeline(
         progress.stage_progress = 0
 
         cross_errors: list[ValidationError] = []
+        progress.detail = "Cruzando C100 x C170 x C190, referencias 0150/0200, E110"
         cross_errors.extend(validate_cross_blocks(records))
-        progress.stage_progress = 33
+        progress.stage_progress = 20
 
+        progress.detail = "Recalculando ICMS, ICMS-ST, IPI, PIS/COFINS nos C170"
         cross_errors.extend(recalculate_taxes(records))
-        progress.stage_progress = 66
+        progress.stage_progress = 45
 
+        progress.detail = "Validando CST ICMS, isencoes e Bloco H"
         cross_errors.extend(validate_cst_and_exemptions(records))
+        progress.stage_progress = 65
+
+        progress.detail = "Analise semantica: CST x CFOP, aliquota zero, IPI, PIS/COFINS"
+        cross_errors.extend(validate_fiscal_semantics(records))
         progress.stage_progress = 100
 
         _persist_stage_errors(db, file_id, cross_errors)
@@ -134,6 +146,7 @@ def run_pipeline(
         # ── Estágio 3: Enriquecimento ──
         progress.stage = "enriquecimento"
         progress.stage_progress = 0
+        progress.detail = "Gerando mensagens amigaveis e buscando base legal"
 
         _enrich_errors(db, file_id, doc_db_path, progress)
         progress.stage_progress = 100
@@ -147,6 +160,7 @@ def run_pipeline(
         # ── Estágio 4: Auto-correção ──
         progress.stage = "auto_correcao"
         progress.stage_progress = 0
+        progress.detail = "Aplicando correcoes automaticas em erros deterministicos"
 
         from .auto_correction_service import auto_correct_errors
         corrected = auto_correct_errors(db, file_id, doc_db_path)
