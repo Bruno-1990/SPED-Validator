@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 
@@ -39,6 +40,11 @@ def load_field_definitions(db_path: str | Path) -> dict[str, list[RegisterField]
     return defs
 
 
+# Registros de abertura/encerramento têm layout fixo (REG + QTD_LIN ou IND_MOV).
+# Nunca devem ser validados com mais de 2 campos, independente do que o banco diga.
+_STRUCTURAL_REGISTERS = re.compile(r"^[A-Z](001|990)$|^9999$")
+
+
 def validate_records(
     records: list[SpedRecord],
     field_defs: dict[str, list[RegisterField]],
@@ -50,6 +56,11 @@ def validate_records(
     errors: list[ValidationError] = []
 
     for record in records:
+        # Registros de abertura/encerramento têm apenas REG + QTD_LIN/IND_MOV.
+        # Pular validação campo-a-campo para evitar falsos positivos.
+        if _STRUCTURAL_REGISTERS.match(record.register):
+            continue
+
         reg_defs = field_defs.get(record.register)
         if not reg_defs:
             continue  # Registro sem definição na documentação

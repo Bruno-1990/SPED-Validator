@@ -43,15 +43,18 @@ def _error(
     field_name: str,
     message: str,
     field_no: int = 0,
+    expected_value: str | None = None,
+    value: str = "",
 ) -> ValidationError:
     return ValidationError(
         line_number=record.line_number,
         register=record.register,
         field_no=field_no,
         field_name=field_name,
-        value="",
+        value=value,
         error_type="CALCULO_DIVERGENTE",
         message=message,
+        expected_value=expected_value,
     )
 
 
@@ -117,6 +120,8 @@ def recalc_icms_item(record: SpedRecord) -> list[ValidationError]:
                 f"BC ICMS: calculado={bc_calc:.2f} (VL_ITEM - VL_DESC) "
                 f"vs declarado={vl_bc_icms:.2f} (dif={diff_bc:.2f}).",
                 field_no=13,
+                expected_value=f"{bc_calc:.2f}",
+                value=f"{vl_bc_icms:.2f}",
             ))
 
     # Verificar ICMS = BC * ALIQ / 100
@@ -128,6 +133,8 @@ def recalc_icms_item(record: SpedRecord) -> list[ValidationError]:
             f"ICMS: calculado={icms_calc:.2f} (BC {vl_bc_icms:.2f} × {aliq_icms:.2f}%) "
             f"vs declarado={vl_icms:.2f} (dif={diff:.2f}).",
             field_no=15,
+            expected_value=f"{icms_calc:.2f}",
+            value=f"{vl_icms:.2f}",
         ))
 
     return errors
@@ -169,10 +176,13 @@ def recalc_icms_st_item(record: SpedRecord) -> list[ValidationError]:
 
     # Se tem BC_ST mas ICMS_ST é zero (ou vice-versa), pode ser inconsistência
     if vl_bc_st > 0 and vl_icms_st == 0:
+        expected_st = (vl_bc_st * aliq_st / 100) if aliq_st and aliq_st > 0 else None
         errors.append(_error(
             record, "VL_ICMS_ST",
             f"CST {cst_icms} indica ST, BC_ST={vl_bc_st:.2f} mas VL_ICMS_ST=0.",
             field_no=18,
+            expected_value=f"{expected_st:.2f}" if expected_st else None,
+            value="0.00",
         ))
 
     # Se tem alíquota, recalcular
@@ -185,6 +195,8 @@ def recalc_icms_st_item(record: SpedRecord) -> list[ValidationError]:
                 f"ICMS-ST: calculado={st_calc:.2f} (BC_ST {vl_bc_st:.2f} × {aliq_st:.2f}%) "
                 f"vs declarado={vl_icms_st:.2f}.",
                 field_no=18,
+                expected_value=f"{st_calc:.2f}",
+                value=f"{vl_icms_st:.2f}",
             ))
 
     return errors
@@ -223,6 +235,8 @@ def recalc_ipi_item(record: SpedRecord) -> list[ValidationError]:
             f"IPI: calculado={ipi_calc:.2f} (BC {vl_bc_ipi:.2f} × {aliq_ipi:.2f}%) "
             f"vs declarado={vl_ipi:.2f} (dif={diff:.2f}).",
             field_no=22,
+            expected_value=f"{ipi_calc:.2f}",
+            value=f"{vl_ipi:.2f}",
         ))
 
     return errors
@@ -255,6 +269,8 @@ def recalc_pis_cofins_item(record: SpedRecord) -> list[ValidationError]:
                 record, "VL_PIS",
                 f"PIS: calculado={pis_calc:.2f} (BC {vl_bc_pis:.2f} × {aliq_pis:.2f}%) vs declarado={vl_pis:.2f}.",
                 field_no=25,
+                expected_value=f"{pis_calc:.2f}",
+                value=f"{vl_pis:.2f}",
             ))
 
     # COFINS: campo 32=VL_BC_COFINS, 33=ALIQ_COFINS(%), 36=VL_COFINS
@@ -272,6 +288,8 @@ def recalc_pis_cofins_item(record: SpedRecord) -> list[ValidationError]:
                 f"COFINS: calculado={cofins_calc:.2f} (BC {vl_bc_cofins:.2f} × "
                 f"{aliq_cofins:.2f}%) vs declarado={vl_cofins:.2f}.",
                 field_no=28,
+                expected_value=f"{cofins_calc:.2f}",
+                value=f"{vl_cofins:.2f}",
             ))
 
     return errors
@@ -344,6 +362,8 @@ def recalc_e110_totals(groups: dict[str, list[SpedRecord]]) -> list[ValidationEr
                 f"(C190={totals.debitos_c190:.2f} + D={totals.debitos_d:.2f}) "
                 f"vs declarado={vl_tot_debitos:.2f} (dif={diff_deb:.2f}).",
                 field_no=2,
+                expected_value=f"{totals.total_debitos:.2f}",
+                value=f"{vl_tot_debitos:.2f}",
             ))
 
         # Créditos
@@ -355,6 +375,8 @@ def recalc_e110_totals(groups: dict[str, list[SpedRecord]]) -> list[ValidationEr
                 f"(C190={totals.creditos_c190:.2f} + D={totals.creditos_d:.2f}) "
                 f"vs declarado={vl_tot_creditos:.2f} (dif={diff_cred:.2f}).",
                 field_no=6,
+                expected_value=f"{totals.total_creditos:.2f}",
+                value=f"{vl_tot_creditos:.2f}",
             ))
 
     return errors

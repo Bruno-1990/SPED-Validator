@@ -94,18 +94,24 @@ def delete_file(db: sqlite3.Connection, file_id: int) -> bool:
 # ──────────────────────────────────────────────
 
 def _update_metadata(db: sqlite3.Connection, file_id: int, records: list[SpedRecord]) -> None:
-    """Extrai metadados do registro 0000."""
+    """Extrai metadados do registro 0000.
+
+    Layout 0000: REG|COD_VER|COD_FIN|DT_INI|DT_FIN|NOME|CNPJ|CPF|UF|IE|...
+    Posições:     0    1       2       3       4      5    6    7   8  9
+    """
     for rec in records:
         if rec.register == "0000" and len(rec.fields) >= 7:
             db.execute(
                 """UPDATE sped_files
-                   SET period_start = ?, period_end = ?, company_name = ?, cnpj = ?
+                   SET period_start = ?, period_end = ?, company_name = ?,
+                       cnpj = ?, uf = ?
                    WHERE id = ?""",
                 (
                     rec.fields[3] if len(rec.fields) > 3 else None,
                     rec.fields[4] if len(rec.fields) > 4 else None,
                     rec.fields[5] if len(rec.fields) > 5 else None,
                     rec.fields[6] if len(rec.fields) > 6 else None,
+                    rec.fields[8] if len(rec.fields) > 8 else None,
                     file_id,
                 ),
             )

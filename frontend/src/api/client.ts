@@ -1,4 +1,4 @@
-import type { ErrorSummary, FileInfo, RecordInfo, ValidationError, ValidationResponse } from '../types/sped'
+import type { ErrorSummary, FileInfo, PipelineEvent, RecordInfo, ValidationError, ValidationResponse } from '../types/sped'
 
 const BASE = '/api'
 
@@ -24,18 +24,51 @@ export const api = {
 
   // Validation
   validate: (fileId: number) => request<ValidationResponse>(`/files/${fileId}/validate`, { method: 'POST' }),
+
+  validateStream: (fileId: number, onEvent: (event: PipelineEvent) => void): EventSource => {
+    const es = new EventSource(`${BASE}/files/${fileId}/validate/stream`)
+
+    es.addEventListener('progress', (e) => {
+      onEvent({ type: 'progress', ...JSON.parse(e.data) })
+    })
+    es.addEventListener('stage_complete', (e) => {
+      onEvent({ type: 'stage_complete', ...JSON.parse(e.data) })
+    })
+    es.addEventListener('auto_correction', (e) => {
+      onEvent({ type: 'auto_correction', ...JSON.parse(e.data) })
+    })
+    es.addEventListener('done', (e) => {
+      onEvent({ type: 'done', ...JSON.parse(e.data) })
+      es.close()
+    })
+    es.addEventListener('error', (e) => {
+      if (e instanceof MessageEvent) {
+        onEvent({ type: 'error', error: JSON.parse(e.data).error })
+      }
+      es.close()
+    })
+
+    return es
+  },
+
   getErrors: (fileId: number, params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : ''
     return request<ValidationError[]>(`/files/${fileId}/errors${qs}`)
   },
   getSummary: (fileId: number) => request<ErrorSummary>(`/files/${fileId}/summary`),
 
+  dismissError: (fileId: number, errorId: number) =>
+    request<{ dismissed: boolean; total_errors: number }>(`/files/${fileId}/errors/${errorId}`, { method: 'DELETE' }),
+
+  dismissAllErrors: (fileId: number) =>
+    request<{ dismissed: number; total_errors: number }>(`/files/${fileId}/errors`, { method: 'DELETE' }),
+
   // Records
   getRecords: (fileId: number, params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : ''
     return request<RecordInfo[]>(`/files/${fileId}/records${qs}`)
   },
-  updateRecord: (fileId: number, recordId: number, data: { field_no: number; field_name: string; new_value: string }) =>
+  updateRecord: (fileId: number, recordId: number, data: { field_no: number; field_name: string; new_value: string; error_id?: number }) =>
     request<{ corrected: boolean }>(`/files/${fileId}/records/${recordId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

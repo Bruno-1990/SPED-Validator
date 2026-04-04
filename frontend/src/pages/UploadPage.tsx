@@ -13,7 +13,7 @@ export default function UploadPage() {
     setError('')
     try {
       const result = await api.uploadFile(file)
-      navigate(`/files/${result.file_id}`)
+      navigate(`/files/${result.file_id}?validate=1`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao fazer upload')
     } finally {

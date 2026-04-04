@@ -35,7 +35,18 @@ export interface ValidationError {
   error_type: string
   severity: string
   message: string
+  friendly_message: string | null
+  legal_basis: string | null
+  expected_value: string | null
+  auto_correctable: boolean
   status: string
+}
+
+export interface LegalBasis {
+  fonte: string
+  artigo: string
+  trecho: string
+  score?: number
 }
 
 export interface ErrorSummary {
@@ -48,4 +59,17 @@ export interface ValidationResponse {
   file_id: number
   total_errors: number
   status: string
+}
+
+export interface PipelineEvent {
+  type: 'progress' | 'stage_complete' | 'auto_correction' | 'done' | 'error'
+  stage?: string
+  stage_progress?: number
+  total_errors?: number
+  errors_by_stage?: Record<string, number>
+  errors_found?: number
+  corrected?: number
+  auto_corrected?: number
+  status?: string
+  error?: string
 }

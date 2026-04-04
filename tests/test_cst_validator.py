@@ -20,9 +20,10 @@ def rec(register: str, fields: list[str], line: int = 1) -> SpedRecord:
 
 
 def c170(cst: str = "000", vl_bc: str = "1000,00", vl_icms: str = "180,00", line: int = 1) -> SpedRecord:
+    """C170 com layout oficial: 9:CST_ICMS, 10:CFOP, 11:COD_NAT, 12:VL_BC_ICMS, 13:ALIQ, 14:VL_ICMS."""
     fields = [
         "C170", "1", "PROD001", "Desc", "100", "UN", "1000,00",
-        "0", "0", "1019", "001", cst,
+        "0", "0", cst, "5101", "001",
         vl_bc, "18,00", vl_icms,
     ]
     return rec("C170", fields, line=line)

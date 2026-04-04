@@ -118,65 +118,69 @@ class TestBuildParentMap:
 # ──────────────────────────────────────────────
 
 class TestValidateC100:
+    # Layout C100 (0-based): 0:REG, 1:IND_OPER, 2:IND_EMIT, 3:COD_PART,
+    # 4:COD_MOD, 5:COD_SIT, 6:SER, 7:NUM_DOC, 8:CHV_NFE, 9:DT_DOC,
+    # 10:DT_E_S, 11:VL_DOC, ...
+
     def test_valid_c100(self) -> None:
         r = rec("C100", ["C100", "0", "0", "FORN", "55", "00", "001", "123",
-                         "10012024", "15012024", "1000,00"])
+                         "", "10012024", "15012024", "1000,00"])
         errors = _validate_c100(r, CTX)
         assert len(errors) == 0
 
     def test_entrada_sem_dt_e_s(self) -> None:
         r = rec("C100", ["C100", "0", "0", "FORN", "55", "00", "001", "123",
-                         "10012024", "", "1000,00"])
+                         "", "10012024", "", "1000,00"])
         errors = _validate_c100(r, CTX)
         assert any(e.error_type == "MISSING_CONDITIONAL" for e in errors)
 
     def test_cancelada_com_valor(self) -> None:
         r = rec("C100", ["C100", "0", "0", "FORN", "55", "02", "001", "123",
-                         "10012024", "15012024", "1000,00"])
+                         "", "10012024", "15012024", "1000,00"])
         errors = _validate_c100(r, CTX)
         assert any(e.error_type == "INCONSISTENCY" for e in errors)
 
     def test_cancelada_sem_valor_ok(self) -> None:
         r = rec("C100", ["C100", "0", "0", "FORN", "55", "03", "001", "123",
-                         "10012024", "15012024", "0"])
+                         "", "10012024", "15012024", "0"])
         errors = _validate_c100(r, CTX)
         assert not any(e.error_type == "INCONSISTENCY" for e in errors)
 
     def test_dt_doc_invalida(self) -> None:
         r = rec("C100", ["C100", "0", "0", "FORN", "55", "00", "001", "123",
-                         "99992024", "15012024", "1000,00"])
+                         "", "99992024", "15012024", "1000,00"])
         errors = _validate_c100(r, CTX)
         assert any(e.error_type == "INVALID_DATE" for e in errors)
 
     def test_dt_e_s_invalida(self) -> None:
         r = rec("C100", ["C100", "0", "0", "FORN", "55", "00", "001", "123",
-                         "10012024", "32012024", "1000,00"])
+                         "", "10012024", "32012024", "1000,00"])
         errors = _validate_c100(r, CTX)
         assert any(e.error_type == "INVALID_DATE" for e in errors)
 
     def test_dt_doc_after_dt_e_s(self) -> None:
         r = rec("C100", ["C100", "0", "0", "FORN", "55", "00", "001", "123",
-                         "20012024", "10012024", "1000,00"])
+                         "", "20012024", "10012024", "1000,00"])
         errors = _validate_c100(r, CTX)
         assert any(e.error_type == "DATE_ORDER" for e in errors)
 
     def test_dt_doc_fora_do_periodo(self) -> None:
         r = rec("C100", ["C100", "0", "0", "FORN", "55", "00", "001", "123",
-                         "10022024", "15022024", "1000,00"])
+                         "", "10022024", "15022024", "1000,00"])
         errors = _validate_c100(r, CTX)
         assert any(e.error_type == "DATE_OUT_OF_PERIOD" for e in errors)
 
     def test_saida_sem_dt_e_s_ok(self) -> None:
         """Saída (IND_OPER=1) não exige DT_E_S."""
         r = rec("C100", ["C100", "1", "0", "CLI", "55", "00", "001", "123",
-                         "10012024", "", "1000,00"])
+                         "", "10012024", "", "1000,00"])
         errors = _validate_c100(r, CTX)
         assert not any(e.error_type == "MISSING_CONDITIONAL" for e in errors)
 
     def test_no_context_no_period_check(self) -> None:
         ctx_empty = SpedContext()
         r = rec("C100", ["C100", "1", "0", "CLI", "55", "00", "001", "123",
-                         "10052025", "10052025", "1000,00"])
+                         "", "10052025", "10052025", "1000,00"])
         errors = _validate_c100(r, ctx_empty)
         assert not any(e.error_type == "DATE_OUT_OF_PERIOD" for e in errors)
 
@@ -189,14 +193,14 @@ class TestValidateC170:
     def test_valid_c170(self) -> None:
         parent = rec("C100", ["C100", "0", "0", "FORN"])
         r = rec("C170", ["C170", "1", "PROD", "Desc", "100", "UN", "1000,00",
-                         "0", "0", "1019", "001", "000", "1000,00", "18,00", "180,00"])
+                         "0", "0", "000", "1019", "001", "1000,00", "18,00", "180,00"])
         errors = _validate_c170(r, parent)
         assert len(errors) == 0
 
     def test_cfop_mismatch_entrada(self) -> None:
         parent = rec("C100", ["C100", "0"])  # IND_OPER=0 (entrada)
         r = rec("C170", ["C170", "1", "PROD", "Desc", "100", "UN", "1000,00",
-                         "0", "0", "5102", "001"])  # CFOP 5xxx = saída
+                         "0", "0", "000", "5102", "001"])  # CFOP 5xxx = saída
         errors = _validate_c170(r, parent)
         assert any(e.error_type == "CFOP_MISMATCH" for e in errors)
 
@@ -209,32 +213,32 @@ class TestValidateC170:
 
     def test_icms_calculo_divergente(self) -> None:
         r = rec("C170", ["C170", "1", "PROD", "Desc", "100", "UN", "1000,00",
-                         "0", "0", "1019", "001", "000", "1000,00", "18,00", "999,99"])
+                         "0", "0", "000", "1019", "001", "1000,00", "18,00", "999,99"])
         errors = _validate_c170(r)
         assert any(e.error_type == "CALCULO_DIVERGENTE" for e in errors)
 
     def test_icms_calculo_ok(self) -> None:
         r = rec("C170", ["C170", "1", "PROD", "Desc", "100", "UN", "1000,00",
-                         "0", "0", "1019", "001", "000", "1000,00", "18,00", "180,00"])
+                         "0", "0", "000", "1019", "001", "1000,00", "18,00", "180,00"])
         errors = _validate_c170(r)
         assert not any(e.error_type == "CALCULO_DIVERGENTE" for e in errors)
 
     def test_icms_within_tolerance(self) -> None:
         # 1000 * 18 / 100 = 180.00, declarado 180.01 -> dentro da tolerância
         r = rec("C170", ["C170", "1", "PROD", "Desc", "100", "UN", "1000,00",
-                         "0", "0", "1019", "001", "000", "1000,00", "18,00", "180,01"])
+                         "0", "0", "000", "1019", "001", "1000,00", "18,00", "180,01"])
         errors = _validate_c170(r)
         assert not any(e.error_type == "CALCULO_DIVERGENTE" for e in errors)
 
     def test_no_parent_no_cfop_check(self) -> None:
         r = rec("C170", ["C170", "1", "PROD", "Desc", "100", "UN", "1000,00",
-                         "0", "0", "5102", "001"])
+                         "0", "0", "000", "5102", "001"])
         errors = _validate_c170(r, parent=None)
         assert not any(e.error_type == "CFOP_MISMATCH" for e in errors)
 
     def test_zero_bc_skips_icms_check(self) -> None:
         r = rec("C170", ["C170", "1", "PROD", "Desc", "100", "UN", "1000,00",
-                         "0", "0", "1019", "001", "000", "0", "0", "0"])
+                         "0", "0", "000", "1019", "001", "0", "0", "0"])
         errors = _validate_c170(r)
         assert not any(e.error_type == "CALCULO_DIVERGENTE" for e in errors)
 
@@ -247,9 +251,9 @@ class TestValidateC190:
     def test_valid_c190(self) -> None:
         c170s = [
             rec("C170", ["C170", "1", "P1", "D", "100", "UN", "500,00",
-                         "0", "0", "1019", "001", "000", "500,00", "18", "90,00"], line=2),
+                         "0", "0", "000", "1019", "001", "500,00", "18", "90,00"], line=2),
             rec("C170", ["C170", "2", "P2", "D", "100", "UN", "500,00",
-                         "0", "0", "1019", "001", "000", "500,00", "18", "90,00"], line=3),
+                         "0", "0", "000", "1019", "001", "500,00", "18", "90,00"], line=3),
         ]
         c190 = rec("C190", ["C190", "000", "1019", "18,00", "1000,00", "1000,00", "180,00"], line=4)
         errors = _validate_c190(c190, c170s)
@@ -258,7 +262,7 @@ class TestValidateC190:
     def test_vl_opr_divergente(self) -> None:
         c170s = [
             rec("C170", ["C170", "1", "P1", "D", "100", "UN", "500,00",
-                         "0", "0", "1019", "001", "000", "500,00", "18", "90,00"]),
+                         "0", "0", "000", "1019", "001", "500,00", "18", "90,00"]),
         ]
         c190 = rec("C190", ["C190", "000", "1019", "18,00", "999,00", "500,00", "90,00"])
         errors = _validate_c190(c190, c170s)
@@ -267,7 +271,7 @@ class TestValidateC190:
     def test_vl_bc_divergente(self) -> None:
         c170s = [
             rec("C170", ["C170", "1", "P1", "D", "100", "UN", "500,00",
-                         "0", "0", "1019", "001", "000", "500,00", "18", "90,00"]),
+                         "0", "0", "000", "1019", "001", "500,00", "18", "90,00"]),
         ]
         c190 = rec("C190", ["C190", "000", "1019", "18,00", "500,00", "999,00", "90,00"])
         errors = _validate_c190(c190, c170s)
@@ -276,7 +280,7 @@ class TestValidateC190:
     def test_vl_icms_divergente(self) -> None:
         c170s = [
             rec("C170", ["C170", "1", "P1", "D", "100", "UN", "500,00",
-                         "0", "0", "1019", "001", "000", "500,00", "18", "90,00"]),
+                         "0", "0", "000", "1019", "001", "500,00", "18", "90,00"]),
         ]
         c190 = rec("C190", ["C190", "000", "1019", "18,00", "500,00", "500,00", "999,00"])
         errors = _validate_c190(c190, c170s)
@@ -291,7 +295,7 @@ class TestValidateC190:
         """C170 com CFOP diferente do C190 não deve ser contabilizado."""
         c170s = [
             rec("C170", ["C170", "1", "P1", "D", "100", "UN", "500,00",
-                         "0", "0", "5102", "001", "000", "500,00", "18", "90,00"]),
+                         "0", "0", "000", "5102", "001", "000", "500,00", "18", "90,00"]),
         ]
         c190 = rec("C190", ["C190", "000", "1019", "18,00", "0", "0", "0"])
         errors = _validate_c190(c190, c170s)
@@ -380,7 +384,7 @@ class TestValidateIntraRegister:
         records = [
             rec("0000", ["0000", "017", "0", "01012024", "31012024", "EMP", "CNPJ"], line=1),
             rec("C100", ["C100", "0", "0", "F", "55", "00", "001", "1",
-                         "10012024", "15012024", "100"], line=2),
+                         "", "10012024", "15012024", "100"], line=2),
         ]
         errors = validate_intra_register(records)
         assert isinstance(errors, list)

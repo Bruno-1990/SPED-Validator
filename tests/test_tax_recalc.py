@@ -25,30 +25,34 @@ def rec(register: str, fields: list[str], line: int = 1) -> SpedRecord:
 def c170(
     vl_item: str = "1000,00", vl_desc: str = "0",
     vl_bc: str = "1000,00", aliq: str = "18,00", vl_icms: str = "180,00",
-    cst: str = "000",
+    cst: str = "000", cfop: str = "5101",
     vl_bc_st: str = "", aliq_st: str = "", vl_icms_st: str = "",
     vl_bc_ipi: str = "", aliq_ipi: str = "", vl_ipi: str = "",
     vl_bc_pis: str = "", aliq_pis: str = "", vl_pis: str = "",
     vl_bc_cofins: str = "", aliq_cofins: str = "", vl_cofins: str = "",
     line: int = 1,
 ) -> SpedRecord:
-    """Constrói um C170 com campos nas posições corretas."""
-    # Posições 0-based: 0:REG, 1:NUM_ITEM, 2:COD_ITEM, 3:DESCR, 4:QTD, 5:UNID,
-    # 6:VL_ITEM, 7:VL_DESC, 8:IND_MOV, 9:CST_ICMS/CFOP, 10:CFOP, 11:CST_ICMS,
-    # 12:VL_BC_ICMS, 13:ALIQ_ICMS, 14:VL_ICMS,
-    # 15:VL_BC_ICMS_ST, 16:ALIQ_ST, 17:VL_ICMS_ST,
-    # 18:?, 19:VL_BC_IPI, 20:ALIQ_IPI, 21:VL_IPI,
-    # 22:VL_BC_PIS, 23:ALIQ_PIS, 24:VL_PIS,
-    # 25:VL_BC_COFINS, 26:ALIQ_COFINS, 27:VL_COFINS
+    """Constrói um C170 com campos nas posições do layout oficial.
+
+    Posições 0-based:
+    0:REG, 1:NUM_ITEM, 2:COD_ITEM, 3:DESCR_COMPL, 4:QTD, 5:UNID,
+    6:VL_ITEM, 7:VL_DESC, 8:IND_MOV, 9:CST_ICMS, 10:CFOP, 11:COD_NAT,
+    12:VL_BC_ICMS, 13:ALIQ_ICMS, 14:VL_ICMS,
+    15:VL_BC_ICMS_ST, 16:ALIQ_ST, 17:VL_ICMS_ST,
+    18:IND_APUR, 19:CST_IPI, 20:COD_ENQ,
+    21:VL_BC_IPI, 22:ALIQ_IPI, 23:VL_IPI,
+    24:CST_PIS, 25:VL_BC_PIS, 26:ALIQ_PIS_PERC, 27:QUANT_BC_PIS, 28:ALIQ_PIS_R, 29:VL_PIS,
+    30:CST_COFINS, 31:VL_BC_COFINS, 32:ALIQ_COFINS_PERC, 33:QUANT_BC_COFINS, 34:ALIQ_COFINS_R, 35:VL_COFINS
+    """
     fields = [
-        "C170", "1", "PROD001", "Desc", "100", "UN",
-        vl_item, vl_desc, "0", "1019", "001", cst,
-        vl_bc, aliq, vl_icms,
-        vl_bc_st, aliq_st, vl_icms_st,
-        "",  # 18
-        vl_bc_ipi, aliq_ipi, vl_ipi,
-        vl_bc_pis, aliq_pis, vl_pis,
-        vl_bc_cofins, aliq_cofins, vl_cofins,
+        "C170", "1", "PROD001", "Desc", "100", "UN",       # 0-5
+        vl_item, vl_desc, "0", cst, cfop, "001",            # 6-11
+        vl_bc, aliq, vl_icms,                                # 12-14
+        vl_bc_st, aliq_st, vl_icms_st,                      # 15-17
+        "", "", "",                                           # 18-20: IND_APUR, CST_IPI, COD_ENQ
+        vl_bc_ipi, aliq_ipi, vl_ipi,                        # 21-23
+        "", vl_bc_pis, aliq_pis, "", "", vl_pis,             # 24-29
+        "", vl_bc_cofins, aliq_cofins, "", "", vl_cofins,    # 30-35
     ]
     return rec("C170", fields, line=line)
 

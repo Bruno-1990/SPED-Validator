@@ -107,12 +107,40 @@ CREATE TABLE IF NOT EXISTS audit_log (
 """
 
 
+_MIGRATIONS: dict[int, list[str]] = {
+    1: [
+        "ALTER TABLE validation_errors ADD COLUMN friendly_message TEXT",
+        "ALTER TABLE validation_errors ADD COLUMN legal_basis TEXT",
+        "ALTER TABLE validation_errors ADD COLUMN expected_value TEXT",
+        "ALTER TABLE validation_errors ADD COLUMN auto_correctable INTEGER DEFAULT 0",
+        "ALTER TABLE sped_files ADD COLUMN validation_stage TEXT",
+        "ALTER TABLE sped_files ADD COLUMN auto_corrections_applied INTEGER DEFAULT 0",
+    ],
+}
+
+
+def _run_migrations(conn: sqlite3.Connection) -> None:
+    """Executa migrações incrementais usando PRAGMA user_version."""
+    current = conn.execute("PRAGMA user_version").fetchone()[0]
+    for version in sorted(_MIGRATIONS):
+        if version > current:
+            for stmt in _MIGRATIONS[version]:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" not in str(e).lower():
+                        raise
+            conn.execute(f"PRAGMA user_version = {version}")
+            conn.commit()
+
+
 def init_audit_db(db_path: str | Path) -> sqlite3.Connection:
     """Cria o banco de auditoria com todas as tabelas."""
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(_AUDIT_SCHEMA)
+    _run_migrations(conn)
     return conn
 
 
@@ -121,4 +149,5 @@ def get_connection(db_path: str | Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
     conn.execute("PRAGMA foreign_keys=ON")
     conn.row_factory = sqlite3.Row
+    _run_migrations(conn)
     return conn

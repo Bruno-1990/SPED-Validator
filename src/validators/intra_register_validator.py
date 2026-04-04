@@ -44,15 +44,18 @@ def _make_error(
     error_type: str,
     message: str,
     field_no: int = 0,
+    expected_value: str | None = None,
+    value: str = "",
 ) -> ValidationError:
     return ValidationError(
         line_number=record.line_number,
         register=record.register,
         field_no=field_no,
         field_name=field_name,
-        value="",
+        value=value,
         error_type=error_type,
         message=message,
+        expected_value=expected_value,
     )
 
 
@@ -171,11 +174,12 @@ def _validate_c100(record: SpedRecord, context: SpedContext) -> list[ValidationE
     dt_e_s = _get_field(record, 10)
     vl_doc = _to_float(_get_field(record, 11))
 
-    # Regra: Se IND_OPER=0 (entrada), DT_E_S deve existir
-    if ind_oper == "0" and not dt_e_s:
+    # Regra: Se IND_OPER=0 (entrada) e documento regular/extemporâneo, DT_E_S deve existir.
+    # Documentos cancelados, inutilizados ou denegados (COD_SIT 02-08) não exigem DT_E_S.
+    if ind_oper == "0" and not dt_e_s and cod_sit in ("00", "01", ""):
         errors.append(_make_error(
             record, "DT_E_S", "MISSING_CONDITIONAL",
-            "Operação de entrada (IND_OPER=0) exige DT_E_S preenchido.",
+            "Operação de entrada (IND_OPER=0) com documento regular exige DT_E_S preenchido.",
             field_no=10,
         ))
 
@@ -278,6 +282,8 @@ def _validate_c170(
                 record, "VL_ICMS", "CALCULO_DIVERGENTE",
                 f"VL_ICMS diverge: calculado={icms_calc:.2f} vs declarado={vl_icms:.2f} (dif={diff:.2f}).",
                 field_no=15,
+                expected_value=f"{icms_calc:.2f}",
+                value=f"{vl_icms:.2f}",
             ))
 
     return errors
@@ -325,6 +331,8 @@ def _validate_c190(
             record, "VL_OPR", "SOMA_DIVERGENTE",
             f"VL_OPR do C190 ({c190_vl_opr:.2f}) diverge da soma dos C170 ({soma_vl_item:.2f}).",
             field_no=5,
+            expected_value=f"{soma_vl_item:.2f}",
+            value=f"{c190_vl_opr:.2f}",
         ))
 
     # Regra: VL_BC_ICMS do C190 = soma VL_BC_ICMS dos C170
@@ -333,6 +341,8 @@ def _validate_c190(
             record, "VL_BC_ICMS", "SOMA_DIVERGENTE",
             f"VL_BC_ICMS do C190 ({c190_vl_bc:.2f}) diverge da soma dos C170 ({soma_vl_bc:.2f}).",
             field_no=6,
+            expected_value=f"{soma_vl_bc:.2f}",
+            value=f"{c190_vl_bc:.2f}",
         ))
 
     # Regra: VL_ICMS do C190 = soma VL_ICMS dos C170
@@ -341,6 +351,8 @@ def _validate_c190(
             record, "VL_ICMS", "SOMA_DIVERGENTE",
             f"VL_ICMS do C190 ({c190_vl_icms:.2f}) diverge da soma dos C170 ({soma_vl_icms:.2f}).",
             field_no=7,
+            expected_value=f"{soma_vl_icms:.2f}",
+            value=f"{c190_vl_icms:.2f}",
         ))
 
     return errors
@@ -390,6 +402,8 @@ def _validate_e110(record: SpedRecord) -> list[ValidationError]:
                 record, "VL_SLD_APURADO", "CALCULO_DIVERGENTE",
                 f"VL_SLD_APURADO: calculado={sld_calc:.2f} vs declarado={vl_sld_apurado:.2f} (dif={diff:.2f}).",
                 field_no=11,
+                expected_value=f"{sld_calc:.2f}",
+                value=f"{vl_sld_apurado:.2f}",
             ))
 
     # Se saldo > 0: VL_ICMS_RECOLHER = VL_SLD_APURADO - VL_TOT_DED
@@ -401,6 +415,8 @@ def _validate_e110(record: SpedRecord) -> list[ValidationError]:
                 record, "VL_ICMS_RECOLHER", "CALCULO_DIVERGENTE",
                 f"VL_ICMS_RECOLHER: calculado={recolher_calc:.2f} vs declarado={vl_icms_recolher:.2f}.",
                 field_no=13,
+                expected_value=f"{recolher_calc:.2f}",
+                value=f"{vl_icms_recolher:.2f}",
             ))
 
     # Se saldo <= 0: VL_SLD_CREDOR_TRANSPORTAR = abs(VL_SLD_APURADO)
@@ -412,6 +428,8 @@ def _validate_e110(record: SpedRecord) -> list[ValidationError]:
                 record, "VL_SLD_CREDOR_TRANSPORTAR", "CALCULO_DIVERGENTE",
                 f"VL_SLD_CREDOR_TRANSPORTAR: calculado={credor_calc:.2f} vs declarado={vl_sld_credor_transp:.2f}.",
                 field_no=14,
+                expected_value=f"{credor_calc:.2f}",
+                value=f"{vl_sld_credor_transp:.2f}",
             ))
 
     return errors

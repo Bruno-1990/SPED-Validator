@@ -33,15 +33,18 @@ def _error(
     error_type: str,
     message: str,
     field_name: str = "",
+    expected_value: str | None = None,
+    value: str = "",
 ) -> ValidationError:
     return ValidationError(
         line_number=source_line,
         register=source_reg,
         field_no=0,
         field_name=field_name,
-        value="",
+        value=value,
         error_type=error_type,
         message=message,
+        expected_value=expected_value,
     )
 
 
@@ -90,6 +93,7 @@ def validate_cadastro_refs(groups: dict[str, list[SpedRecord]]) -> list[Validati
                 "C100", rec.line_number, "REF_INEXISTENTE",
                 f"COD_PART '{cod_part}' referenciado no C100 não existe no 0150.",
                 field_name="COD_PART",
+                value=cod_part,
             ))
 
     # Verificar referências em C170 (COD_ITEM no campo 2)
@@ -100,6 +104,7 @@ def validate_cadastro_refs(groups: dict[str, list[SpedRecord]]) -> list[Validati
                 "C170", rec.line_number, "REF_INEXISTENTE",
                 f"COD_ITEM '{cod_item}' referenciado no C170 não existe no 0200.",
                 field_name="COD_ITEM",
+                value=cod_item,
             ))
 
     # Verificar referências em D100 (COD_PART no campo 3)
@@ -110,6 +115,7 @@ def validate_cadastro_refs(groups: dict[str, list[SpedRecord]]) -> list[Validati
                 "D100", rec.line_number, "REF_INEXISTENTE",
                 f"COD_PART '{cod_part}' referenciado no D100 não existe no 0150.",
                 field_name="COD_PART",
+                value=cod_part,
             ))
 
     return errors
@@ -157,6 +163,8 @@ def validate_c_vs_e(groups: dict[str, list[SpedRecord]]) -> list[ValidationError
                 f"VL_TOT_DEBITOS do E110 ({vl_tot_debitos:.2f}) diverge da soma "
                 f"dos C190 de saída ({soma_debitos:.2f}).",
                 field_name="VL_TOT_DEBITOS",
+                expected_value=f"{soma_debitos:.2f}",
+                value=f"{vl_tot_debitos:.2f}",
             ))
 
         if abs(soma_creditos - vl_tot_creditos) > TOLERANCE:
@@ -165,6 +173,8 @@ def validate_c_vs_e(groups: dict[str, list[SpedRecord]]) -> list[ValidationError
                 f"VL_TOT_CREDITOS do E110 ({vl_tot_creditos:.2f}) diverge da soma "
                 f"dos C190 de entrada ({soma_creditos:.2f}).",
                 field_name="VL_TOT_CREDITOS",
+                expected_value=f"{soma_creditos:.2f}",
+                value=f"{vl_tot_creditos:.2f}",
             ))
 
     return errors
@@ -202,6 +212,8 @@ def validate_block9(
                     "9900", rec.line_number, "CONTAGEM_DIVERGENTE",
                     f"Registro {reg_name}: contagem declarada={declared_count}, real={actual}.",
                     field_name="QTD_REG",
+                    expected_value=str(actual),
+                    value=str(declared_count),
                 ))
 
     # Verificar 9999 (total de linhas)
@@ -213,6 +225,8 @@ def validate_block9(
                 "9999", rec.line_number, "CONTAGEM_DIVERGENTE",
                 f"QTD_LIN declarada={declared_total}, real={actual_total}.",
                 field_name="QTD_LIN",
+                expected_value=str(actual_total),
+                value=str(declared_total),
             ))
 
     return errors

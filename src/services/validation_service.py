@@ -171,12 +171,13 @@ def _persist_errors(db: sqlite3.Connection, file_id: int, errors: list[Validatio
         db.execute(
             """INSERT INTO validation_errors
                (file_id, line_number, register, field_no, field_name, value,
-                error_type, severity, message)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                error_type, severity, message, expected_value)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 file_id, err.line_number, err.register, err.field_no,
                 err.field_name, err.value, err.error_type,
                 _severity_for(err.error_type), err.message,
+                err.expected_value,
             ),
         )
     db.commit()

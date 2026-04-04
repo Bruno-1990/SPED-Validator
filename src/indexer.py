@@ -300,12 +300,41 @@ def _extract_register_fields(content: str) -> list[RegisterField]:
 
             col_map = _map_columns(header)
 
+            # Detectar o registro real da tabela: se o campo REG (nº 01)
+            # contém "texto fixo contendo X990/X001", usar esse código
+            # em vez do heading (previne contaminação entre seções).
+            table_register = _detect_table_register(rows, col_map) or register
+
             for row in rows[1:]:
-                field = _row_to_register_field(register, row, col_map)
+                field = _row_to_register_field(table_register, row, col_map)
                 if field:
                     fields.append(field)
 
     return fields
+
+
+def _detect_table_register(rows: list[list[str]], col_map: dict[str, int]) -> str | None:
+    """Detecta o registro real de uma tabela olhando a descrição do campo REG.
+
+    Ex: 'Texto fixo contendo "E990"' → retorna 'E990'.
+    Previne que campos sejam atribuídos ao registro errado quando o Markdown
+    tem tabelas de múltiplos registros na mesma seção.
+    """
+    desc_col = col_map.get("descricao")
+    campo_col = col_map.get("campo")
+    if desc_col is None:
+        return None
+
+    for row in rows[1:]:  # pular header
+        campo = row[campo_col].strip() if campo_col is not None and campo_col < len(row) else ""
+        if campo.upper() != "REG":
+            continue
+        desc = row[desc_col] if desc_col < len(row) else ""
+        match = re.search(r'["\u201c]([A-Z]\d{3})["\u201d]', desc)
+        if match:
+            return match.group(1)
+
+    return None
 
 
 def _is_field_definition_table(header: list[str]) -> bool:

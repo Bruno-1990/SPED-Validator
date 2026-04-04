@@ -23,7 +23,15 @@
       "Bash(sh)",
       "Bash(rm -rf frontend)",
       "Bash(mkdir -p frontend/src/components frontend/src/pages frontend/src/api frontend/src/types frontend/public)",
-      "Bash(sqlite3 /mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED/db/sped.db \"SELECT register, field_no, field_name, required FROM register_fields WHERE register = 'B001' ORDER BY field_no;\")"
+      "Bash(sqlite3 /mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED/db/sped.db \"SELECT register, field_no, field_name, required FROM register_fields WHERE register = 'B001' ORDER BY field_no;\")",
+      "Bash(claude:*)",
+      "Bash(sqlite3 /mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED/db/audit.db \".schema\")",
+      "Bash(.venv/bin/python:*)",
+      "Bash(grep -n -i \"E990\\\\|H990\" /mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED/data/markdown/guia/*.md)",
+      "Bash(.venv/bin/python3:*)",
+      "Bash(sqlite3 /mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED/db/sped.db \".tables\")",
+      "Bash(sqlite3 /mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED/db/sped.db \".schema\")",
+      "Bash(grep -n \"ALIQ\\\\|aliq\\\\|ICMS\\\\|icms\\\\|zero\\\\|rate\" /mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED/src/validators/*.py)"
     ]
   }
 }

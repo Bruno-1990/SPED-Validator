@@ -69,6 +69,10 @@ class ValidationErrorInfo(BaseModel):
     error_type: str
     severity: str
     message: str
+    friendly_message: str | None = None
+    legal_basis: str | None = None
+    expected_value: str | None = None
+    auto_correctable: bool = False
     status: str = "open"
 
 

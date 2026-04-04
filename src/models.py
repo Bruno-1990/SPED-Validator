@@ -52,6 +52,7 @@ class ValidationError:
     value: str
     error_type: str        # INVALID_VALUE, WRONG_TYPE, WRONG_SIZE, MISSING_REQUIRED
     message: str
+    expected_value: str | None = None  # Valor correto quando calculável (para auto-correção)
 
 
 @dataclass
