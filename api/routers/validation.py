@@ -58,12 +58,17 @@ async def validate_stream(file_id: int) -> StreamingResponse:
 
         last_stage = ""
         last_progress = -1
+        heartbeat_counter = 0
 
         while not task.done():
             await asyncio.sleep(0.5)
+            heartbeat_counter += 1
 
             progress = get_pipeline_progress(file_id)
             if not progress:
+                # Heartbeat a cada 5s para manter conexao viva
+                if heartbeat_counter % 10 == 0:
+                    yield ": heartbeat\n\n"
                 continue
 
             # Emitir evento de progresso quando há mudança
@@ -81,6 +86,10 @@ async def validate_stream(file_id: int) -> StreamingResponse:
                 yield f"event: progress\ndata: {data}\n\n"
                 last_stage = progress.stage
                 last_progress = progress.stage_progress
+                heartbeat_counter = 0
+            elif heartbeat_counter % 10 == 0:
+                # Heartbeat a cada 5s quando sem mudanca de progresso
+                yield ": heartbeat\n\n"
 
         # Pipeline concluído — emitir eventos finais
         try:

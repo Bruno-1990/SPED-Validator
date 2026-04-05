@@ -41,6 +41,21 @@ app.include_router(search.router)
 app.include_router(rules.router)
 
 
+@app.on_event("startup")
+def preload_model() -> None:
+    """Pre-carrega o modelo de embeddings no startup para evitar delay na primeira validacao."""
+    import threading
+
+    def _load():
+        try:
+            from src.embeddings import get_model
+            get_model()
+        except Exception:
+            pass  # Se falhar, carrega lazy depois
+
+    threading.Thread(target=_load, daemon=True).start()
+
+
 @app.get("/api/health")
 def health() -> dict:
     """Health check."""

@@ -34,6 +34,9 @@ def auto_correct_errors(
         (file_id,),
     ).fetchall()
 
+    # Tipos que requerem confirmacao do usuario (nao auto-corrigir)
+    _MANUAL_ONLY = {"ALIQ_ICMS_AUSENTE"}
+
     for row in rows:
         error_id = row[0]
         record_id = row[1]
@@ -45,6 +48,9 @@ def auto_correct_errors(
         expected_value = row[7]
 
         if not expected_value or not record_id or not field_no:
+            continue
+
+        if error_type in _MANUAL_ONLY:
             continue
 
         # Aplicar correção usando o serviço existente
@@ -64,9 +70,12 @@ def auto_correct_errors(
             db.execute(
                 """UPDATE corrections
                    SET applied_by = 'auto'
-                   WHERE file_id = ? AND record_id = ? AND field_no = ?
-                   AND applied_by = 'user'
-                   ORDER BY applied_at DESC LIMIT 1""",
+                   WHERE id = (
+                       SELECT id FROM corrections
+                       WHERE file_id = ? AND record_id = ? AND field_no = ?
+                       AND applied_by = 'user'
+                       ORDER BY applied_at DESC LIMIT 1
+                   )""",
                 (file_id, record_id, field_no),
             )
             db.commit()

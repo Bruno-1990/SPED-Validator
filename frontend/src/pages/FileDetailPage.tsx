@@ -71,17 +71,39 @@ export default function FileDetailPage() {
 
     if (eventSourceRef.current) eventSourceRef.current.close()
 
+    let done = false
+
     const es = api.validateStream(id, (event: PipelineEvent) => {
       setPipelineEvent(event)
       if (event.type === 'done') {
+        done = true
         setValidating(false)
-        loadData().then(() => {
-          // Navigate to most relevant tab
-        })
+        loadData()
       } else if (event.type === 'error') {
+        done = true
         setValidating(false)
       }
     })
+
+    // Fallback: se a conexao SSE fechar sem evento 'done',
+    // fazer polling para verificar se o pipeline terminou
+    const pollInterval = setInterval(async () => {
+      if (done) {
+        clearInterval(pollInterval)
+        return
+      }
+      try {
+        const f = await api.getFile(id)
+        if (f.status === 'validated' || f.status === 'error') {
+          done = true
+          clearInterval(pollInterval)
+          es.close()
+          setValidating(false)
+          if (f.status === 'validated') loadData()
+        }
+      } catch { /* */ }
+    }, 5000)
+
     eventSourceRef.current = es
   }, [id, loadData])
 
@@ -100,18 +122,13 @@ export default function FileDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [errorItems.length, alertItems.length])
 
-  const handleClearAudit = useCallback(async () => {
-    const total = file?.total_errors ?? 0
-    if (!confirm(`Limpar toda a validacao e audit deste arquivo? (${total} apontamentos serao removidos)`)) return
+  const handleDeleteFile = useCallback(async () => {
+    if (!confirm(`Excluir este arquivo e todos os dados associados?`)) return
     try {
-      await api.clearAudit(id)
-      setSummary(null)
-      setErrorItems([])
-      setAlertItems([])
-      setTab('summary')
-      loadData()
+      await api.deleteFile(id)
+      window.location.href = '/files'
     } catch { /* */ }
-  }, [id, file, loadData])
+  }, [id])
 
   if (!file) return <p className="text-gray-500">Carregando...</p>
 
@@ -152,11 +169,11 @@ export default function FileDetailPage() {
           )}
           {file.status === 'validated' && (
             <button
-              onClick={handleClearAudit}
+              onClick={handleDeleteFile}
               disabled={validating}
               className="text-sm text-red-600 px-4 py-2 rounded border border-red-300 hover:bg-red-50 disabled:opacity-50"
             >
-              Limpar Audit
+              Excluir Arquivo
             </button>
           )}
         </div>
@@ -504,12 +521,17 @@ function ErrorCard({
             {isCorrected && <span className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">Corrigido</span>}
           </div>
           <p className="text-sm text-gray-800">{displayMessage}</p>
-          {/* Inline correction preview for errors */}
-          {isError && !isCorrected && error.expected_value && error.value && (
-            <div className="mt-1 text-xs">
-              <span className="text-red-600 line-through">{error.value}</span>
+          {/* Inline correction preview */}
+          {!isCorrected && error.expected_value && error.value && (
+            <div className="mt-1 text-sm">
+              <span className="text-gray-500 font-medium">Correcao: </span>
+              <span className="text-red-600 line-through">
+                {error.value}{error.field_name?.includes('ALIQ') ? '%' : ''}
+              </span>
               <span className="text-gray-400 mx-1">&rarr;</span>
-              <span className="text-green-600 font-semibold">{error.expected_value}</span>
+              <span className="text-green-600 font-semibold">
+                {error.expected_value}{error.field_name?.includes('ALIQ') ? '%' : ''}
+              </span>
             </div>
           )}
         </div>

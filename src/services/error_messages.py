@@ -547,9 +547,8 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
         ),
         "guidance": (
             "O campo ALIQ_ICMS esta zerado mas existe VL_ICMS calculado. "
-            "O motor identificou a aliquota provavel com base na relacao "
-            "entre base de calculo e valor do imposto, confirmada por "
-            "itens do mesmo documento e totalizacao C190."
+            "A aliquota foi identificada pela relacao entre base de calculo "
+            "e valor do imposto. Clique em Corrigir para aplicar."
         ),
         "icon": "calculator",
     },

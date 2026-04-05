@@ -21,14 +21,15 @@ export default function FilesPage() {
 
   useEffect(() => { loadFiles() }, [loadFiles])
 
-  const handleClearAllAudit = useCallback(async () => {
-    const totalErrors = files.reduce((sum, f) => sum + f.total_errors, 0)
-    if (!confirm(`Limpar TODA a auditoria de todos os arquivos? (${totalErrors} apontamentos serão removidos)`)) return
+  const handleDeleteAll = useCallback(async () => {
+    if (!confirm(`Excluir TODOS os ${files.length} arquivos e seus dados?`)) return
     try {
-      await api.clearAllAudit()
+      for (const f of files) {
+        await api.deleteFile(f.id)
+      }
       loadFiles()
     } catch {
-      alert('Erro ao limpar auditoria')
+      alert('Erro ao excluir arquivos')
     }
   }, [files, loadFiles])
 
@@ -40,10 +41,10 @@ export default function FilesPage() {
         <h2 className="text-2xl font-bold">Arquivos Processados</h2>
         {files.length > 0 && (
           <button
-            onClick={handleClearAllAudit}
+            onClick={handleDeleteAll}
             className="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700"
           >
-            Limpar Toda Auditoria
+            Excluir Todos
           </button>
         )}
       </div>

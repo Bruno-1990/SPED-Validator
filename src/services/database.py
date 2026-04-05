@@ -116,6 +116,9 @@ _MIGRATIONS: dict[int, list[str]] = {
         "ALTER TABLE sped_files ADD COLUMN validation_stage TEXT",
         "ALTER TABLE sped_files ADD COLUMN auto_corrections_applied INTEGER DEFAULT 0",
     ],
+    2: [
+        "ALTER TABLE validation_errors ADD COLUMN record_id INTEGER REFERENCES sped_records(id)",
+    ],
 }
 
 
@@ -146,7 +149,9 @@ def init_audit_db(db_path: str | Path) -> sqlite3.Connection:
 
 def get_connection(db_path: str | Path) -> sqlite3.Connection:
     """Abre conexão com o banco de auditoria existente."""
-    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.row_factory = sqlite3.Row
     _run_migrations(conn)

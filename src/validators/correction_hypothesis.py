@@ -294,6 +294,8 @@ def _hypothesis_to_error(
     for reason in hyp.reasons:
         parts.append(f"- {reason}")
 
+    suggested = hyp.suggested_value if hyp.auto_correctable else None
+
     return make_error(
         record,
         "ALIQ_ICMS",
@@ -301,5 +303,5 @@ def _hypothesis_to_error(
         " ".join(parts[:3]) + "\n" + "\n".join(parts[3:]),
         field_no=14,
         value="0",
-        expected_value=hyp.suggested_value if hyp.auto_correctable else None,
+        expected_value=suggested,
     )

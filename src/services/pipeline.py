@@ -87,7 +87,8 @@ def run_pipeline(
         )
         db.commit()
 
-        # Limpar erros anteriores
+        # Limpar correções e erros anteriores (corrections referencia validation_errors)
+        db.execute("DELETE FROM corrections WHERE file_id = ?", (file_id,))
         db.execute("DELETE FROM validation_errors WHERE file_id = ?", (file_id,))
         db.commit()
 
@@ -243,14 +244,26 @@ def _persist_stage_errors(
     errors: list[ValidationError],
 ) -> None:
     """Persiste erros de um estágio (append, não limpa anteriores)."""
+    # Cache line_number -> record_id
+    line_to_record: dict[int, int] = {}
+    rows = db.execute(
+        "SELECT id, line_number FROM sped_records WHERE file_id = ?",
+        (file_id,),
+    ).fetchall()
+    for r in rows:
+        ln = r[1] if isinstance(r, (tuple, list)) else r["line_number"]
+        rid = r[0] if isinstance(r, (tuple, list)) else r["id"]
+        line_to_record[ln] = rid
+
     for err in errors:
+        record_id = line_to_record.get(err.line_number) if err.line_number > 0 else None
         db.execute(
             """INSERT INTO validation_errors
-               (file_id, line_number, register, field_no, field_name, value,
+               (file_id, record_id, line_number, register, field_no, field_name, value,
                 error_type, severity, message, expected_value)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                file_id, err.line_number, err.register, err.field_no,
+                file_id, record_id, err.line_number, err.register, err.field_no,
                 err.field_name, err.value, err.error_type,
                 _severity_for(err.error_type), err.message,
                 err.expected_value,
@@ -322,11 +335,14 @@ def _enrich_errors(
                 sample["message"],
             )
 
-        # Determinar se auto-corrigível
+        # Determinar se auto-corrigível (botao "Corrigir" no frontend)
         auto_correctable = 0
         if error_type in ("CALCULO_DIVERGENTE", "SOMA_DIVERGENTE") and sample["expected_value"]:
             auto_correctable = 1
         elif error_type == "CONTAGEM_DIVERGENTE" and sample["expected_value"]:
+            auto_correctable = 1
+        elif error_type == "ALIQ_ICMS_AUSENTE" and sample["expected_value"]:
+            # Botao aparece, mas auto_correction_service pula (requer clique do usuario)
             auto_correctable = 1
 
         # Atualizar todos os erros do grupo
@@ -389,23 +405,18 @@ def _search_legal_basis(
         if not results:
             return None
 
-        # Pegar o resultado mais relevante
         best = results[0]
         fonte = best.chunk.source_file
-        # Limpar nome do arquivo para ser legível
         if "/" in fonte:
             fonte = fonte.rsplit("/", 1)[-1]
         if fonte.endswith(".md"):
             fonte = fonte[:-3]
         fonte = fonte.replace("_", " ").replace("-", " ").title()
 
-        trecho = best.chunk.content[:500] if best.chunk.content else ""
-        heading = best.chunk.heading or ""
-
         legal = {
             "fonte": fonte,
-            "artigo": heading,
-            "trecho": trecho,
+            "artigo": best.chunk.heading or "",
+            "trecho": (best.chunk.content or "")[:500],
             "score": round(best.score, 3),
         }
         return json.dumps(legal, ensure_ascii=False)

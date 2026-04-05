@@ -46,8 +46,9 @@ export const api = {
     es.addEventListener('error', (e) => {
       if (e instanceof MessageEvent) {
         onEvent({ type: 'error', error: JSON.parse(e.data).error })
+        es.close()
       }
-      es.close()
+      // Erros de conexao: nao fechar — EventSource reconecta automaticamente
     })
 
     return es
