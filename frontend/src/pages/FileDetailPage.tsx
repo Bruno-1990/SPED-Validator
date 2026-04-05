@@ -604,6 +604,25 @@ function ErrorCard({
 
       {expanded && (
         <div className="border-t px-4 pb-4 pt-3 space-y-3 bg-gray-50 bg-opacity-50">
+          {/* Card de explicacao — destaque principal */}
+          {error.doc_suggestion && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="text-sm text-gray-800 whitespace-pre-line leading-relaxed">
+                {error.doc_suggestion.split('**Como corrigir:**').map((part, i) =>
+                  i === 0 ? (
+                    <p key={i}>{part.trim()}</p>
+                  ) : (
+                    <div key={i} className="mt-3 pt-3 border-t border-blue-200">
+                      <span className="font-semibold text-blue-800">Como corrigir: </span>
+                      <span className="text-gray-700">{part.trim()}</span>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Dados tecnicos */}
           <div className="grid grid-cols-3 gap-4 text-xs">
             <div>
               <span className="text-gray-500">Tipo:</span>{' '}
@@ -617,26 +636,26 @@ function ErrorCard({
             )}
             {error.expected_value && (
               <div>
-                <span className="text-gray-500">Valor correto:</span>{' '}
+                <span className="text-gray-500">Valor sugerido:</span>{' '}
                 <span className="font-mono text-green-600">{error.expected_value}</span>
               </div>
             )}
           </div>
+
+          {/* Detalhe tecnico — colapsado */}
           {error.friendly_message && error.message !== error.friendly_message && (
-            <div className="text-xs text-gray-500">
-              <span className="font-semibold">Detalhe tecnico:</span> {error.message}
-            </div>
+            <details className="text-xs text-gray-500">
+              <summary className="cursor-pointer font-semibold hover:text-gray-700">Detalhe tecnico</summary>
+              <p className="mt-1 pl-3 border-l-2 border-gray-200">{error.message}</p>
+            </details>
           )}
+
+          {/* Base legal — referencia modesta */}
           {legalBasis && (
-            <div className="bg-white border rounded p-3">
-              <h4 className="text-xs font-semibold text-gray-700 mb-1">Base Legal</h4>
-              <p className="text-sm font-medium text-blue-800">{legalBasis.fonte}</p>
-              {legalBasis.artigo && <p className="text-xs text-gray-600">{legalBasis.artigo}</p>}
-              {legalBasis.trecho && (
-                <blockquote className="mt-2 text-xs text-gray-600 border-l-2 border-blue-300 pl-3 italic">
-                  {legalBasis.trecho.length > 300 ? legalBasis.trecho.substring(0, 300) + '...' : legalBasis.trecho}
-                </blockquote>
-              )}
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <span>Ref:</span>
+              <span className="font-medium text-gray-500">{legalBasis.fonte}</span>
+              {legalBasis.artigo && <span className="text-gray-400">— {legalBasis.artigo}</span>}
             </div>
           )}
         </div>

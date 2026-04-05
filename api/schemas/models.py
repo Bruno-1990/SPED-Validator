@@ -72,6 +72,7 @@ class ValidationErrorInfo(BaseModel):
     severity: str
     message: str
     friendly_message: str | None = None
+    doc_suggestion: str | None = None
     legal_basis: str | None = None
     expected_value: str | None = None
     auto_correctable: bool = False

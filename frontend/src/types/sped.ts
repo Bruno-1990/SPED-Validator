@@ -71,6 +71,7 @@ export interface ValidationError {
   severity: string
   message: string
   friendly_message: string | null
+  doc_suggestion: string | null
   legal_basis: string | null
   expected_value: string | null
   auto_correctable: boolean
