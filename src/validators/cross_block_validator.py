@@ -150,7 +150,8 @@ def validate_c_vs_e(groups: dict[str, list[SpedRecord]]) -> list[ValidationError
             errors.append(_error(
                 "E110", e110.line_number, "CRUZAMENTO_DIVERGENTE",
                 f"VL_TOT_DEBITOS do E110 ({vl_tot_debitos:.2f}) diverge da soma "
-                f"dos C190 de saida ({soma_debitos:.2f}).",
+                f"dos C190 de saida ({soma_debitos:.2f}). "
+                f"Confianca: alta (100 pontos).",
                 field_name="VL_TOT_DEBITOS",
                 expected_value=f"{soma_debitos:.2f}",
                 value=f"{vl_tot_debitos:.2f}",
@@ -160,7 +161,8 @@ def validate_c_vs_e(groups: dict[str, list[SpedRecord]]) -> list[ValidationError
             errors.append(_error(
                 "E110", e110.line_number, "CRUZAMENTO_DIVERGENTE",
                 f"VL_TOT_CREDITOS do E110 ({vl_tot_creditos:.2f}) diverge da soma "
-                f"dos C190 de entrada ({soma_creditos:.2f}).",
+                f"dos C190 de entrada ({soma_creditos:.2f}). "
+                f"Confianca: alta (100 pontos).",
                 field_name="VL_TOT_CREDITOS",
                 expected_value=f"{soma_creditos:.2f}",
                 value=f"{vl_tot_creditos:.2f}",
@@ -199,7 +201,8 @@ def validate_block9(
             if actual != declared_count:
                 errors.append(_error(
                     "9900", rec.line_number, "CONTAGEM_DIVERGENTE",
-                    f"Registro {reg_name}: contagem declarada={declared_count}, real={actual}.",
+                    f"Registro {reg_name}: contagem declarada={declared_count}, real={actual}. "
+                    f"Confianca: alta (100 pontos).",
                     field_name="QTD_REG",
                     expected_value=str(actual),
                     value=str(declared_count),
@@ -212,7 +215,8 @@ def validate_block9(
         if declared_total != actual_total:
             errors.append(_error(
                 "9999", rec.line_number, "CONTAGEM_DIVERGENTE",
-                f"QTD_LIN declarada={declared_total}, real={actual_total}.",
+                f"QTD_LIN declarada={declared_total}, real={actual_total}. "
+                f"Confianca: alta (100 pontos).",
                 field_name="QTD_LIN",
                 expected_value=str(actual_total),
                 value=str(declared_total),

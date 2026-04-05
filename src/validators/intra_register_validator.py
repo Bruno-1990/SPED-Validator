@@ -333,7 +333,8 @@ def _validate_c190(
             record, "VL_BC_ICMS", "SOMA_DIVERGENTE",
             (
                 f"VL_BC_ICMS do C190 ({c190_vl_bc:.2f}) diverge da soma dos "
-                f"C170 ({soma_vl_bc:.2f}) para {chave}."
+                f"C170 ({soma_vl_bc:.2f}) para {chave}. "
+                f"Confianca: alta (100 pontos)."
             ),
             field_no=6,
             expected_value=f"{soma_vl_bc:.2f}",
@@ -346,7 +347,8 @@ def _validate_c190(
             record, "VL_ICMS", "SOMA_DIVERGENTE",
             (
                 f"VL_ICMS do C190 ({c190_vl_icms:.2f}) diverge da soma dos "
-                f"C170 ({soma_vl_icms:.2f}) para {chave}."
+                f"C170 ({soma_vl_icms:.2f}) para {chave}. "
+                f"Confianca: alta (100 pontos)."
             ),
             field_no=7,
             expected_value=f"{soma_vl_icms:.2f}",

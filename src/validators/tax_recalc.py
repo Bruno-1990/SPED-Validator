@@ -53,6 +53,7 @@ def _check_calc(
     if vl_bc > 0 and vl_declarado > 0:
         taxa_efetiva = vl_declarado / vl_bc * 100
         if round(taxa_efetiva, 2) == round(aliq, 2):
+            # Arredondamento: confianca 95% (taxa efetiva confirma, so precisao difere)
             return [make_error(
                 record, field_name, "CALCULO_ARREDONDAMENTO",
                 f"{tributo_label}: diferenca de R$ {diff:.2f} entre calculado "
@@ -62,17 +63,19 @@ def _check_calc(
                 f"coincide com a aliquota informada ({aliq:.2f}%), indicando "
                 f"que o ERP calculou com precisao maior (comum em operacoes do "
                 f"Simples Nacional, LC 123/2006). "
-                f"Caso deseje padronizar, clique em Corrigir para usar o valor "
-                f"recalculado com a aliquota de 2 decimais.",
+                f"Confianca: alta (95 pontos).",
                 field_no=field_no,
                 expected_value=f"{calc:.2f}",
                 value=f"{vl_declarado:.2f}",
             )]
 
+    # Calculo divergente: confianca baseada na certeza matematica
+    score = 100  # Recalculo deterministico = certeza maxima
     return [make_error(
         record, field_name, "CALCULO_DIVERGENTE",
         f"{tributo_label}: calculado={calc:.2f} (BC {vl_bc:.2f} x {aliq:.2f}%) "
-        f"vs declarado={vl_declarado:.2f} (dif={diff:.2f}).",
+        f"vs declarado={vl_declarado:.2f} (dif={diff:.2f}). "
+        f"Confianca: alta ({score} pontos).",
         field_no=field_no,
         expected_value=f"{calc:.2f}",
         value=f"{vl_declarado:.2f}",
@@ -320,7 +323,8 @@ def recalc_e110_totals(groups: dict[str, list[SpedRecord]]) -> list[ValidationEr
                 e110, "VL_TOT_DEBITOS", "CALCULO_DIVERGENTE",
                 f"Totalizacao E110: debitos recalculados={totals.total_debitos:.2f} "
                 f"(C190={totals.debitos_c190:.2f} + D={totals.debitos_d:.2f}) "
-                f"vs declarado={vl_tot_debitos:.2f} (dif={diff_deb:.2f}).",
+                f"vs declarado={vl_tot_debitos:.2f} (dif={diff_deb:.2f}). "
+                f"Confianca: alta (100 pontos).",
                 field_no=2,
                 expected_value=f"{totals.total_debitos:.2f}",
                 value=f"{vl_tot_debitos:.2f}",
@@ -333,7 +337,8 @@ def recalc_e110_totals(groups: dict[str, list[SpedRecord]]) -> list[ValidationEr
                 e110, "VL_TOT_CREDITOS", "CALCULO_DIVERGENTE",
                 f"Totalizacao E110: creditos recalculados={totals.total_creditos:.2f} "
                 f"(C190={totals.creditos_c190:.2f} + D={totals.creditos_d:.2f}) "
-                f"vs declarado={vl_tot_creditos:.2f} (dif={diff_cred:.2f}).",
+                f"vs declarado={vl_tot_creditos:.2f} (dif={diff_cred:.2f}). "
+                f"Confianca: alta (100 pontos).",
                 field_no=6,
                 expected_value=f"{totals.total_creditos:.2f}",
                 value=f"{vl_tot_creditos:.2f}",

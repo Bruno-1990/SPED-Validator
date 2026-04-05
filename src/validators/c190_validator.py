@@ -190,7 +190,8 @@ def _check_c190_001(
                         f"C190 (CST={cst_c190} CFOP={cfop_c190} ALIQ={aliq_c190:.2f}%): "
                         f"VL_OPR={vl_opr_c190:.2f} diverge do valor reconstruido "
                         f"{vl_opr_esperado:.2f} (dif={diff_opr:.2f}). "
-                        f"Composicao: {composicao}."
+                        f"Composicao: {composicao}. "
+                        f"Confianca: alta (100 pontos)."
                     ),
                     field_no=5,
                     value=f"{vl_opr_c190:.2f}",
@@ -211,7 +212,8 @@ def _check_c190_001(
                             f"C190 (CST={cst_c190} CFOP={cfop_c190}): "
                             f"VL_ICMS={vl_icms_c190:.2f} diverge da soma dos "
                             f"C170.VL_ICMS={soma_icms_c170:.2f} "
-                            f"(dif={diff_icms:.2f})."
+                            f"(dif={diff_icms:.2f}). "
+                            f"Confianca: alta (100 pontos)."
                         ),
                         field_no=7,
                         value=f"{vl_icms_c190:.2f}",
