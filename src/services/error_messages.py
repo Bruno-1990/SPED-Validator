@@ -91,9 +91,24 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
         ),
         "guidance": (
             "Verifique a base de cálculo e a alíquota aplicada. "
-            "O sistema pode corrigir automaticamente."
+            "Clique em Corrigir para aplicar o valor recalculado."
         ),
         "icon": "calculator",
+    },
+    "CALCULO_ARREDONDAMENTO": {
+        "friendly": (
+            "Divergencia de arredondamento no campo '{field_name}' "
+            "do registro {register} (linha {line}). "
+            "Valor declarado: R$ {value}."
+        ),
+        "guidance": (
+            "O ERP provavelmente calculou o imposto com uma aliquota de "
+            "precisao maior do que os 2 decimais gravados no SPED (comum "
+            "em operacoes do Simples Nacional, LC 123/2006). A taxa efetiva "
+            "derivada dos valores declarados e coerente com a aliquota "
+            "informada. Nenhuma correcao e necessaria."
+        ),
+        "icon": "info",
     },
     "CRUZAMENTO_DIVERGENTE": {
         "friendly": (
@@ -551,6 +566,105 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "e valor do imposto. Clique em Corrigir para aplicar."
         ),
         "icon": "calculator",
+    },
+    # ── DIFAL ──────────────────────────────────
+    "DIFAL_FALTANTE_CONSUMO_FINAL": {
+        "friendly": (
+            "DIFAL faltante: operacao interestadual para consumidor final "
+            "no registro {register} (linha {line}). {value}"
+        ),
+        "guidance": (
+            "Operacoes interestaduais para consumidor final nao-contribuinte "
+            "exigem recolhimento do DIFAL (diferenca entre aliquota interna "
+            "do destino e aliquota interestadual). Verifique se o DIFAL esta "
+            "sendo apurado no registro E300 ou recolhido por GNRE."
+        ),
+        "icon": "alert-triangle",
+    },
+    "DIFAL_INDEVIDO_REVENDA": {
+        "friendly": (
+            "DIFAL indevido em operacao de revenda/industrializacao "
+            "no registro {register} (linha {line}). {value}"
+        ),
+        "guidance": (
+            "DIFAL so se aplica a operacoes destinadas a consumidor final. "
+            "Operacoes de revenda ou industrializacao devem usar apenas "
+            "a aliquota interestadual (4%, 7% ou 12%)."
+        ),
+        "icon": "alert-circle",
+    },
+    "DIFAL_UF_DESTINO_INCONSISTENTE": {
+        "friendly": (
+            "UF do destinatario inconsistente com CFOP interestadual "
+            "no registro {register} (linha {line}). {value}"
+        ),
+        "guidance": (
+            "O CFOP indica operacao interestadual mas o destinatario esta "
+            "cadastrado na mesma UF do declarante. Corrija o cadastro do "
+            "participante (0150) ou o CFOP da operacao."
+        ),
+        "icon": "map-pin",
+    },
+    "DIFAL_ALIQ_INTERNA_INCORRETA": {
+        "friendly": (
+            "Aliquota interna do destino incorreta para DIFAL "
+            "no registro {register} (linha {line}). Usado: {value}, "
+            "esperado: {expected}."
+        ),
+        "guidance": (
+            "A aliquota interna utilizada no calculo do DIFAL nao corresponde "
+            "a aliquota oficial da UF de destino. Consulte a tabela de "
+            "aliquotas internas vigente e ajuste o parametro no ERP."
+        ),
+        "icon": "percent",
+    },
+    "DIFAL_BASE_INCONSISTENTE": {
+        "friendly": (
+            "Base de calculo do DIFAL inconsistente "
+            "no registro {register} (linha {line}). {value}"
+        ),
+        "guidance": (
+            "O valor do ICMS calculado sobre a base informada nao corresponde "
+            "ao valor escriturado. Revise a base de calculo e a aliquota "
+            "aplicada na operacao interestadual."
+        ),
+        "icon": "calculator",
+    },
+    "DIFAL_FCP_AUSENTE": {
+        "friendly": (
+            "FCP (Fundo de Combate a Pobreza) possivelmente ausente "
+            "no registro {register} (linha {line}). {value}"
+        ),
+        "guidance": (
+            "A UF de destino cobra FCP adicional em operacoes interestaduais "
+            "para consumidor final. Verifique se o FCP esta sendo calculado "
+            "e recolhido junto com o DIFAL."
+        ),
+        "icon": "dollar-sign",
+    },
+    "DIFAL_PERFIL_INCOMPATIVEL": {
+        "friendly": (
+            "Perfil do destinatario incompativel com a operacao "
+            "no registro {register} (linha {line}). {value}"
+        ),
+        "guidance": (
+            "O indicador de IE do destinatario (contribuinte/nao-contribuinte) "
+            "nao e compativel com o CFOP utilizado. Isso impacta diretamente "
+            "a responsabilidade pelo recolhimento do DIFAL."
+        ),
+        "icon": "user-x",
+    },
+    "DIFAL_CONSUMO_FINAL_SEM_MARCADOR": {
+        "friendly": (
+            "Operacao para consumidor final sem CFOP adequado "
+            "no registro {register} (linha {line}). {value}"
+        ),
+        "guidance": (
+            "Destinatario nao-contribuinte deveria usar CFOP especifico "
+            "de consumo final (6107, 6108, etc.) para correto rastreio "
+            "do DIFAL na apuracao."
+        ),
+        "icon": "tag",
     },
     "CST_HIPOTESE": {
         "friendly": (

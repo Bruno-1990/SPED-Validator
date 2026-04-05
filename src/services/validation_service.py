@@ -11,6 +11,7 @@ from ..validators.correction_hypothesis import validate_with_hypotheses
 from ..validators.cst_hypothesis import validate_cst_hypotheses
 from ..validators.audit_rules import validate_audit_rules
 from ..validators.beneficio_audit_validator import validate_beneficio_audit
+from ..validators.difal_validator import validate_difal
 from ..validators.c190_validator import validate_c190
 from ..validators.cross_block_validator import validate_cross_blocks
 from ..validators.cst_validator import validate_cst_and_exemptions
@@ -77,6 +78,9 @@ def run_full_validation(
 
     # 12. Regras pendentes
     all_errors.extend(validate_pendentes(records))
+
+    # 14. DIFAL (Diferencial de Aliquota Interestadual)
+    all_errors.extend(validate_difal(records))
 
     # 13. Hipoteses de correcao inteligente (aliquota e CST)
     all_errors.extend(validate_with_hypotheses(records))
@@ -219,6 +223,9 @@ def _severity_for(error_type: str) -> str:
         # Hipotese de correcao
         "ALIQ_ICMS_AUSENTE",
         "CST_HIPOTESE",
+        # DIFAL — critical
+        "DIFAL_FALTANTE_CONSUMO_FINAL",
+        "DIFAL_ALIQ_INTERNA_INCORRETA",
     }
     warning = {
         "DATE_OUT_OF_PERIOD", "DATE_ORDER", "MISSING_CONDITIONAL",
@@ -246,8 +253,15 @@ def _severity_for(error_type: str) -> str:
         "BENEFICIO_NAO_VINCULADO",
         "DEVOLUCAO_INCONSISTENTE",
         "IPI_ALIQ_NCM_DIVERGENTE",
+        # DIFAL — warning
+        "DIFAL_INDEVIDO_REVENDA",
+        "DIFAL_UF_DESTINO_INCONSISTENTE",
+        "DIFAL_BASE_INCONSISTENTE",
+        "DIFAL_FCP_AUSENTE",
+        "DIFAL_PERFIL_INCOMPATIVEL",
     }
     info = {
+        "CALCULO_ARREDONDAMENTO",
         "CST_ALIQ_ZERO_MODERADO", "CST_ALIQ_ZERO_INFO",
         "IPI_CST_ALIQ_ZERO", "PIS_CST_ALIQ_ZERO", "COFINS_CST_ALIQ_ZERO",
         "MONOFASICO_ENTRADA_CST04",
@@ -256,6 +270,8 @@ def _severity_for(error_type: str) -> str:
         "CHECKLIST_INCOMPLETO",
         "CLASSIFICACAO_TIPO_ERRO",
         "ACHADO_LIMITADO_AO_SPED",
+        # DIFAL — info
+        "DIFAL_CONSUMO_FINAL_SEM_MARCADOR",
         # Pendentes — info
         "ANOMALIA_HISTORICA",
     }
