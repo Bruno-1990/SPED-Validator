@@ -377,6 +377,9 @@ def _enrich_errors(
         elif error_type == "CST_HIPOTESE" and sample["expected_value"]:
             # Hipotese de CST — sempre requer confirmacao manual
             auto_correctable = 1
+        elif error_type == "CALCULO_ARREDONDAMENTO" and sample["expected_value"]:
+            # Arredondamento — usuario decide se padroniza o valor
+            auto_correctable = 1
 
         # Atualizar todos os erros do grupo
         for entry in entries:

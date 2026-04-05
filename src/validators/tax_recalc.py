@@ -28,6 +28,57 @@ def _float_opt(value: str) -> float | None:
         return None
 
 
+def _check_calc(
+    record: SpedRecord,
+    field_name: str,
+    field_no: int,
+    vl_bc: float,
+    aliq: float,
+    vl_declarado: float,
+    tributo_label: str,
+) -> list[ValidationError]:
+    """Verifica calculo imposto = BC * ALIQ / 100 com deteccao de arredondamento.
+
+    Se a divergencia decorre de arredondamento de aliquota (ERP usa
+    precisao maior que 2 decimais), gera CALCULO_ARREDONDAMENTO com
+    explicacao e botao de correcao. Caso contrario, gera CALCULO_DIVERGENTE.
+    """
+    calc = vl_bc * aliq / 100
+    diff = abs(calc - vl_declarado)
+
+    if diff <= TOLERANCE:
+        return []
+
+    # Verificar arredondamento: taxa efetiva arredondada bate com aliquota?
+    if vl_bc > 0 and vl_declarado > 0:
+        taxa_efetiva = vl_declarado / vl_bc * 100
+        if round(taxa_efetiva, 2) == round(aliq, 2):
+            return [make_error(
+                record, field_name, "CALCULO_ARREDONDAMENTO",
+                f"{tributo_label}: diferenca de R$ {diff:.2f} entre calculado "
+                f"({calc:.2f} = BC {vl_bc:.2f} x {aliq:.2f}%) "
+                f"e declarado ({vl_declarado:.2f}). "
+                f"A taxa efetiva ({taxa_efetiva:.4f}%) arredondada em 2 decimais "
+                f"coincide com a aliquota informada ({aliq:.2f}%), indicando "
+                f"que o ERP calculou com precisao maior (comum em operacoes do "
+                f"Simples Nacional, LC 123/2006). "
+                f"Caso deseje padronizar, clique em Corrigir para usar o valor "
+                f"recalculado com a aliquota de 2 decimais.",
+                field_no=field_no,
+                expected_value=f"{calc:.2f}",
+                value=f"{vl_declarado:.2f}",
+            )]
+
+    return [make_error(
+        record, field_name, "CALCULO_DIVERGENTE",
+        f"{tributo_label}: calculado={calc:.2f} (BC {vl_bc:.2f} x {aliq:.2f}%) "
+        f"vs declarado={vl_declarado:.2f} (dif={diff:.2f}).",
+        field_no=field_no,
+        expected_value=f"{calc:.2f}",
+        value=f"{vl_declarado:.2f}",
+    )]
+
+
 # ──────────────────────────────────────────────
 # API publica
 # ──────────────────────────────────────────────
@@ -80,54 +131,12 @@ def recalc_icms_item(record: SpedRecord) -> list[ValidationError]:
     if vl_bc_icms == 0 and aliq_icms == 0:
         return errors  # Item nao tributado
 
-    # Nota: NAO comparamos VL_BC_ICMS com VL_ITEM - VL_DESC.
-    # Sao conceitos diferentes: a base de calculo pode incluir frete,
-    # seguro, IPI (quando nao recuperavel), ou excluir valores por
-    # reducao de base, descontos condicionados, etc. A unica validacao
-    # confiavel e a coerencia matematica ICMS = BC x ALIQ.
+    # Caso especial: ALIQ=0 mas VL_ICMS > 0 com BC > 0
+    # Tratado pelo correction_hypothesis.py com analise de confianca.
+    if aliq_icms == 0 and vl_icms > 0 and vl_bc_icms > 0:
+        return errors
 
-    # Verificar ICMS = BC * ALIQ / 100 (vale para todos os CSTs)
-    icms_calc = vl_bc_icms * aliq_icms / 100
-    diff = abs(icms_calc - vl_icms)
-    if diff > TOLERANCE:
-        # Caso especial: ALIQ=0 mas VL_ICMS > 0 com BC > 0
-        # Tratado pelo correction_hypothesis.py com analise de confianca,
-        # cruzamento com itens irmaos e C190. Nao duplicar aqui.
-        if aliq_icms == 0 and vl_icms > 0 and vl_bc_icms > 0:
-            return errors
-
-        # Verificar se a divergencia decorre de arredondamento da aliquota.
-        # ERPs frequentemente calculam com aliquota de precisao maior
-        # (ex: Simples Nacional 3,090909...%) mas gravam arredondada
-        # no SPED (3,09%). Se a taxa efetiva (VL_ICMS/VL_BC) arredondada
-        # em 2 decimais bate com ALIQ_ICMS, a divergencia e de arredondamento.
-        if vl_bc_icms > 0 and vl_icms > 0:
-            taxa_efetiva = vl_icms / vl_bc_icms * 100
-            if round(taxa_efetiva, 2) == round(aliq_icms, 2):
-                errors.append(make_error(
-                    record, "VL_ICMS", "CALCULO_ARREDONDAMENTO",
-                    f"ICMS: diferenca de R$ {diff:.2f} entre calculado "
-                    f"({icms_calc:.2f} = BC {vl_bc_icms:.2f} x {aliq_icms:.2f}%) "
-                    f"e declarado ({vl_icms:.2f}). "
-                    f"A taxa efetiva ({taxa_efetiva:.4f}%) arredondada em 2 decimais "
-                    f"coincide com a aliquota informada ({aliq_icms:.2f}%), indicando "
-                    f"que o ERP calculou com precisao maior (comum em operacoes do "
-                    f"Simples Nacional, LC 123/2006). O valor declarado e coerente "
-                    f"com a aliquota real, embora divirja do recalculo com 2 decimais.",
-                    field_no=15,
-                    value=f"{vl_icms:.2f}",
-                ))
-                return errors
-
-        errors.append(make_error(
-            record, "VL_ICMS", "CALCULO_DIVERGENTE",
-            f"ICMS: calculado={icms_calc:.2f} (BC {vl_bc_icms:.2f} x {aliq_icms:.2f}%) "
-            f"vs declarado={vl_icms:.2f} (dif={diff:.2f}).",
-            field_no=15,
-            expected_value=f"{icms_calc:.2f}",
-            value=f"{vl_icms:.2f}",
-        ))
-
+    errors.extend(_check_calc(record, "VL_ICMS", 15, vl_bc_icms, aliq_icms, vl_icms, "ICMS"))
     return errors
 
 
@@ -178,31 +187,7 @@ def recalc_icms_st_item(record: SpedRecord) -> list[ValidationError]:
 
     # Se tem aliquota, recalcular
     if aliq_st is not None and aliq_st > 0 and vl_bc_st > 0:
-        st_calc = vl_bc_st * aliq_st / 100
-        diff = abs(st_calc - vl_icms_st)
-        if diff > TOLERANCE:
-            # Verificar arredondamento de aliquota
-            if vl_icms_st > 0:
-                taxa_ef = vl_icms_st / vl_bc_st * 100
-                if round(taxa_ef, 2) == round(aliq_st, 2):
-                    errors.append(make_error(
-                        record, "VL_ICMS_ST", "CALCULO_ARREDONDAMENTO",
-                        f"ICMS-ST: diferenca de R$ {diff:.2f} entre calculado "
-                        f"({st_calc:.2f}) e declarado ({vl_icms_st:.2f}). "
-                        f"Taxa efetiva ({taxa_ef:.4f}%) arredondada coincide com "
-                        f"aliquota informada ({aliq_st:.2f}%) — arredondamento de precisao.",
-                        field_no=18,
-                        value=f"{vl_icms_st:.2f}",
-                    ))
-                else:
-                    errors.append(make_error(
-                        record, "VL_ICMS_ST", "CALCULO_DIVERGENTE",
-                        f"ICMS-ST: calculado={st_calc:.2f} (BC_ST {vl_bc_st:.2f} x {aliq_st:.2f}%) "
-                        f"vs declarado={vl_icms_st:.2f}.",
-                        field_no=18,
-                        expected_value=f"{st_calc:.2f}",
-                        value=f"{vl_icms_st:.2f}",
-                    ))
+        errors.extend(_check_calc(record, "VL_ICMS_ST", 18, vl_bc_st, aliq_st, vl_icms_st, "ICMS-ST"))
 
     return errors
 
@@ -232,33 +217,7 @@ def recalc_ipi_item(record: SpedRecord) -> list[ValidationError]:
     if vl_bc_ipi == 0 and aliq_ipi == 0:
         return errors
 
-    ipi_calc = vl_bc_ipi * aliq_ipi / 100
-    diff = abs(ipi_calc - vl_ipi)
-    if diff > TOLERANCE:
-        # Verificar arredondamento de aliquota
-        if vl_ipi > 0 and vl_bc_ipi > 0:
-            taxa_ef = vl_ipi / vl_bc_ipi * 100
-            if round(taxa_ef, 2) == round(aliq_ipi, 2):
-                errors.append(make_error(
-                    record, "VL_IPI", "CALCULO_ARREDONDAMENTO",
-                    f"IPI: diferenca de R$ {diff:.2f} entre calculado "
-                    f"({ipi_calc:.2f}) e declarado ({vl_ipi:.2f}). "
-                    f"Taxa efetiva ({taxa_ef:.4f}%) arredondada coincide com "
-                    f"aliquota informada ({aliq_ipi:.2f}%) — arredondamento de precisao.",
-                    field_no=22,
-                    value=f"{vl_ipi:.2f}",
-                ))
-                return errors
-
-        errors.append(make_error(
-            record, "VL_IPI", "CALCULO_DIVERGENTE",
-            f"IPI: calculado={ipi_calc:.2f} (BC {vl_bc_ipi:.2f} x {aliq_ipi:.2f}%) "
-            f"vs declarado={vl_ipi:.2f} (dif={diff:.2f}).",
-            field_no=22,
-            expected_value=f"{ipi_calc:.2f}",
-            value=f"{vl_ipi:.2f}",
-        ))
-
+    errors.extend(_check_calc(record, "VL_IPI", 22, vl_bc_ipi, aliq_ipi, vl_ipi, "IPI"))
     return errors
 
 
@@ -282,29 +241,7 @@ def recalc_pis_cofins_item(record: SpedRecord) -> list[ValidationError]:
 
     if (vl_bc_pis is not None and aliq_pis is not None and vl_pis is not None
             and vl_bc_pis > 0 and aliq_pis > 0):
-        pis_calc = vl_bc_pis * aliq_pis / 100
-        diff = abs(pis_calc - vl_pis)
-        if diff > TOLERANCE:
-            # Verificar arredondamento de aliquota
-            taxa_ef = vl_pis / vl_bc_pis * 100
-            if round(taxa_ef, 2) == round(aliq_pis, 2):
-                errors.append(make_error(
-                    record, "VL_PIS", "CALCULO_ARREDONDAMENTO",
-                    f"PIS: diferenca de R$ {diff:.2f} entre calculado "
-                    f"({pis_calc:.2f}) e declarado ({vl_pis:.2f}). "
-                    f"Taxa efetiva ({taxa_ef:.4f}%) arredondada coincide com "
-                    f"aliquota informada ({aliq_pis:.2f}%) — arredondamento de precisao.",
-                    field_no=25,
-                    value=f"{vl_pis:.2f}",
-                ))
-            else:
-                errors.append(make_error(
-                    record, "VL_PIS", "CALCULO_DIVERGENTE",
-                    f"PIS: calculado={pis_calc:.2f} (BC {vl_bc_pis:.2f} x {aliq_pis:.2f}%) vs declarado={vl_pis:.2f}.",
-                    field_no=25,
-                    expected_value=f"{pis_calc:.2f}",
-                    value=f"{vl_pis:.2f}",
-                ))
+        errors.extend(_check_calc(record, "VL_PIS", 25, vl_bc_pis, aliq_pis, vl_pis, "PIS"))
 
     # COFINS: campo 32=VL_BC_COFINS, 33=ALIQ_COFINS(%), 36=VL_COFINS
     vl_bc_cofins = _float_opt(get_field(record, 31))
@@ -313,30 +250,7 @@ def recalc_pis_cofins_item(record: SpedRecord) -> list[ValidationError]:
 
     if (vl_bc_cofins is not None and aliq_cofins is not None and vl_cofins is not None
             and vl_bc_cofins > 0 and aliq_cofins > 0):
-        cofins_calc = vl_bc_cofins * aliq_cofins / 100
-        diff = abs(cofins_calc - vl_cofins)
-        if diff > TOLERANCE:
-            # Verificar arredondamento de aliquota
-            taxa_ef = vl_cofins / vl_bc_cofins * 100
-            if round(taxa_ef, 2) == round(aliq_cofins, 2):
-                errors.append(make_error(
-                    record, "VL_COFINS", "CALCULO_ARREDONDAMENTO",
-                    f"COFINS: diferenca de R$ {diff:.2f} entre calculado "
-                    f"({cofins_calc:.2f}) e declarado ({vl_cofins:.2f}). "
-                    f"Taxa efetiva ({taxa_ef:.4f}%) arredondada coincide com "
-                    f"aliquota informada ({aliq_cofins:.2f}%) — arredondamento de precisao.",
-                    field_no=28,
-                    value=f"{vl_cofins:.2f}",
-                ))
-            else:
-                errors.append(make_error(
-                    record, "VL_COFINS", "CALCULO_DIVERGENTE",
-                    f"COFINS: calculado={cofins_calc:.2f} (BC {vl_bc_cofins:.2f} x "
-                    f"{aliq_cofins:.2f}%) vs declarado={vl_cofins:.2f}.",
-                    field_no=28,
-                    expected_value=f"{cofins_calc:.2f}",
-                    value=f"{vl_cofins:.2f}",
-                ))
+        errors.extend(_check_calc(record, "VL_COFINS", 28, vl_bc_cofins, aliq_cofins, vl_cofins, "COFINS"))
 
     return errors
 
