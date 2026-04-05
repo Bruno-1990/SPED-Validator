@@ -749,9 +749,9 @@ function ReportTab({ fileId }: { fileId: number }) {
             </p>
             <p className="text-xs text-gray-500">Conformidade</p>
           </div>
-          <div className="text-center p-3 bg-green-50 rounded">
-            <p className="text-2xl font-bold text-green-600">{summary.auto_corrected}</p>
-            <p className="text-xs text-gray-500">Correcoes</p>
+          <div className="text-center p-3 bg-blue-50 rounded">
+            <p className="text-2xl font-bold text-blue-600">{summary.pending_suggestions}</p>
+            <p className="text-xs text-gray-500">Sugestoes</p>
           </div>
         </div>
       </div>
@@ -783,11 +783,11 @@ function ReportTab({ fileId }: { fileId: number }) {
         </div>
       )}
 
-      {/* 4. Correcoes Aplicadas */}
+      {/* 4. Correcoes Aplicadas pelo Analista */}
       <div className="bg-white rounded shadow p-6">
-        <h3 className="font-semibold text-lg mb-4">Correcoes Aplicadas</h3>
+        <h3 className="font-semibold text-lg mb-4">Correcoes Aplicadas pelo Analista</h3>
         {corrections.length === 0 ? (
-          <p className="text-gray-500 text-sm">Nenhuma correcao aplicada.</p>
+          <p className="text-gray-500 text-sm">Nenhuma correcao aplicada ainda. As sugestoes do motor de inteligencia aguardam aprovacao na aba Erros.</p>
         ) : (
           <table className="w-full text-sm">
             <thead>

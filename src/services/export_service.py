@@ -26,7 +26,6 @@ def export_report_structured(db: sqlite3.Connection, file_id: int) -> dict:
 
     total_records = file_info[9] or 0
     total_all_errors = file_info[10] or 0
-    auto_corrected = file_info[12] or 0
 
     # Counts by severity
     sev_rows = db.execute(
@@ -44,12 +43,26 @@ def export_report_structured(db: sqlite3.Connection, file_id: int) -> dict:
         1,
     )
 
+    # Sugestoes pendentes (erros com expected_value e botao Corrigir)
+    pending_suggestions = db.execute(
+        """SELECT COUNT(*) FROM validation_errors
+           WHERE file_id = ? AND status = 'open' AND auto_correctable = 1
+           AND expected_value IS NOT NULL""",
+        (file_id,),
+    ).fetchone()[0]
+
+    # Correcoes ja aplicadas pelo usuario
+    applied_corrections = db.execute(
+        "SELECT COUNT(*) FROM corrections WHERE file_id = ?", (file_id,),
+    ).fetchone()[0]
+
     summary = {
         "total_records": total_records,
         "total_errors": total_errors,
         "total_warnings": total_warnings,
         "compliance_pct": compliance_pct,
-        "auto_corrected": auto_corrected,
+        "pending_suggestions": pending_suggestions,
+        "applied_corrections": applied_corrections,
     }
 
     # Top findings
@@ -104,8 +117,10 @@ def export_report_structured(db: sqlite3.Connection, file_id: int) -> dict:
         parts.append(f"Identificados {total_errors} erros que necessitam correção.")
     if total_warnings > 0:
         parts.append(f"{total_warnings} alertas para revisão.")
-    if auto_corrected > 0:
-        parts.append(f"{auto_corrected} correções foram aplicadas automaticamente.")
+    if pending_suggestions > 0:
+        parts.append(f"{pending_suggestions} sugestões de correção aguardam aprovação.")
+    if applied_corrections > 0:
+        parts.append(f"{applied_corrections} correções aplicadas pelo analista.")
     if total_errors == 0 and total_warnings == 0:
         parts.append("Nenhuma irregularidade identificada.")
     parts.append(f"Conformidade geral: {compliance_pct}%.")

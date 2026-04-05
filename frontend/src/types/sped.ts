@@ -39,7 +39,8 @@ export interface StructuredReport {
     total_errors: number
     total_warnings: number
     compliance_pct: number
-    auto_corrected: number
+    pending_suggestions: number
+    applied_corrections: number
   }
   top_findings: Array<{
     error_type: string
