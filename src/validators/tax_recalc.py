@@ -80,25 +80,11 @@ def recalc_icms_item(record: SpedRecord) -> list[ValidationError]:
     if vl_bc_icms == 0 and aliq_icms == 0:
         return errors  # Item nao tributado
 
-    # Verificar BC: deveria ser VL_ITEM - VL_DESC
-    # EXCETO para CSTs que admitem redução de base (020, 070, etc.)
-    cst_icms = get_field(record, 9)
-    cst_trib = cst_icms[-2:] if len(cst_icms) >= 2 else cst_icms
-    _CST_BASE_REDUZIDA = {"20", "70"}
-
-    if cst_trib not in _CST_BASE_REDUZIDA:
-        bc_calc = vl_item - vl_desc
-        if bc_calc > 0 and vl_bc_icms > 0:
-            diff_bc = abs(bc_calc - vl_bc_icms)
-            if diff_bc > TOLERANCE:
-                errors.append(make_error(
-                    record, "VL_BC_ICMS", "CALCULO_DIVERGENTE",
-                    f"BC ICMS: calculado={bc_calc:.2f} (VL_ITEM - VL_DESC) "
-                    f"vs declarado={vl_bc_icms:.2f} (dif={diff_bc:.2f}).",
-                    field_no=13,
-                    expected_value=f"{bc_calc:.2f}",
-                    value=f"{vl_bc_icms:.2f}",
-                ))
+    # Nota: NAO comparamos VL_BC_ICMS com VL_ITEM - VL_DESC.
+    # Sao conceitos diferentes: a base de calculo pode incluir frete,
+    # seguro, IPI (quando nao recuperavel), ou excluir valores por
+    # reducao de base, descontos condicionados, etc. A unica validacao
+    # confiavel e a coerencia matematica ICMS = BC x ALIQ.
 
     # Verificar ICMS = BC * ALIQ / 100 (vale para todos os CSTs)
     icms_calc = vl_bc_icms * aliq_icms / 100

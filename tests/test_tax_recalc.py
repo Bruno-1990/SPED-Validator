@@ -71,12 +71,13 @@ class TestRecalcIcmsItem:
         errors = recalc_icms_item(r)
         assert any(e.field_name == "VL_ICMS" for e in errors)
 
-    def test_bc_divergent(self) -> None:
-        # VL_ITEM=1000, VL_DESC=100 -> BC deveria ser 900, mas declarado 1000
+    def test_bc_diferente_de_vl_item_nao_e_erro(self) -> None:
+        """BC != VL_ITEM nao e erro se ICMS = BC x ALIQ fecha.
+        A BC pode incluir frete/IPI ou excluir reducoes."""
         r = c170(vl_item="1000,00", vl_desc="100,00", vl_bc="1000,00",
                  aliq="18,00", vl_icms="180,00")
         errors = recalc_icms_item(r)
-        assert any(e.field_name == "VL_BC_ICMS" for e in errors)
+        assert not any(e.field_name == "VL_BC_ICMS" for e in errors)
 
     def test_within_tolerance(self) -> None:
         # 1000 * 18% = 180.00, declarado 180.01 -> OK

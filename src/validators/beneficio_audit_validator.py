@@ -38,11 +38,14 @@ from .helpers import (
     F_C190_VL_OPR,
     F_E110_VL_AJ_CREDITOS,
     F_E110_VL_AJ_DEBITOS,
+    F_E110_VL_ESTORNOS_CRED,
+    F_E110_VL_ESTORNOS_DEB,
     F_E110_VL_SLD_CREDOR_TRANSPORTAR,
     F_E110_VL_TOT_AJ_CREDITOS,
     F_E110_VL_TOT_AJ_DEBITOS,
     F_E110_VL_TOT_CREDITOS,
     F_E110_VL_TOT_DEBITOS,
+    F_E110_VL_TOT_DED,
     F_E111_COD_AJ_APUR,
     F_E111_DESCR_COMPL,
     F_E111_VL_AJ_APUR,
@@ -121,17 +124,45 @@ class _E111Agrupado:
         return len(self.filhos_e112) > 0 or len(self.filhos_e113) > 0
 
     @property
+    def natureza(self) -> str:
+        """Natureza do ajuste conforme posicao [3] do COD_AJ_APUR.
+
+        Formato COD_AJ_APUR: UUTNNnnn
+        [0-1]=UF, [2]=Tipo (0=ICMS proprio), [3]=Natureza:
+        0=Outros debitos        -> E110.VL_AJ_DEBITOS
+        1=Estorno de creditos   -> E110.VL_ESTORNOS_CRED
+        2=Outros creditos       -> E110.VL_AJ_CREDITOS
+        3=Estorno de debitos    -> E110.VL_ESTORNOS_DEB
+        4=Deducoes              -> E110.VL_TOT_DED
+        """
+        if len(self.cod_aj) >= 4:
+            return self.cod_aj[3]
+        return ""
+
+    @property
     def eh_credito(self) -> bool:
-        """Posicao [2] do COD_AJ_APUR: 0=debito, 1=credito."""
-        if len(self.cod_aj) >= 3:
-            return self.cod_aj[2] == "1"
-        return False
+        """Natureza indica outros creditos (pos[3]=2)."""
+        return self.natureza == "2"
 
     @property
     def eh_debito(self) -> bool:
-        if len(self.cod_aj) >= 3:
-            return self.cod_aj[2] == "0"
-        return False
+        """Natureza indica outros debitos (pos[3]=0)."""
+        return self.natureza == "0"
+
+    @property
+    def eh_estorno_debito(self) -> bool:
+        """Natureza indica estorno de debito (pos[3]=3)."""
+        return self.natureza == "3"
+
+    @property
+    def eh_estorno_credito(self) -> bool:
+        """Natureza indica estorno de credito (pos[3]=1)."""
+        return self.natureza == "1"
+
+    @property
+    def eh_deducao(self) -> bool:
+        """Natureza indica deducao (pos[3]=4)."""
+        return self.natureza == "4"
 
     @property
     def eh_codigo_generico(self) -> bool:
@@ -139,7 +170,7 @@ class _E111Agrupado:
 
     @property
     def eh_credito_presumido(self) -> bool:
-        """Credito presumido: natureza indica credito (pos[2]=1)."""
+        """Credito presumido: natureza indica credito (pos[3]=2)."""
         return self.eh_credito
 
 
@@ -180,9 +211,12 @@ class _BeneficioContext:
         self.e110_vl_tot_debitos = 0.0
         self.e110_vl_aj_debitos = 0.0
         self.e110_vl_tot_aj_debitos = 0.0
+        self.e110_vl_estornos_cred = 0.0
         self.e110_vl_tot_creditos = 0.0
         self.e110_vl_aj_creditos = 0.0
         self.e110_vl_tot_aj_creditos = 0.0
+        self.e110_vl_estornos_deb = 0.0
+        self.e110_vl_tot_ded = 0.0
         self.e110_vl_sld_credor = 0.0
         self.e110_presente = False
         for r in groups.get("E110", []):
@@ -190,9 +224,12 @@ class _BeneficioContext:
             self.e110_vl_tot_debitos = to_float(get_field(r, F_E110_VL_TOT_DEBITOS))
             self.e110_vl_aj_debitos = to_float(get_field(r, F_E110_VL_AJ_DEBITOS))
             self.e110_vl_tot_aj_debitos = to_float(get_field(r, F_E110_VL_TOT_AJ_DEBITOS))
+            self.e110_vl_estornos_cred = to_float(get_field(r, F_E110_VL_ESTORNOS_CRED))
             self.e110_vl_tot_creditos = to_float(get_field(r, F_E110_VL_TOT_CREDITOS))
             self.e110_vl_aj_creditos = to_float(get_field(r, F_E110_VL_AJ_CREDITOS))
             self.e110_vl_tot_aj_creditos = to_float(get_field(r, F_E110_VL_TOT_AJ_CREDITOS))
+            self.e110_vl_estornos_deb = to_float(get_field(r, F_E110_VL_ESTORNOS_DEB))
+            self.e110_vl_tot_ded = to_float(get_field(r, F_E110_VL_TOT_DED))
             self.e110_vl_sld_credor = to_float(get_field(r, F_E110_VL_SLD_CREDOR_TRANSPORTAR))
             break
 
@@ -325,11 +362,28 @@ class _BeneficioContext:
 
     @property
     def total_e111_creditos(self) -> float:
+        """Natureza 2: outros creditos -> E110.VL_AJ_CREDITOS."""
         return sum(e.valor for e in self.e111_list if e.eh_credito)
 
     @property
     def total_e111_debitos(self) -> float:
+        """Natureza 0: outros debitos -> E110.VL_AJ_DEBITOS."""
         return sum(e.valor for e in self.e111_list if e.eh_debito)
+
+    @property
+    def total_e111_estornos_deb(self) -> float:
+        """Natureza 3: estorno de debitos -> E110.VL_ESTORNOS_DEB."""
+        return sum(e.valor for e in self.e111_list if e.eh_estorno_debito)
+
+    @property
+    def total_e111_estornos_cred(self) -> float:
+        """Natureza 1: estorno de creditos -> E110.VL_ESTORNOS_CRED."""
+        return sum(e.valor for e in self.e111_list if e.eh_estorno_credito)
+
+    @property
+    def total_e111_deducoes(self) -> float:
+        """Natureza 4: deducoes -> E110.VL_TOT_DED."""
+        return sum(e.valor for e in self.e111_list if e.eh_deducao)
 
     @property
     def tem_credito_presumido(self) -> bool:
@@ -453,44 +507,48 @@ def _check_e111_sem_rastreabilidade(ctx: _BeneficioContext) -> list[ValidationEr
 # ──────────────────────────────────────────────
 
 def _check_e111_soma_vs_e110(ctx: _BeneficioContext) -> list[ValidationError]:
-    """Soma E111 por natureza vs E110 totais de ajuste."""
+    """Soma E111 por natureza vs campo correspondente do E110.
+
+    COD_AJ_APUR posicao [3] define a natureza:
+    0 = Outros debitos        -> E110.VL_AJ_DEBITOS
+    1 = Estorno de creditos   -> E110.VL_ESTORNOS_CRED
+    2 = Outros creditos       -> E110.VL_AJ_CREDITOS
+    3 = Estorno de debitos    -> E110.VL_ESTORNOS_DEB
+    4 = Deducoes              -> E110.VL_TOT_DED
+    """
     if not ctx.e110_presente or not ctx.e111_list:
         return []
 
     errors: list[ValidationError] = []
 
-    soma_creditos = ctx.total_e111_creditos
-    soma_debitos = ctx.total_e111_debitos
+    # Comparacoes por natureza: (soma_e111, campo_e110, label)
+    checks = [
+        (ctx.total_e111_debitos, ctx.e110_vl_aj_debitos,
+         "outros debitos", "VL_AJ_DEBITOS"),
+        (ctx.total_e111_creditos, ctx.e110_vl_aj_creditos,
+         "outros creditos", "VL_AJ_CREDITOS"),
+        (ctx.total_e111_estornos_deb, ctx.e110_vl_estornos_deb,
+         "estornos de debito", "VL_ESTORNOS_DEB"),
+        (ctx.total_e111_estornos_cred, ctx.e110_vl_estornos_cred,
+         "estornos de credito", "VL_ESTORNOS_CRED"),
+        (ctx.total_e111_deducoes, ctx.e110_vl_tot_ded,
+         "deducoes", "VL_TOT_DED"),
+    ]
 
-    # Creditos
-    if soma_creditos > 0 or ctx.e110_vl_tot_aj_creditos > 0:
-        diff_cred = abs(soma_creditos - ctx.e110_vl_tot_aj_creditos)
-        if diff_cred > TOLERANCE:
-            errors.append(make_generic_error(
-                "AJUSTE_SOMA_DIVERGENTE",
-                (
-                    f"Soma dos ajustes E111 de credito = R$ {soma_creditos:,.2f} "
-                    f"diverge de E110.VL_TOT_AJ_CREDITOS = R$ {ctx.e110_vl_tot_aj_creditos:,.2f} "
-                    f"(diferenca: R$ {diff_cred:,.2f}). Os valores devem ser consistentes."
-                ),
-                register="E111",
-                value=f"E111_CRED={soma_creditos:,.2f} E110={ctx.e110_vl_tot_aj_creditos:,.2f}",
-            ))
-
-    # Debitos
-    if soma_debitos > 0 or ctx.e110_vl_tot_aj_debitos > 0:
-        diff_deb = abs(soma_debitos - ctx.e110_vl_tot_aj_debitos)
-        if diff_deb > TOLERANCE:
-            errors.append(make_generic_error(
-                "AJUSTE_SOMA_DIVERGENTE",
-                (
-                    f"Soma dos ajustes E111 de debito = R$ {soma_debitos:,.2f} "
-                    f"diverge de E110.VL_TOT_AJ_DEBITOS = R$ {ctx.e110_vl_tot_aj_debitos:,.2f} "
-                    f"(diferenca: R$ {diff_deb:,.2f}). Os valores devem ser consistentes."
-                ),
-                register="E111",
-                value=f"E111_DEB={soma_debitos:,.2f} E110={ctx.e110_vl_tot_aj_debitos:,.2f}",
-            ))
+    for soma_e111, campo_e110, label, campo_nome in checks:
+        if soma_e111 > 0 or campo_e110 > 0:
+            diff = abs(soma_e111 - campo_e110)
+            if diff > TOLERANCE:
+                errors.append(make_generic_error(
+                    "AJUSTE_SOMA_DIVERGENTE",
+                    (
+                        f"Soma dos ajustes E111 de {label} = R$ {soma_e111:,.2f} "
+                        f"diverge de E110.{campo_nome} = R$ {campo_e110:,.2f} "
+                        f"(diferenca: R$ {diff:,.2f})."
+                    ),
+                    register="E111",
+                    value=f"E111={soma_e111:,.2f} E110.{campo_nome}={campo_e110:,.2f}",
+                ))
 
     return errors
 

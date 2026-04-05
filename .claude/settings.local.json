@@ -1,4 +1,18 @@
 {
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/commit-push.sh",
+            "timeout": 60,
+            "statusMessage": "Commit & Push..."
+          }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "allow": [
       "Bash(pip3 --version)",
@@ -46,7 +60,9 @@
       "Bash(pip3 install:*)",
       "Bash(python:*)",
       "Bash(grep -E \"\\\\.bat$|resposta\")",
-      "Bash(grep \"\\\\.bat$\")"
+      "Bash(grep \"\\\\.bat$\")",
+      "Skill(update-config)",
+      "Bash(chmod +x:*)"
     ]
   }
 }

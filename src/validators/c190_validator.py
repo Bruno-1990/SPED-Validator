@@ -22,7 +22,9 @@ from .helpers import (
     F_C170_ALIQ_ICMS,
     F_C170_CFOP,
     F_C170_CST_ICMS,
+    F_C170_VL_BC_ICMS,
     F_C170_VL_DESC,
+    F_C170_VL_ICMS,
     F_C170_VL_ITEM,
     F_C190_ALIQ,
     F_C190_CFOP,
@@ -117,16 +119,21 @@ def _check_c190_001(
         # Somar C170 por combinacao analitica (CST+CFOP+ALIQ)
         # Usa CST completo (3 digitos) para nao colapsar origens diferentes
         # (ex: 090 vs 290 devem ser combinacoes distintas)
-        c170_sums: dict[tuple[str, str, float], float] = defaultdict(float)
+        c170_vl_liq: dict[tuple[str, str, float], float] = defaultdict(float)
+        c170_vl_icms: dict[tuple[str, str, float], float] = defaultdict(float)
+        c170_vl_bc: dict[tuple[str, str, float], float] = defaultdict(float)
         for it in items:
             cst = get_field(it, F_C170_CST_ICMS)
             cfop = get_field(it, F_C170_CFOP)
             aliq = round(to_float(get_field(it, F_C170_ALIQ_ICMS)), 2)
             vl_item = to_float(get_field(it, F_C170_VL_ITEM))
             vl_desc = to_float(get_field(it, F_C170_VL_DESC))
-            c170_sums[(cst, cfop, aliq)] += max(0.0, vl_item - vl_desc)
+            key = (cst, cfop, aliq)
+            c170_vl_liq[key] += max(0.0, vl_item - vl_desc)
+            c170_vl_icms[key] += to_float(get_field(it, F_C170_VL_ICMS))
+            c170_vl_bc[key] += to_float(get_field(it, F_C170_VL_BC_ICMS))
 
-        qtd_combinacoes = len(c170_sums)
+        qtd_combinacoes = len(c170_vl_liq)
 
         # Validar cada C190
         for c190 in c190_recs:
@@ -139,7 +146,7 @@ def _check_c190_001(
 
             # -- Validacao 1: VL_OPR por reconstrucao com rateio --
             key = (cst_c190, cfop_c190, aliq_c190)
-            soma_itens = c170_sums.get(key, 0.0)
+            soma_itens = c170_vl_liq.get(key, 0.0)
 
             if soma_itens == 0.0 and vl_opr_c190 > 0:
                 # Combinacao no C190 sem itens C170 correspondentes
@@ -190,22 +197,25 @@ def _check_c190_001(
                     expected_value=f"{vl_opr_esperado:.2f}",
                 ))
 
-            # -- Validacao 2: ICMS = BC x ALIQ --
-            if aliq_c190 > 0 and vl_bc_c190 > 0:
-                icms_esperado = round(vl_bc_c190 * aliq_c190 / 100, 2)
-                diff_icms = abs(icms_esperado - vl_icms_c190)
+            # -- Validacao 2: VL_ICMS do C190 vs soma dos C170.VL_ICMS --
+            # Nao recalcular BC x ALIQ pois arredondamento item a item gera
+            # centavos de diferenca legitima. A referencia correta e a soma
+            # dos VL_ICMS ja arredondados de cada C170.
+            soma_icms_c170 = c170_vl_icms.get(key, 0.0)
+            if soma_icms_c170 > 0 or vl_icms_c190 > 0:
+                diff_icms = abs(soma_icms_c170 - vl_icms_c190)
                 if diff_icms > TOLERANCE:
                     errors.append(make_error(
                         c190, "VL_ICMS", "C190_DIVERGE_C170",
                         (
                             f"C190 (CST={cst_c190} CFOP={cfop_c190}): "
-                            f"VL_ICMS={vl_icms_c190:.2f} diverge de "
-                            f"BC({vl_bc_c190:.2f}) x ALIQ({aliq_c190:.2f}%) = "
-                            f"{icms_esperado:.2f} (dif={diff_icms:.2f})."
+                            f"VL_ICMS={vl_icms_c190:.2f} diverge da soma dos "
+                            f"C170.VL_ICMS={soma_icms_c170:.2f} "
+                            f"(dif={diff_icms:.2f})."
                         ),
                         field_no=7,
                         value=f"{vl_icms_c190:.2f}",
-                        expected_value=f"{icms_esperado:.2f}",
+                        expected_value=f"{soma_icms_c170:.2f}",
                     ))
 
     return errors
