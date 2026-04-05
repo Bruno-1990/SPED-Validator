@@ -226,13 +226,14 @@ def run_pipeline(
 # ──────────────────────────────────────────────
 
 def _deduplicate_errors(errors: list[ValidationError]) -> list[ValidationError]:
-    """Remove erros genericos quando hipotese inteligente ja cobre o mesmo item.
+    """Remove erros duplicados e genericos quando outro erro ja cobre o mesmo item.
 
-    Regras de supressao:
-    - ALIQ_ICMS_AUSENTE supersede CST_ALIQ_ZERO_FORTE (mesma linha)
-    - CST_HIPOTESE supersede CST_ALIQ_ZERO_FORTE e CST_ALIQ_ZERO_MODERADO (mesma linha)
+    Duas estrategias:
+    1. Hipoteses inteligentes supersede erros genericos (mesma linha)
+    2. Mesma linha + mesmo campo: manter apenas o mais especifico
+       (com expected_value ou maior prioridade)
     """
-    # Coletar linhas cobertas por hipoteses
+    # ── Estrategia 1: hipoteses supersede genericos ──
     lines_aliq_hyp: set[int] = set()
     lines_cst_hyp: set[int] = set()
 
@@ -242,10 +243,6 @@ def _deduplicate_errors(errors: list[ValidationError]) -> list[ValidationError]:
         elif err.error_type == "CST_HIPOTESE":
             lines_cst_hyp.add(err.line_number)
 
-    if not lines_aliq_hyp and not lines_cst_hyp:
-        return errors
-
-    # Tipos suprimidos por cada hipotese (sintomas genericos da mesma causa raiz)
     _SUPRIMIDOS_POR_ALIQ = {"CST_ALIQ_ZERO_FORTE"}
     _SUPRIMIDOS_POR_CST = {
         "CST_ALIQ_ZERO_FORTE",
@@ -253,7 +250,7 @@ def _deduplicate_errors(errors: list[ValidationError]) -> list[ValidationError]:
         "ISENCAO_INCONSISTENTE",
     }
 
-    result = []
+    after_hyp = []
     for err in errors:
         ln = err.line_number
         et = err.error_type
@@ -263,7 +260,37 @@ def _deduplicate_errors(errors: list[ValidationError]) -> list[ValidationError]:
         if ln in lines_cst_hyp and et in _SUPRIMIDOS_POR_CST:
             continue
 
-        result.append(err)
+        after_hyp.append(err)
+
+    # ── Estrategia 2: mesma linha + mesmo campo = manter o melhor ──
+    # Quando dois erros apontam para o mesmo (linha, campo), manter
+    # o que tem expected_value (acionavel) ou o mais especifico.
+    seen: dict[tuple[int, str], ValidationError] = {}
+    result = []
+
+    for err in after_hyp:
+        key = (err.line_number, err.field_name or "")
+
+        # Erros sem field_name (genericos) nao deduplicam por campo
+        if not err.field_name:
+            result.append(err)
+            continue
+
+        if key not in seen:
+            seen[key] = err
+            result.append(err)
+        else:
+            existing = seen[key]
+            # Preferir o que tem expected_value (acionavel pelo usuario)
+            if err.expected_value and not existing.expected_value:
+                result.remove(existing)
+                seen[key] = err
+                result.append(err)
+            # Se ambos tem expected_value, preferir o mais especifico
+            # (CALCULO_DIVERGENTE > CRUZAMENTO_DIVERGENTE)
+            elif err.expected_value and existing.expected_value:
+                # Manter o existente (primeiro encontrado)
+                pass
 
     return result
 

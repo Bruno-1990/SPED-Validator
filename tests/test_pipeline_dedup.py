@@ -109,17 +109,18 @@ class TestDeduplicateErrors:
 
         assert len(result) == 4
 
-    def test_non_hypothesis_errors_never_suppressed(self):
-        """Erros não-hipotese (BENEFICIO_NAO_VINCULADO etc.) nunca são suprimidos."""
+    def test_non_hypothesis_errors_different_fields_not_suppressed(self):
+        """Erros em campos diferentes na mesma linha nunca são suprimidos."""
         errors = [
-            _make_error("ALIQ_ICMS_AUSENTE", line_number=10),
-            _make_error("BENEFICIO_NAO_VINCULADO", line_number=10),
-            _make_error("CALCULO_DIVERGENTE", line_number=10),
-            _make_error("MISSING_REQUIRED", line_number=10),
+            _make_error("ALIQ_ICMS_AUSENTE", line_number=10, field_name="ALIQ_ICMS"),
+            _make_error("BENEFICIO_NAO_VINCULADO", line_number=10, field_name="COD_ITEM"),
+            _make_error("CALCULO_DIVERGENTE", line_number=10, field_name="VL_ICMS"),
+            _make_error("MISSING_REQUIRED", line_number=10, field_name="QTD"),
         ]
         result = _deduplicate_errors(errors)
 
         types = [e.error_type for e in result]
+        assert len(result) == 4
         assert "BENEFICIO_NAO_VINCULADO" in types
         assert "CALCULO_DIVERGENTE" in types
         assert "MISSING_REQUIRED" in types
@@ -162,6 +163,31 @@ class TestDeduplicateErrors:
         assert ("ALIQ_ICMS_AUSENTE", 10) in result_pairs
         assert ("CST_HIPOTESE", 20) in result_pairs
         assert ("CST_ALIQ_ZERO_FORTE", 30) in result_pairs
+
+    def test_same_line_same_field_keeps_one_with_expected_value(self):
+        """Mesma linha + mesmo campo: mantém o que tem expected_value."""
+        errors = [
+            _make_error("CRUZAMENTO_DIVERGENTE", line_number=7352,
+                        field_name="VL_TOT_DEBITOS"),
+            _make_error("CALCULO_DIVERGENTE", line_number=7352,
+                        field_name="VL_TOT_DEBITOS", expected_value="29800384.66"),
+        ]
+        result = _deduplicate_errors(errors)
+
+        assert len(result) == 1
+        assert result[0].error_type == "CALCULO_DIVERGENTE"
+        assert result[0].expected_value == "29800384.66"
+
+    def test_same_line_different_fields_both_kept(self):
+        """Mesma linha mas campos diferentes: ambos mantidos."""
+        errors = [
+            _make_error("CALCULO_DIVERGENTE", line_number=100,
+                        field_name="VL_TOT_DEBITOS", expected_value="1000"),
+            _make_error("CALCULO_DIVERGENTE", line_number=100,
+                        field_name="VL_TOT_CREDITOS", expected_value="2000"),
+        ]
+        result = _deduplicate_errors(errors)
+        assert len(result) == 2
 
 
 # ══════════════════════════════════════════════
