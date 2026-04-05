@@ -73,6 +73,18 @@ class TestDeduplicateErrors:
         assert "CST_HIPOTESE" in types
         assert "CST_ALIQ_ZERO_FORTE" not in types
 
+    def test_cst_hipotese_suppresses_isencao_inconsistente_same_line(self):
+        """CST_HIPOTESE deve suprimir ISENCAO_INCONSISTENTE na mesma linha."""
+        errors = [
+            _make_error("CST_HIPOTESE", line_number=4926),
+            _make_error("ISENCAO_INCONSISTENTE", line_number=4926),
+        ]
+        result = _deduplicate_errors(errors)
+
+        types = [e.error_type for e in result]
+        assert "CST_HIPOTESE" in types
+        assert "ISENCAO_INCONSISTENTE" not in types
+
     def test_cst_hipotese_suppresses_cst_aliq_zero_moderado_same_line(self):
         """CST_HIPOTESE deve suprimir CST_ALIQ_ZERO_MODERADO na mesma linha."""
         errors = [

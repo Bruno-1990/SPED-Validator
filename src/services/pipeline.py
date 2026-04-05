@@ -245,9 +245,13 @@ def _deduplicate_errors(errors: list[ValidationError]) -> list[ValidationError]:
     if not lines_aliq_hyp and not lines_cst_hyp:
         return errors
 
-    # Tipos suprimidos por cada hipotese
+    # Tipos suprimidos por cada hipotese (sintomas genericos da mesma causa raiz)
     _SUPRIMIDOS_POR_ALIQ = {"CST_ALIQ_ZERO_FORTE"}
-    _SUPRIMIDOS_POR_CST = {"CST_ALIQ_ZERO_FORTE", "CST_ALIQ_ZERO_MODERADO"}
+    _SUPRIMIDOS_POR_CST = {
+        "CST_ALIQ_ZERO_FORTE",
+        "CST_ALIQ_ZERO_MODERADO",
+        "ISENCAO_INCONSISTENTE",
+    }
 
     result = []
     for err in errors:
