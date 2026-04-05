@@ -253,6 +253,8 @@ def _severity_for(error_type: str) -> str:
         "BENEFICIO_NAO_VINCULADO",
         "DEVOLUCAO_INCONSISTENTE",
         "IPI_ALIQ_NCM_DIVERGENTE",
+        # Arredondamento de aliquota
+        "CALCULO_ARREDONDAMENTO",
         # DIFAL — warning
         "DIFAL_INDEVIDO_REVENDA",
         "DIFAL_UF_DESTINO_INCONSISTENTE",
@@ -261,7 +263,6 @@ def _severity_for(error_type: str) -> str:
         "DIFAL_PERFIL_INCOMPATIVEL",
     }
     info = {
-        "CALCULO_ARREDONDAMENTO",
         "CST_ALIQ_ZERO_MODERADO", "CST_ALIQ_ZERO_INFO",
         "IPI_CST_ALIQ_ZERO", "PIS_CST_ALIQ_ZERO", "COFINS_CST_ALIQ_ZERO",
         "MONOFASICO_ENTRADA_CST04",
