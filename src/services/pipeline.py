@@ -181,31 +181,14 @@ def run_pipeline(
         _enrich_errors(db, file_id, doc_db_path, progress)
         progress.stage_progress = 100
 
-        db.execute(
-            "UPDATE sped_files SET validation_stage = 'auto_correcao' WHERE id = ?",
-            (file_id,),
-        )
-        db.commit()
-
-        # ── Estágio 4: Auto-correção ──
-        progress.stage = "auto_correcao"
-        progress.stage_progress = 0
-        progress.detail = "Aplicando correcoes automaticas em erros deterministicos"
-
-        from .auto_correction_service import auto_correct_errors
-        corrected = auto_correct_errors(db, file_id, doc_db_path)
-        progress.auto_corrected = len(corrected)
-        progress.stage_progress = 100
-
         # Finalizar
         db.execute(
             """UPDATE sped_files
                SET status = 'validated',
                    total_errors = ?,
-                   validation_stage = 'concluido',
-                   auto_corrections_applied = ?
+                   validation_stage = 'concluido'
                WHERE id = ?""",
-            (progress.total_errors, progress.auto_corrected, file_id),
+            (progress.total_errors, file_id),
         )
         db.commit()
 
@@ -214,8 +197,7 @@ def run_pipeline(
             (
                 file_id,
                 "validate",
-                f"Pipeline completo: {progress.total_errors} erros, "
-                f"{progress.auto_corrected} auto-corrigidos.",
+                f"Pipeline completo: {progress.total_errors} erros encontrados.",
             ),
         )
         db.commit()

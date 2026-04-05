@@ -36,9 +36,6 @@ export const api = {
     es.addEventListener('stage_complete', (e) => {
       onEvent({ type: 'stage_complete', ...JSON.parse(e.data) })
     })
-    es.addEventListener('auto_correction', (e) => {
-      onEvent({ type: 'auto_correction', ...JSON.parse(e.data) })
-    })
     es.addEventListener('done', (e) => {
       onEvent({ type: 'done', ...JSON.parse(e.data) })
       es.close()

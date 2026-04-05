@@ -107,17 +107,9 @@ async def validate_stream(file_id: int) -> StreamingResponse:
             }, ensure_ascii=False)
             yield f"event: stage_complete\ndata: {stage_data}\n\n"
 
-        # Evento de auto-correção
-        if result.auto_corrected > 0:
-            auto_data = json.dumps({
-                "corrected": result.auto_corrected,
-            }, ensure_ascii=False)
-            yield f"event: auto_correction\ndata: {auto_data}\n\n"
-
         # Evento final
         done_data = json.dumps({
             "total_errors": result.total_errors,
-            "auto_corrected": result.auto_corrected,
             "status": "validated",
             "errors_by_stage": result.errors_by_stage,
         }, ensure_ascii=False)

@@ -7,11 +7,10 @@ const STAGE_LABELS: Record<string, string> = {
   estrutural: 'Analise Estrutural',
   cruzamento: 'Cruzamento de Dados',
   enriquecimento: 'Consultando Base Legal',
-  auto_correcao: 'Correcao Automatica',
   concluido: 'Concluido',
 }
 
-const STAGE_ORDER = ['estrutural', 'cruzamento', 'enriquecimento', 'auto_correcao']
+const STAGE_ORDER = ['estrutural', 'cruzamento', 'enriquecimento']
 
 const SEVERITY_LABELS: Record<string, string> = {
   critical: 'Critico',
@@ -197,23 +196,7 @@ export default function FileDetailPage() {
           <p className="text-sm text-gray-500">Conformidade</p>
           <p className={`text-2xl font-bold ${Number(conformidade) >= 95 ? 'text-green-600' : 'text-orange-600'}`}>{conformidade}%</p>
         </div>
-        <div className="bg-white p-4 rounded shadow border-l-4 border-green-500">
-          <p className="text-sm text-gray-500">Correcoes</p>
-          <p className="text-2xl font-bold text-green-600">{pipelineEvent?.auto_corrected ?? file.auto_corrections_applied ?? 0}</p>
-        </div>
       </div>
-
-      {/* Auto-correction banner */}
-      {file.status === 'validated' && file.auto_corrections_applied > 0 && !validating && (
-        <div className="bg-green-50 border border-green-200 rounded p-4 mb-6 flex items-center justify-between">
-          <span className="text-green-800">
-            {file.auto_corrections_applied} erro{file.auto_corrections_applied !== 1 ? 's' : ''} corrigido{file.auto_corrections_applied !== 1 ? 's' : ''} automaticamente.
-          </span>
-          <a href={api.downloadSped(id)} className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700">
-            Baixar Arquivo Corrigido
-          </a>
-        </div>
-      )}
 
       {/* Pipeline Progress */}
       {validating && pipelineEvent && <PipelineProgressPanel event={pipelineEvent} />}
@@ -325,11 +308,6 @@ function PipelineProgressPanel({ event }: { event: PipelineEvent }) {
           }}
         />
       </div>
-      {event.auto_corrected && event.auto_corrected > 0 && (
-        <div className="mt-3 bg-green-50 text-green-700 text-sm p-2 rounded">
-          {event.auto_corrected} apontamento{event.auto_corrected !== 1 ? 's' : ''} corrigido{event.auto_corrected !== 1 ? 's' : ''} automaticamente
-        </div>
-      )}
     </div>
   )
 }
