@@ -117,56 +117,12 @@ def validate_cadastro_refs(groups: dict[str, list[SpedRecord]]) -> list[Validati
 def validate_c_vs_e(groups: dict[str, list[SpedRecord]]) -> list[ValidationError]:
     """Cruza totais dos C190 com valores declarados no E110.
 
-    C190 com CFOP de saida (5xxx, 6xxx, 7xxx) -> debitos
-    C190 com CFOP de entrada (1xxx, 2xxx, 3xxx) -> creditos
+    NOTA: validacao E110 completa (com deteccao de E111, D190, DIFAL)
+    e feita pelo tax_recalc.recalc_e110_totals(). Esta funcao nao
+    duplica essa validacao.
     """
-    errors: list[ValidationError] = []
-
-    c190_records = groups.get("C190", [])
-    e110_records = groups.get("E110", [])
-
-    if not c190_records or not e110_records:
-        return errors
-
-    # Somar ICMS dos C190 separando por tipo de operacao
-    soma_debitos = 0.0
-    soma_creditos = 0.0
-
-    for rec in c190_records:
-        cfop = get_field(rec, 2)
-        vl_icms = to_float(get_field(rec, 6))
-
-        if cfop and cfop[0] in ("5", "6", "7"):
-            soma_debitos += vl_icms
-        elif cfop and cfop[0] in ("1", "2", "3"):
-            soma_creditos += vl_icms
-
-    # Comparar com E110
-    for e110 in e110_records:
-        vl_tot_debitos = to_float(get_field(e110, 1))
-        vl_tot_creditos = to_float(get_field(e110, 5))
-
-        if abs(soma_debitos - vl_tot_debitos) > TOLERANCE:
-            errors.append(_error(
-                "E110", e110.line_number, "CRUZAMENTO_DIVERGENTE",
-                f"VL_TOT_DEBITOS do E110 ({vl_tot_debitos:.2f}) diverge da soma "
-                f"dos C190 de saida ({soma_debitos:.2f}). "
-                f"Confianca: alta (100 pontos).",
-                field_name="VL_TOT_DEBITOS",
-                expected_value=f"{soma_debitos:.2f}",
-                value=f"{vl_tot_debitos:.2f}",
-            ))
-
-        if abs(soma_creditos - vl_tot_creditos) > TOLERANCE:
-            errors.append(_error(
-                "E110", e110.line_number, "CRUZAMENTO_DIVERGENTE",
-                f"VL_TOT_CREDITOS do E110 ({vl_tot_creditos:.2f}) diverge da soma "
-                f"dos C190 de entrada ({soma_creditos:.2f}). "
-                f"Confianca: alta (100 pontos).",
-                field_name="VL_TOT_CREDITOS",
-                expected_value=f"{soma_creditos:.2f}",
-                value=f"{vl_tot_creditos:.2f}",
-            ))
+    # Delegado ao tax_recalc.py que considera E111, D190, C390, DIFAL
+    return []
 
     return errors
 

@@ -87,51 +87,17 @@ class TestValidateCadastroRefs:
 # ──────────────────────────────────────────────
 
 class TestValidateCvsE:
-    def test_valid_cross(self) -> None:
-        """Débitos dos C190 = VL_TOT_DEBITOS do E110."""
-        records = [
-            # C190 saída: ICMS=180
-            rec("C190", ["C190", "000", "5102", "18,00", "1000,00", "1000,00", "180,00"], line=1),
-            # C190 saída: ICMS=180
-            rec("C190", ["C190", "000", "5102", "18,00", "1000,00", "1000,00", "180,00"], line=2),
-            # C190 entrada: ICMS=90
-            rec("C190", ["C190", "000", "1019", "18,00", "500,00", "500,00", "90,00"], line=3),
-            # E110: débitos=360, créditos=90
-            rec("E110", ["E110", "360,00", "0", "0", "0", "90,00"], line=4),
-        ]
-        groups = group_by_register(records)
-        errors = validate_c_vs_e(groups)
-        assert len(errors) == 0
+    """Validacao E110 delegada ao tax_recalc.recalc_e110_totals()."""
 
-    def test_debitos_divergentes(self) -> None:
+    def test_delegated_returns_empty(self) -> None:
+        """validate_c_vs_e agora delega ao tax_recalc e retorna vazio."""
         records = [
             rec("C190", ["C190", "000", "5102", "18,00", "1000,00", "1000,00", "180,00"], line=1),
             rec("E110", ["E110", "999,00", "0", "0", "0", "0"], line=2),
         ]
         groups = group_by_register(records)
         errors = validate_c_vs_e(groups)
-        assert any("VL_TOT_DEBITOS" in e.field_name for e in errors)
-
-    def test_creditos_divergentes(self) -> None:
-        records = [
-            rec("C190", ["C190", "000", "1019", "18,00", "500,00", "500,00", "90,00"], line=1),
-            rec("E110", ["E110", "0", "0", "0", "0", "999,00"], line=2),
-        ]
-        groups = group_by_register(records)
-        errors = validate_c_vs_e(groups)
-        assert any("VL_TOT_CREDITOS" in e.field_name for e in errors)
-
-    def test_no_c190_no_errors(self) -> None:
-        records = [rec("E110", ["E110", "0", "0", "0", "0", "0"], line=1)]
-        groups = group_by_register(records)
-        errors = validate_c_vs_e(groups)
-        assert len(errors) == 0
-
-    def test_no_e110_no_errors(self) -> None:
-        records = [rec("C190", ["C190", "000", "5102", "18", "1000", "1000", "180"], line=1)]
-        groups = group_by_register(records)
-        errors = validate_c_vs_e(groups)
-        assert len(errors) == 0
+        assert len(errors) == 0  # Delegado ao tax_recalc
 
 
 # ──────────────────────────────────────────────

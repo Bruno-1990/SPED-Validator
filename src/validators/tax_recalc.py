@@ -285,6 +285,10 @@ def recalc_e110_totals(groups: dict[str, list[SpedRecord]]) -> list[ValidationEr
     Soma ICMS dos C190 com CFOP de saida -> debitos
     Soma ICMS dos C190 com CFOP de entrada -> creditos
     Compara com VL_TOT_DEBITOS e VL_TOT_CREDITOS do E110.
+
+    IMPORTANTE: O E110 pode ter componentes nao cobertos pelo recalculo
+    (D190, C390, C590, ajustes E111, DIFAL E300+). O sistema informa
+    o que foi considerado e o que pode justificar a diferenca.
     """
     errors: list[ValidationError] = []
 
@@ -312,6 +316,29 @@ def recalc_e110_totals(groups: dict[str, list[SpedRecord]]) -> list[ValidationEr
         elif cfop and cfop[0] in ("1", "2", "3"):
             totals.creditos_d += vl_icms
 
+    # Detectar presenca de componentes nao cobertos pelo recalculo
+    has_e111 = len(groups.get("E111", [])) > 0
+    has_d190 = len(groups.get("D190", [])) > 0
+    has_c390 = len(groups.get("C390", [])) > 0
+    has_c590 = len(groups.get("C590", [])) > 0
+    has_e300 = len(groups.get("E300", [])) > 0
+
+    nao_cobertos: list[str] = []
+    if has_e111:
+        nao_cobertos.append("E111 (ajustes de apuracao)")
+    if has_d190:
+        nao_cobertos.append("D190 (servicos)")
+    if has_c390:
+        nao_cobertos.append("C390 (cupons fiscais)")
+    if has_c590:
+        nao_cobertos.append("C590 (energia/comunicacao)")
+    if has_e300:
+        nao_cobertos.append("E300+ (DIFAL)")
+
+    # Ajustar confianca: se ha componentes nao cobertos, a sugestao
+    # de correcao pode estar incompleta
+    tem_lacunas = len(nao_cobertos) > 0
+
     for e110 in e110_records:
         vl_tot_debitos = to_float(get_field(e110, 1))
         vl_tot_creditos = to_float(get_field(e110, 5))
@@ -319,12 +346,23 @@ def recalc_e110_totals(groups: dict[str, list[SpedRecord]]) -> list[ValidationEr
         # Debitos
         diff_deb = abs(totals.total_debitos - vl_tot_debitos)
         if diff_deb > TOLERANCE:
+            if tem_lacunas:
+                score = 60
+                aviso = (
+                    f" ATENCAO: o recalculo considerou apenas C190+D690. "
+                    f"O arquivo tambem contem {', '.join(nao_cobertos)} que "
+                    f"podem justificar a diferenca. Avalie antes de corrigir."
+                )
+            else:
+                score = 100
+                aviso = ""
+
             errors.append(make_error(
                 e110, "VL_TOT_DEBITOS", "CALCULO_DIVERGENTE",
                 f"Totalizacao E110: debitos recalculados={totals.total_debitos:.2f} "
                 f"(C190={totals.debitos_c190:.2f} + D={totals.debitos_d:.2f}) "
-                f"vs declarado={vl_tot_debitos:.2f} (dif={diff_deb:.2f}). "
-                f"Confianca: alta (100 pontos).",
+                f"vs declarado={vl_tot_debitos:.2f} (dif={diff_deb:.2f}).{aviso} "
+                f"Confianca: {'provavel' if tem_lacunas else 'alta'} ({score} pontos).",
                 field_no=2,
                 expected_value=f"{totals.total_debitos:.2f}",
                 value=f"{vl_tot_debitos:.2f}",
@@ -333,12 +371,23 @@ def recalc_e110_totals(groups: dict[str, list[SpedRecord]]) -> list[ValidationEr
         # Creditos
         diff_cred = abs(totals.total_creditos - vl_tot_creditos)
         if diff_cred > TOLERANCE:
+            if tem_lacunas:
+                score = 60
+                aviso = (
+                    f" ATENCAO: o recalculo considerou apenas C190+D690. "
+                    f"O arquivo tambem contem {', '.join(nao_cobertos)} que "
+                    f"podem justificar a diferenca. Avalie antes de corrigir."
+                )
+            else:
+                score = 100
+                aviso = ""
+
             errors.append(make_error(
                 e110, "VL_TOT_CREDITOS", "CALCULO_DIVERGENTE",
                 f"Totalizacao E110: creditos recalculados={totals.total_creditos:.2f} "
                 f"(C190={totals.creditos_c190:.2f} + D={totals.creditos_d:.2f}) "
-                f"vs declarado={vl_tot_creditos:.2f} (dif={diff_cred:.2f}). "
-                f"Confianca: alta (100 pontos).",
+                f"vs declarado={vl_tot_creditos:.2f} (dif={diff_cred:.2f}).{aviso} "
+                f"Confianca: {'provavel' if tem_lacunas else 'alta'} ({score} pontos).",
                 field_no=6,
                 expected_value=f"{totals.total_creditos:.2f}",
                 value=f"{vl_tot_creditos:.2f}",
