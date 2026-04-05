@@ -394,7 +394,8 @@ def _enrich_errors(
 
         # Determinar se auto-corrigível (botao "Corrigir" no frontend)
         auto_correctable = 0
-        if error_type in ("CALCULO_DIVERGENTE", "SOMA_DIVERGENTE") and sample["expected_value"]:
+        if error_type in ("CALCULO_DIVERGENTE", "SOMA_DIVERGENTE", "CRUZAMENTO_DIVERGENTE",
+                         "C190_DIVERGE_C170") and sample["expected_value"]:
             auto_correctable = 1
         elif error_type == "CONTAGEM_DIVERGENTE" and sample["expected_value"]:
             auto_correctable = 1
