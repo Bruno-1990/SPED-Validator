@@ -160,6 +160,9 @@ def run_pipeline(
         cross_errors.extend(validate_cst_hypotheses(records))
         progress.stage_progress = 100
 
+        # Deduplicar: hipoteses inteligentes supersede erros genericos
+        cross_errors = _deduplicate_errors(cross_errors)
+
         _persist_stage_errors(db, file_id, cross_errors)
         progress.errors_by_stage["cruzamento"] = len(cross_errors)
         progress.total_errors += len(cross_errors)
@@ -239,6 +242,45 @@ def run_pipeline(
 # ──────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────
+
+def _deduplicate_errors(errors: list[ValidationError]) -> list[ValidationError]:
+    """Remove erros genericos quando hipotese inteligente ja cobre o mesmo item.
+
+    Regras de supressao:
+    - ALIQ_ICMS_AUSENTE supersede CST_ALIQ_ZERO_FORTE (mesma linha)
+    - CST_HIPOTESE supersede CST_ALIQ_ZERO_FORTE e CST_ALIQ_ZERO_MODERADO (mesma linha)
+    """
+    # Coletar linhas cobertas por hipoteses
+    lines_aliq_hyp: set[int] = set()
+    lines_cst_hyp: set[int] = set()
+
+    for err in errors:
+        if err.error_type == "ALIQ_ICMS_AUSENTE":
+            lines_aliq_hyp.add(err.line_number)
+        elif err.error_type == "CST_HIPOTESE":
+            lines_cst_hyp.add(err.line_number)
+
+    if not lines_aliq_hyp and not lines_cst_hyp:
+        return errors
+
+    # Tipos suprimidos por cada hipotese
+    _SUPRIMIDOS_POR_ALIQ = {"CST_ALIQ_ZERO_FORTE"}
+    _SUPRIMIDOS_POR_CST = {"CST_ALIQ_ZERO_FORTE", "CST_ALIQ_ZERO_MODERADO"}
+
+    result = []
+    for err in errors:
+        ln = err.line_number
+        et = err.error_type
+
+        if ln in lines_aliq_hyp and et in _SUPRIMIDOS_POR_ALIQ:
+            continue
+        if ln in lines_cst_hyp and et in _SUPRIMIDOS_POR_CST:
+            continue
+
+        result.append(err)
+
+    return result
+
 
 def _persist_stage_errors(
     db: sqlite3.Connection,
