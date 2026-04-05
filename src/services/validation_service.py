@@ -223,6 +223,8 @@ def _severity_for(error_type: str) -> str:
         # Hipotese de correcao
         "ALIQ_ICMS_AUSENTE",
         "CST_HIPOTESE",
+        # Arredondamento de aliquota
+        "CALCULO_ARREDONDAMENTO",
         # DIFAL — critical
         "DIFAL_FALTANTE_CONSUMO_FINAL",
         "DIFAL_ALIQ_INTERNA_INCORRETA",
@@ -253,8 +255,6 @@ def _severity_for(error_type: str) -> str:
         "BENEFICIO_NAO_VINCULADO",
         "DEVOLUCAO_INCONSISTENTE",
         "IPI_ALIQ_NCM_DIVERGENTE",
-        # Arredondamento de aliquota
-        "CALCULO_ARREDONDAMENTO",
         # DIFAL — warning
         "DIFAL_INDEVIDO_REVENDA",
         "DIFAL_UF_DESTINO_INCONSISTENTE",
