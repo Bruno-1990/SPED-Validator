@@ -211,23 +211,12 @@ class TestValidateC170:
         errors = _validate_c170(r, parent)
         assert any(e.error_type == "CFOP_MISMATCH" for e in errors)
 
-    def test_icms_calculo_divergente(self) -> None:
+    def test_icms_calculo_delegado_ao_tax_recalc(self) -> None:
+        """Recalculo VL_ICMS = BC * ALIQ delegado ao tax_recalc.py."""
         r = rec("C170", ["C170", "1", "PROD", "Desc", "100", "UN", "1000,00",
                          "0", "0", "000", "1019", "001", "1000,00", "18,00", "999,99"])
         errors = _validate_c170(r)
-        assert any(e.error_type == "CALCULO_DIVERGENTE" for e in errors)
-
-    def test_icms_calculo_ok(self) -> None:
-        r = rec("C170", ["C170", "1", "PROD", "Desc", "100", "UN", "1000,00",
-                         "0", "0", "000", "1019", "001", "1000,00", "18,00", "180,00"])
-        errors = _validate_c170(r)
-        assert not any(e.error_type == "CALCULO_DIVERGENTE" for e in errors)
-
-    def test_icms_within_tolerance(self) -> None:
-        # 1000 * 18 / 100 = 180.00, declarado 180.01 -> dentro da tolerância
-        r = rec("C170", ["C170", "1", "PROD", "Desc", "100", "UN", "1000,00",
-                         "0", "0", "000", "1019", "001", "1000,00", "18,00", "180,01"])
-        errors = _validate_c170(r)
+        # Nao deve gerar CALCULO_DIVERGENTE aqui (tratado por tax_recalc)
         assert not any(e.error_type == "CALCULO_DIVERGENTE" for e in errors)
 
     def test_no_parent_no_cfop_check(self) -> None:

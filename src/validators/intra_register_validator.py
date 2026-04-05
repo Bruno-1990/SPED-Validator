@@ -256,19 +256,8 @@ def _validate_c170(
                 field_no=10,
             ))
 
-    # Regra: VL_BC_ICMS * ALIQ_ICMS / 100 ~= VL_ICMS
-    if (vl_bc_icms is not None and aliq_icms is not None and vl_icms is not None
-            and vl_bc_icms > 0 and aliq_icms > 0):
-        icms_calc = vl_bc_icms * aliq_icms / 100
-        diff = abs(icms_calc - vl_icms)
-        if diff > TOLERANCE:
-            errors.append(make_error(
-                record, "VL_ICMS", "CALCULO_DIVERGENTE",
-                f"VL_ICMS diverge: calculado={icms_calc:.2f} vs declarado={vl_icms:.2f} (dif={diff:.2f}).",
-                field_no=15,
-                expected_value=f"{icms_calc:.2f}",
-                value=f"{vl_icms:.2f}",
-            ))
+    # Nota: recalculo VL_ICMS = BC * ALIQ delegado ao tax_recalc.py
+    # que trata arredondamento de aliquota (Simples Nacional, etc.)
 
     return errors
 
