@@ -90,6 +90,12 @@ def recalc_icms_item(record: SpedRecord) -> list[ValidationError]:
     icms_calc = vl_bc_icms * aliq_icms / 100
     diff = abs(icms_calc - vl_icms)
     if diff > TOLERANCE:
+        # Caso especial: ALIQ=0 mas VL_ICMS > 0 com BC > 0
+        # Tratado pelo correction_hypothesis.py com analise de confianca,
+        # cruzamento com itens irmaos e C190. Nao duplicar aqui.
+        if aliq_icms == 0 and vl_icms > 0 and vl_bc_icms > 0:
+            return errors
+
         errors.append(make_error(
             record, "VL_ICMS", "CALCULO_DIVERGENTE",
             f"ICMS: calculado={icms_calc:.2f} (BC {vl_bc_icms:.2f} x {aliq_icms:.2f}%) "

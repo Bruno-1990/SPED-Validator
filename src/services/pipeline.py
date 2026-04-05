@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from ..models import SpedRecord, ValidationError
 from ..validator import load_field_definitions, validate_records
 from ..validators.aliquota_validator import validate_aliquotas
+from ..validators.correction_hypothesis import validate_with_hypotheses
 from ..validators.audit_rules import validate_audit_rules
 from ..validators.beneficio_audit_validator import validate_beneficio_audit
 from ..validators.c190_validator import validate_c190
@@ -150,6 +151,10 @@ def run_pipeline(
         progress.detail = "Auditoria de beneficios fiscais e regras pendentes"
         cross_errors.extend(validate_beneficio_audit(records))
         cross_errors.extend(validate_pendentes(records))
+        progress.stage_progress = 97
+
+        progress.detail = "Hipoteses de correcao inteligente"
+        cross_errors.extend(validate_with_hypotheses(records))
         progress.stage_progress = 100
 
         _persist_stage_errors(db, file_id, cross_errors)

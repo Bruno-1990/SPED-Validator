@@ -540,6 +540,19 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
         ),
         "icon": "shield-alert",
     },
+    "ALIQ_ICMS_AUSENTE": {
+        "friendly": (
+            "Aliquota ICMS ausente (0%) com valor de imposto destacado "
+            "no registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "O campo ALIQ_ICMS esta zerado mas existe VL_ICMS calculado. "
+            "O motor identificou a aliquota provavel com base na relacao "
+            "entre base de calculo e valor do imposto, confirmada por "
+            "itens do mesmo documento e totalizacao C190."
+        ),
+        "icon": "calculator",
+    },
 }
 
 # Mensagem padrão para tipos não mapeados
