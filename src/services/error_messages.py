@@ -5,13 +5,18 @@ from __future__ import annotations
 # Template de mensagens por error_type.
 # Variáveis disponíveis: {field_name}, {register}, {line}, {value},
 # {expected}, {valid_values}, {difference}
+#
+# REGRA: guidance deve ser breve e direto (1-2 frases curtas).
+# Sempre terminar com referencia ao detalhe tecnico.
+_DETALHE = "Veja Detalhe tecnico para mais informacoes."
+
 ERROR_MESSAGES: dict[str, dict[str, str]] = {
     "MISSING_REQUIRED": {
         "friendly": (
             "O campo '{field_name}' é obrigatório mas está vazio "
             "no registro {register} (linha {line})."
         ),
-        "guidance": "Preencha este campo conforme o layout do registro.",
+        "guidance": f"Preencha este campo conforme o layout do registro. {_DETALHE}",
         "icon": "alert-circle",
     },
     "WRONG_TYPE": {
@@ -19,7 +24,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O campo '{field_name}' deveria ser numérico, "
             "mas contém o valor '{value}' no registro {register} (linha {line})."
         ),
-        "guidance": "Corrija o valor para um número válido.",
+        "guidance": f"Corrija o valor para um numero valido. {_DETALHE}",
         "icon": "type",
     },
     "WRONG_SIZE": {
@@ -27,7 +32,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O campo '{field_name}' excede o tamanho máximo permitido "
             "no registro {register} (linha {line})."
         ),
-        "guidance": "Reduza o valor para o tamanho máximo do campo.",
+        "guidance": f"Reduza o valor para o tamanho maximo do campo. {_DETALHE}",
         "icon": "maximize",
     },
     "INVALID_VALUE": {
@@ -35,7 +40,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O valor '{value}' não é aceito para '{field_name}'. "
             "Valores permitidos: {valid_values}."
         ),
-        "guidance": "Corrija para uma das opções listadas.",
+        "guidance": f"Corrija para uma das opcoes listadas. {_DETALHE}",
         "icon": "x-circle",
     },
     "INVALID_DATE": {
@@ -43,7 +48,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "A data '{value}' no campo '{field_name}' não é válida "
             "(formato esperado: DDMMAAAA)."
         ),
-        "guidance": "Informe uma data válida no formato dia/mês/ano (DDMMAAAA).",
+        "guidance": f"Informe uma data valida no formato DDMMAAAA. {_DETALHE}",
         "icon": "calendar-x",
     },
     "DATE_OUT_OF_PERIOD": {
@@ -51,10 +56,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "A data '{value}' no campo '{field_name}' está fora do período "
             "de apuração informado no registro 0000."
         ),
-        "guidance": (
-            "Verifique se a data do documento está dentro do período "
-            "DT_INI e DT_FIN declarado."
-        ),
+        "guidance": f"Verifique se a data esta dentro do periodo DT_INI/DT_FIN. {_DETALHE}",
         "icon": "calendar-range",
     },
     "DATE_ORDER": {
@@ -62,7 +64,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "A data do documento (DT_DOC) é posterior à data de entrada/saída "
             "(DT_E_S) no registro {register} (linha {line})."
         ),
-        "guidance": "A data do documento deve ser anterior ou igual à data de entrada/saída.",
+        "guidance": f"DT_DOC deve ser anterior ou igual a DT_E_S. {_DETALHE}",
         "icon": "calendar-arrow",
     },
     "MISSING_CONDITIONAL": {
@@ -70,10 +72,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O campo '{field_name}' é obrigatório nesta situação "
             "no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Este campo é condicional e deve ser preenchido conforme "
-            "o tipo de operação."
-        ),
+        "guidance": f"Preencha conforme o tipo de operacao. {_DETALHE}",
         "icon": "alert-triangle",
     },
     "INCONSISTENCY": {
@@ -81,7 +80,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Inconsistência detectada no campo '{field_name}' "
             "do registro {register} (linha {line}): {value}."
         ),
-        "guidance": "Revise o status do documento e os valores declarados.",
+        "guidance": f"Revise o status do documento e os valores declarados. {_DETALHE}",
         "icon": "alert-octagon",
     },
     "CALCULO_DIVERGENTE": {
@@ -89,10 +88,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O cálculo de '{field_name}' não confere: "
             "esperado R$ {expected}, encontrado R$ {value}."
         ),
-        "guidance": (
-            "Verifique a base de cálculo e a alíquota aplicada. "
-            "Clique em Corrigir para aplicar o valor recalculado."
-        ),
+        "guidance": f"Clique em Corrigir para aplicar o valor recalculado. {_DETALHE}",
         "icon": "calculator",
     },
     "CALCULO_ARREDONDAMENTO": {
@@ -102,11 +98,8 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Valor declarado: R$ {value}."
         ),
         "guidance": (
-            "O ERP provavelmente calculou o imposto com uma aliquota de "
-            "precisao maior do que os 2 decimais gravados no SPED (comum "
-            "em operacoes do Simples Nacional, LC 123/2006). A taxa efetiva "
-            "derivada dos valores declarados e coerente com a aliquota "
-            "informada. Nenhuma correcao e necessaria."
+            "ERP calculou com aliquota de precisao maior que 2 decimais. "
+            f"Clique em Corrigir para padronizar, se desejado. {_DETALHE}"
         ),
         "icon": "info",
     },
@@ -115,7 +108,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Os totais do registro {register} não conferem "
             "com os documentos fiscais de origem."
         ),
-        "guidance": "Revise os valores dos documentos e da apuração.",
+        "guidance": f"Clique em Corrigir para ajustar o totalizador. {_DETALHE}",
         "icon": "git-branch",
     },
     "SOMA_DIVERGENTE": {
@@ -124,7 +117,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "em {register} (linha {line}). Esperado: R$ {expected}, "
             "encontrado: R$ {value}."
         ),
-        "guidance": "Revise os valores individuais e o totalizador.",
+        "guidance": f"Clique em Corrigir para ajustar. {_DETALHE}",
         "icon": "sigma",
     },
     "CONTAGEM_DIVERGENTE": {
@@ -132,7 +125,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "A quantidade de registros declarada no Bloco 9 "
             "não confere com o arquivo."
         ),
-        "guidance": "O Bloco 9 será recalculado automaticamente.",
+        "guidance": f"Clique em Corrigir para atualizar a contagem. {_DETALHE}",
         "icon": "hash",
     },
     "REF_INEXISTENTE": {
@@ -140,10 +133,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O código '{value}' usado em {register} não foi encontrado "
             "no cadastro (Bloco 0)."
         ),
-        "guidance": (
-            "Verifique se o cadastro 0150 (participantes) ou "
-            "0200 (itens) contém este código."
-        ),
+        "guidance": f"Verifique o cadastro 0150 ou 0200. {_DETALHE}",
         "icon": "link-broken",
     },
     "CFOP_MISMATCH": {
@@ -151,10 +141,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O CFOP '{value}' é incompatível com o tipo de operação "
             "declarado no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "CFOPs iniciados em 1/2/3 são de entrada; "
-            "5/6/7 são de saída. Verifique o IND_OPER do C100 pai."
-        ),
+        "guidance": f"1/2/3=entrada, 5/6/7=saida. Verifique o IND_OPER. {_DETALHE}",
         "icon": "arrows-cross",
     },
     "CST_INVALIDO": {
@@ -162,7 +149,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O código de situação tributária '{value}' não é válido "
             "para o campo '{field_name}'."
         ),
-        "guidance": "Consulte a Tabela A (origem) e Tabela B (tributação) do ICMS.",
+        "guidance": f"Consulte a Tabela A (origem) e Tabela B (tributacao). {_DETALHE}",
         "icon": "file-warning",
     },
     "ISENCAO_INCONSISTENTE": {
@@ -170,10 +157,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O CST indica isenção/não-tributação, mas há valores de "
             "imposto preenchidos no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Se o CST for 40, 41 ou 50, a base de cálculo "
-            "e o ICMS devem ser zero."
-        ),
+        "guidance": f"CST 40/41/50 exige BC e ICMS zerados. {_DETALHE}",
         "icon": "shield-alert",
     },
     "TRIBUTACAO_INCONSISTENTE": {
@@ -181,10 +165,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O CST indica tributação, mas o valor do imposto está "
             "zerado no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Se o CST for 00, 10, 20, 70 ou 90 e a base de cálculo "
-            "for maior que zero, o ICMS deve ser informado."
-        ),
+        "guidance": f"CST tributado com BC>0 exige ICMS preenchido. {_DETALHE}",
         "icon": "shield-x",
     },
     "VALOR_NEGATIVO": {
@@ -192,14 +173,14 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O campo '{field_name}' contém valor negativo "
             "no registro {register} (linha {line})."
         ),
-        "guidance": "Valores negativos não são permitidos neste campo.",
+        "guidance": f"Valores negativos nao sao permitidos. {_DETALHE}",
         "icon": "minus-circle",
     },
     "FORMATO_INVALIDO": {
         "friendly": (
             "O formato do campo '{field_name}' está inválido: '{value}'."
         ),
-        "guidance": "Verifique o formato esperado conforme o Guia Prático EFD.",
+        "guidance": f"Verifique o formato esperado no Guia Pratico EFD. {_DETALHE}",
         "icon": "file-x",
     },
     "CST_ALIQ_ZERO_FORTE": {
@@ -207,11 +188,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O CST indica tributação, mas a alíquota está zerada com base "
             "de cálculo preenchida no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Verifique se o item deveria usar CST de isenção (40), "
-            "não-tributação (41), suspensão (50) ou diferimento (51). "
-            "Se houver benefício fiscal, parametrize-o no sistema."
-        ),
+        "guidance": f"Verifique se o CST deveria ser 40/41/50/51. {_DETALHE}",
         "icon": "shield-alert",
     },
     "CST_ALIQ_ZERO_MODERADO": {
@@ -219,11 +196,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O CST indica tributação integral, mas base, alíquota e imposto "
             "estão todos zerados no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Verifique se há classificação fiscal incorreta ou lançamento "
-            "incompleto. Se a operação for isenta, use CST 40; se não "
-            "tributada, CST 41; se suspensa, CST 50."
-        ),
+        "guidance": f"Possivel classificacao incorreta. Revise o CST. {_DETALHE}",
         "icon": "alert-triangle",
     },
     "CST_ALIQ_ZERO_INFO": {
@@ -231,10 +204,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Operação com alíquota zero aceita no contexto fiscal "
             "do registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Nenhuma ação necessária. A alíquota zero é compatível "
-            "com o contexto da operação (exportação, remessa, etc.)."
-        ),
+        "guidance": f"Nenhuma acao necessaria. {_DETALHE}",
         "icon": "info",
     },
     "IPI_CST_ALIQ_ZERO": {
@@ -242,10 +212,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O CST_IPI indica tributação, mas base, alíquota e valor "
             "de IPI estão zerados no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Verifique se o CST_IPI deveria ser 02 (isento), "
-            "03 (não tributado), 04 (imune) ou 05 (suspenso)."
-        ),
+        "guidance": f"Verifique se o CST_IPI deveria ser 02/03/04/05. {_DETALHE}",
         "icon": "alert-triangle",
     },
     "PIS_CST_ALIQ_ZERO": {
@@ -253,10 +220,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O CST_PIS indica operação tributável, mas base, alíquota "
             "e valor estão zerados no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Verifique se o CST_PIS deveria ser 04 (não tributado), "
-            "06 (alíquota zero), 07 (isento) ou 08 (sem incidência)."
-        ),
+        "guidance": f"Verifique se o CST_PIS deveria ser 04/06/07/08. {_DETALHE}",
         "icon": "alert-triangle",
     },
     "COFINS_CST_ALIQ_ZERO": {
@@ -264,10 +228,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "O CST_COFINS indica operação tributável, mas base, alíquota "
             "e valor estão zerados no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Verifique se o CST_COFINS deveria ser 04 (não tributado), "
-            "06 (alíquota zero), 07 (isento) ou 08 (sem incidência)."
-        ),
+        "guidance": f"Verifique se o CST_COFINS deveria ser 04/06/07/08. {_DETALHE}",
         "icon": "alert-triangle",
     },
     "CST_CFOP_INCOMPATIVEL": {
@@ -275,11 +236,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Incompatibilidade entre CST e CFOP detectada "
             "no registro {register} (linha {line}): {value}."
         ),
-        "guidance": (
-            "Verifique se o CST está coerente com a natureza da operação "
-            "indicada pelo CFOP. Vendas tributadas normalmente usam CST de "
-            "tributação; exportações normalmente têm imunidade."
-        ),
+        "guidance": f"CST deve ser coerente com a natureza do CFOP. {_DETALHE}",
         "icon": "arrows-cross",
     },
     "MONOFASICO_ALIQ_INVALIDA": {
@@ -287,12 +244,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "CST indica operação monofásica, mas a alíquota é maior que zero "
             "no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Na revenda de produto monofásico (CST 04), a alíquota de "
-            "PIS/COFINS deve ser zero. O tributo já foi recolhido pelo "
-            "fabricante ou importador (Lei 10.147/00, Lei 10.485/02, "
-            "Lei 10.833/03)."
-        ),
+        "guidance": f"CST 04 (monofasico) exige aliquota zero. {_DETALHE}",
         "icon": "shield-x",
     },
     "MONOFASICO_VALOR_INDEVIDO": {
@@ -300,11 +252,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "CST indica operação monofásica, mas há valor de tributo "
             "preenchido no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Na revenda de produto monofásico, o valor de PIS/COFINS deve "
-            "ser zero. O recolhimento ocorre na etapa de industrialização "
-            "ou importação."
-        ),
+        "guidance": f"Monofasico: valor de PIS/COFINS deve ser zero. {_DETALHE}",
         "icon": "shield-x",
     },
     "MONOFASICO_NCM_INCOMPATIVEL": {
@@ -312,13 +260,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "CST monofásico informado, mas o NCM do produto não consta na "
             "lista de incidência monofásica ({register}, linha {line})."
         ),
-        "guidance": (
-            "Verifique se o produto realmente está sujeito à tributação "
-            "monofásica conforme Lei 10.147/00 (farmacêuticos/higiene), "
-            "Lei 10.485/02 (veículos/autopeças), Lei 10.833/03 (bebidas) "
-            "ou Lei 10.865/04 (combustíveis). Se não for monofásico, "
-            "corrija o CST para 01 (tributação normal) ou outro adequado."
-        ),
+        "guidance": f"Verifique se o NCM e realmente monofasico. {_DETALHE}",
         "icon": "alert-triangle",
     },
     "MONOFASICO_CST_INCORRETO": {
@@ -326,12 +268,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Produto com NCM sujeito a incidência monofásica está com CST "
             "de tributação normal no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Na revenda de produto monofásico, o CST de PIS/COFINS deveria "
-            "ser 04 (monofásico - revenda a alíquota zero). Tributar "
-            "normalmente um produto monofásico pode gerar recolhimento "
-            "indevido em duplicidade."
-        ),
+        "guidance": f"Revenda monofasica deveria usar CST 04. {_DETALHE}",
         "icon": "alert-octagon",
     },
     "MONOFASICO_ENTRADA_CST04": {
@@ -339,12 +276,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "CST monofásico (04) informado em operação de entrada "
             "no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Na entrada, o CST 04 se aplica à aquisição para revenda sem "
-            "direito a crédito. Se a empresa for industrializadora com "
-            "direito a crédito de PIS/COFINS, o CST deveria ser 50-56. "
-            "Verifique a natureza da operação e o regime tributário."
-        ),
+        "guidance": f"Verifique se ha direito a credito (CST 50-56). {_DETALHE}",
         "icon": "info",
     },
     # ── Regras de auditoria (audit_rules.py) ──
@@ -353,11 +285,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "CFOP interestadual com destinatário da mesma UF no "
             "registro {register} (linha {line})."
         ),
-        "guidance": (
-            "CFOP da série 6xxx indica operação interestadual, mas o "
-            "participante é da mesma UF do declarante. Verifique se o "
-            "CFOP deveria ser da série 5xxx (interna)."
-        ),
+        "guidance": f"CFOP 6xxx mas destinatario e da mesma UF. Deveria ser 5xxx? {_DETALHE}",
         "icon": "alert-octagon",
     },
     "DIFERIMENTO_COM_DEBITO": {
@@ -365,10 +293,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "CST de diferimento gerando débito de ICMS no "
             "registro {register} (linha {line})."
         ),
-        "guidance": (
-            "No diferimento (CST 051), o ICMS é adiado e não deve gerar "
-            "débito no período corrente, salvo diferimento parcial."
-        ),
+        "guidance": f"CST 051: ICMS adiado, nao deve gerar debito. {_DETALHE}",
         "icon": "alert-triangle",
     },
     "IPI_REFLEXO_INCORRETO": {
@@ -376,10 +301,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "IPI não recuperável parece não estar incluído na base do "
             "ICMS no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Para contribuintes que não recuperam IPI (CST IPI 02-05), "
-            "o valor do IPI deve integrar a base de cálculo do ICMS."
-        ),
+        "guidance": f"IPI nao recuperavel deve integrar a BC do ICMS. {_DETALHE}",
         "icon": "calculator",
     },
     "BENEFICIO_CARGA_REDUZIDA_DOCUMENTO": {
@@ -387,22 +309,14 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Operação interestadual com alíquota que não corresponde às "
             "alíquotas padrão (4%/7%/12%) no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Benefícios por crédito presumido devem ser tratados na "
-            "apuração (E111), não como redução direta no documento. "
-            "O destaque na NF-e deve ser integral."
-        ),
+        "guidance": f"Beneficio deve ser na apuracao (E111), nao no documento. {_DETALHE}",
         "icon": "shield-alert",
     },
     "VOLUME_ISENTO_ATIPICO": {
         "friendly": (
             "Percentual de operações isentas/NT acima de 50% do total."
         ),
-        "guidance": (
-            "Um volume elevado de operações com CST isento, não tributado "
-            "ou suspenso é atípico para a maioria dos contribuintes. "
-            "Revise se as classificações estão corretas."
-        ),
+        "guidance": f"Volume elevado de isencao e atipico. Revise as classificacoes. {_DETALHE}",
         "icon": "alert-triangle",
     },
     "REMESSA_SEM_RETORNO": {
@@ -410,20 +324,14 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Remessa sem retorno correspondente no período no "
             "registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Operações de remessa devem ter retorno dentro do prazo "
-            "legal. Remessa sem retorno pode indicar venda disfarçada."
-        ),
+        "guidance": f"Remessa sem retorno pode indicar venda disfarçada. {_DETALHE}",
         "icon": "arrows-cross",
     },
     "INVENTARIO_ITEM_PARADO": {
         "friendly": (
             "Item no inventário sem movimentação no período."
         ),
-        "guidance": (
-            "Itens no H010 sem nenhum C170 no período podem indicar "
-            "estoque obsoleto ou erro de inventário."
-        ),
+        "guidance": f"Possivel estoque obsoleto ou erro de inventario. {_DETALHE}",
         "icon": "info",
     },
     "PARAMETRIZACAO_SISTEMICA_INCORRETA": {
@@ -431,11 +339,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Padrão repetitivo de CST incompatível com CFOP detectado "
             "no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "O mesmo item apresenta CST incompatível com o CFOP na "
-            "maioria das ocorrências, indicando erro sistêmico no "
-            "cadastro fiscal do ERP."
-        ),
+        "guidance": f"Erro sistêmico no cadastro fiscal do ERP. {_DETALHE}",
         "icon": "alert-octagon",
     },
     "CREDITO_USO_CONSUMO_INDEVIDO": {
@@ -443,21 +347,14 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Item com entrada para comercialização mas sem saída e sem "
             "estoque no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "O item foi creditado como compra para revenda mas nunca "
-            "aparece em saídas nem no inventário. Pode ser material "
-            "de uso/consumo com crédito indevido de ICMS."
-        ),
+        "guidance": f"Possivel credito indevido de uso/consumo. {_DETALHE}",
         "icon": "shield-x",
     },
     "REGISTROS_ESSENCIAIS_AUSENTES": {
         "friendly": (
             "O arquivo SPED não contém registros essenciais para auditoria."
         ),
-        "guidance": (
-            "Registros como 0150, 0200, C100, C170, C190, E110 e H010 "
-            "são necessários para uma auditoria fiscal completa."
-        ),
+        "guidance": f"Registros 0150, 0200, C100, C170, C190, E110 necessarios. {_DETALHE}",
         "icon": "info",
     },
     # ── Fase 1 — Alíquotas ──
@@ -466,10 +363,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Operação interestadual com alíquota fora do padrão esperado "
             "(4%/7%/12%) no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Revise UF de origem, UF de destino, origem da mercadoria "
-            "e regra de tributação. Resolução Senado 22/1989 e 13/2012."
-        ),
+        "guidance": f"Revise UF origem/destino e regra de tributacao. {_DETALHE}",
         "icon": "alert-octagon",
     },
     "ALIQ_INTERNA_EM_INTERESTADUAL": {
@@ -477,11 +371,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Alíquota interna usada em operação interestadual "
             "no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Operações interestaduais usam 4%, 7% ou 12%. Alíquota >= 17% "
-            "é típica de operação interna. Confirme UF do destinatário "
-            "e parametrização do ERP."
-        ),
+        "guidance": f"Interestadual usa 4/7/12%. Aliq >=17% e interna. {_DETALHE}",
         "icon": "alert-octagon",
     },
     "ALIQ_INTERESTADUAL_EM_INTERNA": {
@@ -489,10 +379,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Alíquota interestadual usada em operação interna "
             "no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Operações internas não devem usar alíquotas interestaduais "
-            "(4%/7%/12%). Revise cadastro do cliente e UF do participante."
-        ),
+        "guidance": f"Operacao interna nao deve usar 4/7/12%. Revise o cadastro. {_DETALHE}",
         "icon": "alert-triangle",
     },
     "ALIQ_MEDIA_INDEVIDA": {
@@ -500,11 +387,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "C190 com alíquota intermediária não suportada pelos itens "
             "no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Cada item deve ser tratado com sua própria alíquota. "
-            "O C190 não deve conter alíquota média. Reprocesse o "
-            "agrupamento item a item."
-        ),
+        "guidance": f"C190 nao deve usar aliquota media. Agrupe item a item. {_DETALHE}",
         "icon": "calculator",
     },
     # ── Fase 1 — C190 ──
@@ -513,10 +396,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "C190 não fecha com a soma dos itens C170 "
             "no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "O C190 deve refletir exatamente os agrupamentos dos C170 "
-            "por CST+CFOP+ALIQ. Reprocesse o analítico da nota."
-        ),
+        "guidance": f"Clique em Corrigir para ajustar. {_DETALHE}",
         "icon": "sigma",
     },
     "C190_COMBINACAO_INCOMPATIVEL": {
@@ -524,11 +404,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Combinação atípica de CST/CFOP/ALIQ no C190 "
             "no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "Verifique se o CST é coerente com a alíquota e o CFOP. "
-            "CST isento não deveria ter alíquota; CST tributado deveria "
-            "ter alíquota positiva."
-        ),
+        "guidance": f"CST deve ser coerente com aliquota e CFOP. {_DETALHE}",
         "icon": "alert-triangle",
     },
     # ── Fase 1 — CST/IPI expandidos ──
@@ -537,11 +413,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "CST 020 informado sem redução real de base "
             "no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "CST 020 indica redução de base de cálculo. Se a base é "
-            "praticamente integral, verifique se deveria ser CST 00 "
-            "ou se a redução não foi aplicada corretamente."
-        ),
+        "guidance": f"Base praticamente integral — deveria ser CST 00? {_DETALHE}",
         "icon": "alert-triangle",
     },
     "IPI_CST_INCOMPATIVEL": {
@@ -549,10 +421,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "CST IPI incompatível com campos monetários "
             "no registro {register} (linha {line})."
         ),
-        "guidance": (
-            "CST de IPI tributado deve ter base/valor; CST isento/NT "
-            "deve ter base/valor zerados. Revise a tributação do IPI."
-        ),
+        "guidance": f"CST tributado exige base/valor; isento exige zeros. {_DETALHE}",
         "icon": "shield-alert",
     },
     "ALIQ_ICMS_AUSENTE": {
@@ -561,9 +430,8 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "no registro {register} (linha {line})."
         ),
         "guidance": (
-            "O campo ALIQ_ICMS esta zerado mas existe VL_ICMS calculado. "
-            "A aliquota foi identificada pela relacao entre base de calculo "
-            "e valor do imposto. Clique em Corrigir para aplicar."
+            "Aliquota identificada pela relacao BC/ICMS. "
+            f"Clique em Corrigir para aplicar. {_DETALHE}"
         ),
         "icon": "calculator",
     },
@@ -573,12 +441,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "DIFAL faltante: operacao interestadual para consumidor final "
             "no registro {register} (linha {line}). {value}"
         ),
-        "guidance": (
-            "Operacoes interestaduais para consumidor final nao-contribuinte "
-            "exigem recolhimento do DIFAL (diferenca entre aliquota interna "
-            "do destino e aliquota interestadual). Verifique se o DIFAL esta "
-            "sendo apurado no registro E300 ou recolhido por GNRE."
-        ),
+        "guidance": f"Verifique apuracao E300 ou recolhimento por GNRE. {_DETALHE}",
         "icon": "alert-triangle",
     },
     "DIFAL_INDEVIDO_REVENDA": {
@@ -586,11 +449,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "DIFAL indevido em operacao de revenda/industrializacao "
             "no registro {register} (linha {line}). {value}"
         ),
-        "guidance": (
-            "DIFAL so se aplica a operacoes destinadas a consumidor final. "
-            "Operacoes de revenda ou industrializacao devem usar apenas "
-            "a aliquota interestadual (4%, 7% ou 12%)."
-        ),
+        "guidance": f"DIFAL so se aplica a consumidor final. {_DETALHE}",
         "icon": "alert-circle",
     },
     "DIFAL_UF_DESTINO_INCONSISTENTE": {
@@ -598,11 +457,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "UF do destinatario inconsistente com CFOP interestadual "
             "no registro {register} (linha {line}). {value}"
         ),
-        "guidance": (
-            "O CFOP indica operacao interestadual mas o destinatario esta "
-            "cadastrado na mesma UF do declarante. Corrija o cadastro do "
-            "participante (0150) ou o CFOP da operacao."
-        ),
+        "guidance": f"CFOP interestadual mas destinatario e da mesma UF. {_DETALHE}",
         "icon": "map-pin",
     },
     "DIFAL_ALIQ_INTERNA_INCORRETA": {
@@ -611,11 +466,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "no registro {register} (linha {line}). Usado: {value}, "
             "esperado: {expected}."
         ),
-        "guidance": (
-            "A aliquota interna utilizada no calculo do DIFAL nao corresponde "
-            "a aliquota oficial da UF de destino. Consulte a tabela de "
-            "aliquotas internas vigente e ajuste o parametro no ERP."
-        ),
+        "guidance": f"Consulte tabela de aliquotas internas da UF destino. {_DETALHE}",
         "icon": "percent",
     },
     "DIFAL_BASE_INCONSISTENTE": {
@@ -623,11 +474,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Base de calculo do DIFAL inconsistente "
             "no registro {register} (linha {line}). {value}"
         ),
-        "guidance": (
-            "O valor do ICMS calculado sobre a base informada nao corresponde "
-            "ao valor escriturado. Revise a base de calculo e a aliquota "
-            "aplicada na operacao interestadual."
-        ),
+        "guidance": f"Revise BC e aliquota da operacao interestadual. {_DETALHE}",
         "icon": "calculator",
     },
     "DIFAL_FCP_AUSENTE": {
@@ -635,11 +482,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "FCP (Fundo de Combate a Pobreza) possivelmente ausente "
             "no registro {register} (linha {line}). {value}"
         ),
-        "guidance": (
-            "A UF de destino cobra FCP adicional em operacoes interestaduais "
-            "para consumidor final. Verifique se o FCP esta sendo calculado "
-            "e recolhido junto com o DIFAL."
-        ),
+        "guidance": f"UF destino cobra FCP adicional. Verifique o calculo. {_DETALHE}",
         "icon": "dollar-sign",
     },
     "DIFAL_PERFIL_INCOMPATIVEL": {
@@ -647,11 +490,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Perfil do destinatario incompativel com a operacao "
             "no registro {register} (linha {line}). {value}"
         ),
-        "guidance": (
-            "O indicador de IE do destinatario (contribuinte/nao-contribuinte) "
-            "nao e compativel com o CFOP utilizado. Isso impacta diretamente "
-            "a responsabilidade pelo recolhimento do DIFAL."
-        ),
+        "guidance": f"Indicador IE impacta responsabilidade do DIFAL. {_DETALHE}",
         "icon": "user-x",
     },
     "DIFAL_CONSUMO_FINAL_SEM_MARCADOR": {
@@ -659,11 +498,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "Operacao para consumidor final sem CFOP adequado "
             "no registro {register} (linha {line}). {value}"
         ),
-        "guidance": (
-            "Destinatario nao-contribuinte deveria usar CFOP especifico "
-            "de consumo final (6107, 6108, etc.) para correto rastreio "
-            "do DIFAL na apuracao."
-        ),
+        "guidance": f"Use CFOP de consumo final (6107, 6108, etc.). {_DETALHE}",
         "icon": "tag",
     },
     "CST_HIPOTESE": {
@@ -673,10 +508,8 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "nao e compativel com os demais campos do item."
         ),
         "guidance": (
-            "O motor identificou incompatibilidade entre o CST informado e "
-            "os campos de base de calculo, aliquota e valor do ICMS. "
-            "Verifique o enquadramento fiscal da operacao e clique em "
-            "Corrigir para aplicar a sugestao, se pertinente."
+            "CST incompativel com os campos do item. "
+            f"Clique em Corrigir para aplicar a sugestao. {_DETALHE}"
         ),
         "icon": "search",
     },
@@ -685,7 +518,7 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
 # Mensagem padrão para tipos não mapeados
 _DEFAULT = {
     "friendly": "Erro de validação no campo '{field_name}' do registro {register} (linha {line}).",
-    "guidance": "Consulte o Guia Prático EFD para detalhes sobre este campo.",
+    "guidance": f"Consulte o Guia Pratico EFD. {_DETALHE}",
     "icon": "info",
 }
 
@@ -701,29 +534,24 @@ def format_friendly_message(
     valid_values: str = "",
     difference: str = "",
 ) -> str:
-    """Gera mensagem amigável interpolando o template do error_type."""
-    template = ERROR_MESSAGES.get(error_type, _DEFAULT)
-    try:
-        return template["friendly"].format(
-            field_name=field_name,
-            register=register,
-            line=line,
-            value=value,
-            expected=expected,
-            valid_values=valid_values,
-            difference=difference,
-        )
-    except (KeyError, IndexError):
-        return template["friendly"]
+    """Formata mensagem amigável para um tipo de erro."""
+    template = ERROR_MESSAGES.get(error_type, _DEFAULT)["friendly"]
+    return template.format(
+        field_name=field_name,
+        register=register,
+        line=line,
+        value=value,
+        expected=expected,
+        valid_values=valid_values,
+        difference=difference,
+    )
 
 
 def get_guidance(error_type: str) -> str:
-    """Retorna a orientação de correção para um tipo de erro."""
-    template = ERROR_MESSAGES.get(error_type, _DEFAULT)
-    return template["guidance"]
+    """Retorna orientação de correção para o tipo de erro."""
+    return ERROR_MESSAGES.get(error_type, _DEFAULT)["guidance"]
 
 
 def get_icon(error_type: str) -> str:
-    """Retorna o ícone sugerido para um tipo de erro."""
-    template = ERROR_MESSAGES.get(error_type, _DEFAULT)
-    return template["icon"]
+    """Retorna ícone sugerido para o tipo de erro."""
+    return ERROR_MESSAGES.get(error_type, _DEFAULT).get("icon", "info")

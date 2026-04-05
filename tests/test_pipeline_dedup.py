@@ -259,7 +259,7 @@ class TestGetGuidance:
 
     def test_unknown_type_returns_default_guidance(self):
         guidance = get_guidance("TIPO_INEXISTENTE_XYZ")
-        assert "Guia Prático" in guidance
+        assert "Guia Pratico" in guidance
 
 
 # ══════════════════════════════════════════════
