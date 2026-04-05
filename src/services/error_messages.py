@@ -513,6 +513,73 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
         ),
         "icon": "search",
     },
+    # ── Auditoria de beneficios e ajustes ──
+    "AJUSTE_SEM_LASTRO_DOCUMENTAL": {
+        "friendly": (
+            "Ajuste de apuracao (E111) sem lastro documental "
+            "no registro {register} (linha {line}). {value}"
+        ),
+        "guidance": (
+            "Ajuste sem E112/E113 vinculados. Comprove com documentos. "
+            f"{_DETALHE}"
+        ),
+        "icon": "shield-alert",
+    },
+    "BENEFICIO_NAO_VINCULADO": {
+        "friendly": (
+            "Operacao com possivel beneficio fiscal sem vinculacao "
+            "no registro {register} (linha {line})."
+        ),
+        "guidance": f"Verifique se ha beneficio fiscal aplicavel. {_DETALHE}",
+        "icon": "alert-triangle",
+    },
+    "DIVERGENCIA_DOCUMENTO_ESCRITURACAO": {
+        "friendly": (
+            "Divergencia entre documento fiscal e escrituracao "
+            "detectada no arquivo SPED."
+        ),
+        "guidance": f"Compare os documentos originais com o SPED. {_DETALHE}",
+        "icon": "alert-triangle",
+    },
+    "CLASSIFICACAO_TIPO_ERRO": {
+        "friendly": (
+            "Classificacao do tipo de erro identificada pelo motor de auditoria."
+        ),
+        "guidance": f"Informativo sobre a natureza do achado. {_DETALHE}",
+        "icon": "info",
+    },
+    "ACHADO_LIMITADO_AO_SPED": {
+        "friendly": (
+            "Achado identificado com base apenas nos dados do SPED. "
+            "Pode requerer verificacao em documentos externos."
+        ),
+        "guidance": f"Valide com documentos fiscais originais. {_DETALHE}",
+        "icon": "info",
+    },
+    "ANOMALIA_HISTORICA": {
+        "friendly": (
+            "Operacao com padrao atipico em relacao ao historico "
+            "no registro {register} (linha {line})."
+        ),
+        "guidance": f"Padrao fora do habitual. Verifique a operacao. {_DETALHE}",
+        "icon": "alert-triangle",
+    },
+    "TRILHA_BENEFICIO_AUSENTE": {
+        "friendly": (
+            "Trilha de auditoria de beneficio fiscal ausente "
+            "no registro {register} (linha {line})."
+        ),
+        "guidance": f"Beneficio sem rastreabilidade completa. {_DETALHE}",
+        "icon": "shield-alert",
+    },
+    "AJUSTE_SOMA_DIVERGENTE": {
+        "friendly": (
+            "Soma dos ajustes E111 diverge do valor no E110 "
+            "no registro {register} (linha {line})."
+        ),
+        "guidance": f"Revise os registros E111 e o totalizador E110. {_DETALHE}",
+        "icon": "sigma",
+    },
 }
 
 # Mensagem padrão para tipos não mapeados
