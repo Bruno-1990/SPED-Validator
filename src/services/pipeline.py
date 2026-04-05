@@ -228,10 +228,10 @@ def run_pipeline(
 def _deduplicate_errors(errors: list[ValidationError]) -> list[ValidationError]:
     """Remove erros duplicados e genericos quando outro erro ja cobre o mesmo item.
 
-    Duas estrategias:
+    Tres estrategias:
     1. Hipoteses inteligentes supersede erros genericos (mesma linha)
-    2. Mesma linha + mesmo campo: manter apenas o mais especifico
-       (com expected_value ou maior prioridade)
+    2. Erros de mesma causa raiz: manter o mais especifico (mesma linha)
+    3. Mesma linha + mesmo campo: manter apenas o mais acionavel
     """
     # ── Estrategia 1: hipoteses supersede genericos ──
     lines_aliq_hyp: set[int] = set()
@@ -250,6 +250,16 @@ def _deduplicate_errors(errors: list[ValidationError]) -> list[ValidationError]:
         "ISENCAO_INCONSISTENTE",
     }
 
+    # ── Estrategia 2: mesma causa raiz na mesma linha ──
+    # CST_ALIQ_ZERO_MODERADO ja diz "CST errado" — BENEFICIO_NAO_VINCULADO
+    # e CST_CFOP_INCOMPATIVEL sao sintomas da mesma causa
+    lines_cst_zero: set[int] = set()
+    for err in errors:
+        if err.error_type == "CST_ALIQ_ZERO_MODERADO":
+            lines_cst_zero.add(err.line_number)
+
+    _SUPRIMIDOS_POR_CST_ZERO = {"BENEFICIO_NAO_VINCULADO", "CST_CFOP_INCOMPATIVEL"}
+
     after_hyp = []
     for err in errors:
         ln = err.line_number
@@ -258,6 +268,8 @@ def _deduplicate_errors(errors: list[ValidationError]) -> list[ValidationError]:
         if ln in lines_aliq_hyp and et in _SUPRIMIDOS_POR_ALIQ:
             continue
         if ln in lines_cst_hyp and et in _SUPRIMIDOS_POR_CST:
+            continue
+        if ln in lines_cst_zero and et in _SUPRIMIDOS_POR_CST_ZERO:
             continue
 
         after_hyp.append(err)
