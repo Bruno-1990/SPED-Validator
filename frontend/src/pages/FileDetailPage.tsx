@@ -383,7 +383,7 @@ interface ListProps {
   onRevalidate: () => void
 }
 
-function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileId, onReload, onRevalidate }: ListProps) {
+function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileId, onReload }: ListProps) {
   const openItems = items.filter(e => e.status === 'open')
   const [showCorrected, setShowCorrected] = useState(false)
   const displayItems = showCorrected ? items : openItems
@@ -505,6 +505,38 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
 }
 
 
+// ── Confidence Badge ──
+
+function ConfidenceBadge({ message }: { message: string }) {
+  // Extrai "Confianca: alta (80 pontos)" da mensagem técnica
+  const match = message.match(/Confianca:\s*(alta|provavel|indicio|baixa)\s*\((\d+)\s*pontos?\)/)
+  if (!match) return null
+
+  const [, level, scoreStr] = match
+  const score = parseInt(scoreStr, 10)
+
+  const config = {
+    alta:     { label: 'Alta',      color: 'bg-green-100 text-green-800',  barColor: 'bg-green-500' },
+    provavel: { label: 'Provavel',  color: 'bg-blue-100 text-blue-800',   barColor: 'bg-blue-500' },
+    indicio:  { label: 'Indicio',   color: 'bg-yellow-100 text-yellow-800', barColor: 'bg-yellow-500' },
+    baixa:    { label: 'Baixa',     color: 'bg-gray-100 text-gray-600',   barColor: 'bg-gray-400' },
+  }[level] || { label: level, color: 'bg-gray-100 text-gray-600', barColor: 'bg-gray-400' }
+
+  const pct = Math.min(score, 100)
+
+  return (
+    <div className="flex items-center gap-2" title={`Confianca: ${config.label} (${score} pontos)`}>
+      <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${config.barColor}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${config.color}`}>
+        {score}%
+      </span>
+    </div>
+  )
+}
+
+
 // ── Error Card ──
 
 function ErrorCard({
@@ -543,17 +575,20 @@ function ErrorCard({
             {isCorrected && <span className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">Corrigido</span>}
           </div>
           <p className="text-sm text-gray-800">{displayMessage}</p>
-          {/* Inline correction preview */}
+          {/* Inline correction preview + confidence */}
           {!isCorrected && error.expected_value && error.value && (
-            <div className="mt-1 text-sm">
-              <span className="text-gray-500 font-medium">Correcao: </span>
-              <span className="text-red-600 line-through">
-                {error.value}{error.field_name?.includes('ALIQ') ? '%' : ''}
-              </span>
-              <span className="text-gray-400 mx-1">&rarr;</span>
-              <span className="text-green-600 font-semibold">
-                {error.expected_value}{error.field_name?.includes('ALIQ') ? '%' : ''}
-              </span>
+            <div className="mt-1.5 flex items-center gap-3 flex-wrap">
+              <div className="text-sm">
+                <span className="text-gray-500 font-medium">Correcao: </span>
+                <span className="text-red-600 line-through">
+                  {error.value}{error.field_name?.includes('ALIQ') ? '%' : ''}
+                </span>
+                <span className="text-gray-400 mx-1">&rarr;</span>
+                <span className="text-green-600 font-semibold">
+                  {error.expected_value}{error.field_name?.includes('ALIQ') ? '%' : ''}
+                </span>
+              </div>
+              <ConfidenceBadge message={error.message} />
             </div>
           )}
         </div>
