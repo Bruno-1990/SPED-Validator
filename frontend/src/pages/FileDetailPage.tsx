@@ -604,9 +604,10 @@ function ErrorCard({
 
       {expanded && (
         <div className="border-t px-4 pb-4 pt-3 space-y-3 bg-gray-50 bg-opacity-50">
-          {/* Card de explicacao — destaque principal */}
-          {error.doc_suggestion && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          {/* Card de explicacao — tudo dentro do card azul */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+            {/* Explicacao principal */}
+            {error.doc_suggestion ? (
               <div className="text-sm text-gray-800 whitespace-pre-line leading-relaxed">
                 {error.doc_suggestion.split('**Como corrigir:**').map((part, i) =>
                   i === 0 ? (
@@ -619,36 +620,38 @@ function ErrorCard({
                   )
                 )}
               </div>
-            </div>
-          )}
+            ) : error.friendly_message ? (
+              <p className="text-sm text-gray-800">{error.friendly_message}</p>
+            ) : null}
 
-          {/* Dados tecnicos */}
-          <div className="grid grid-cols-3 gap-4 text-xs">
-            <div>
-              <span className="text-gray-500">Tipo:</span>{' '}
-              <span className="font-mono">{error.error_type}</span>
+            {/* Dados do erro */}
+            <div className="grid grid-cols-3 gap-4 text-xs pt-2 border-t border-blue-200">
+              <div>
+                <span className="text-gray-500">Tipo:</span>{' '}
+                <span className="font-mono">{error.error_type}</span>
+              </div>
+              {error.value && (
+                <div>
+                  <span className="text-gray-500">Valor atual:</span>{' '}
+                  <span className="font-mono text-red-600">{error.value}</span>
+                </div>
+              )}
+              {error.expected_value && (
+                <div>
+                  <span className="text-gray-500">Valor sugerido:</span>{' '}
+                  <span className="font-mono text-green-600">{error.expected_value}</span>
+                </div>
+              )}
             </div>
-            {error.value && (
-              <div>
-                <span className="text-gray-500">Valor atual:</span>{' '}
-                <span className="font-mono text-red-600">{error.value}</span>
-              </div>
-            )}
-            {error.expected_value && (
-              <div>
-                <span className="text-gray-500">Valor sugerido:</span>{' '}
-                <span className="font-mono text-green-600">{error.expected_value}</span>
-              </div>
+
+            {/* Detalhe tecnico — colapsavel dentro do card */}
+            {error.message && error.message !== error.friendly_message && (
+              <details className="text-xs text-gray-500 pt-1 border-t border-blue-100">
+                <summary className="cursor-pointer font-semibold hover:text-gray-700 py-1">Detalhe tecnico</summary>
+                <p className="mt-1 pl-3 border-l-2 border-blue-200 text-gray-600 whitespace-pre-line">{error.message}</p>
+              </details>
             )}
           </div>
-
-          {/* Detalhe tecnico — colapsado */}
-          {error.friendly_message && error.message !== error.friendly_message && (
-            <details className="text-xs text-gray-500">
-              <summary className="cursor-pointer font-semibold hover:text-gray-700">Detalhe tecnico</summary>
-              <p className="mt-1 pl-3 border-l-2 border-gray-200">{error.message}</p>
-            </details>
-          )}
 
           {/* Base legal — referencia modesta */}
           {legalBasis && (
