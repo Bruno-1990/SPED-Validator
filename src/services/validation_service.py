@@ -8,6 +8,7 @@ from ..models import SpedRecord, ValidationError
 from ..validator import load_field_definitions, validate_records
 from ..validators.aliquota_validator import validate_aliquotas
 from ..validators.correction_hypothesis import validate_with_hypotheses
+from ..validators.cst_hypothesis import validate_cst_hypotheses
 from ..validators.audit_rules import validate_audit_rules
 from ..validators.beneficio_audit_validator import validate_beneficio_audit
 from ..validators.c190_validator import validate_c190
@@ -77,8 +78,9 @@ def run_full_validation(
     # 12. Regras pendentes
     all_errors.extend(validate_pendentes(records))
 
-    # 13. Hipoteses de correcao inteligente
+    # 13. Hipoteses de correcao inteligente (aliquota e CST)
     all_errors.extend(validate_with_hypotheses(records))
+    all_errors.extend(validate_cst_hypotheses(records))
 
     # Persistir erros
     _persist_errors(db, file_id, all_errors)
@@ -216,6 +218,7 @@ def _severity_for(error_type: str) -> str:
         "DESONERACAO_SEM_MOTIVO",
         # Hipotese de correcao
         "ALIQ_ICMS_AUSENTE",
+        "CST_HIPOTESE",
     }
     warning = {
         "DATE_OUT_OF_PERIOD", "DATE_ORDER", "MISSING_CONDITIONAL",

@@ -552,6 +552,20 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
         ),
         "icon": "calculator",
     },
+    "CST_HIPOTESE": {
+        "friendly": (
+            "Possivel inconsistencia no CST ICMS do registro {register} "
+            "(linha {line}). O enquadramento fiscal informado ({value}) "
+            "nao e compativel com os demais campos do item."
+        ),
+        "guidance": (
+            "O motor identificou incompatibilidade entre o CST informado e "
+            "os campos de base de calculo, aliquota e valor do ICMS. "
+            "Verifique o enquadramento fiscal da operacao e clique em "
+            "Corrigir para aplicar a sugestao, se pertinente."
+        ),
+        "icon": "search",
+    },
 }
 
 # Mensagem padrão para tipos não mapeados

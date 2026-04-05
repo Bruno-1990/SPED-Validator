@@ -10,6 +10,7 @@ from ..models import SpedRecord, ValidationError
 from ..validator import load_field_definitions, validate_records
 from ..validators.aliquota_validator import validate_aliquotas
 from ..validators.correction_hypothesis import validate_with_hypotheses
+from ..validators.cst_hypothesis import validate_cst_hypotheses
 from ..validators.audit_rules import validate_audit_rules
 from ..validators.beneficio_audit_validator import validate_beneficio_audit
 from ..validators.c190_validator import validate_c190
@@ -154,8 +155,9 @@ def run_pipeline(
         cross_errors.extend(validate_pendentes(records))
         progress.stage_progress = 97
 
-        progress.detail = "Hipoteses de correcao inteligente"
+        progress.detail = "Hipoteses de correcao inteligente (aliquota e CST)"
         cross_errors.extend(validate_with_hypotheses(records))
+        cross_errors.extend(validate_cst_hypotheses(records))
         progress.stage_progress = 100
 
         _persist_stage_errors(db, file_id, cross_errors)
@@ -343,6 +345,9 @@ def _enrich_errors(
             auto_correctable = 1
         elif error_type == "ALIQ_ICMS_AUSENTE" and sample["expected_value"]:
             # Botao aparece, mas auto_correction_service pula (requer clique do usuario)
+            auto_correctable = 1
+        elif error_type == "CST_HIPOTESE" and sample["expected_value"]:
+            # Hipotese de CST — sempre requer confirmacao manual
             auto_correctable = 1
 
         # Atualizar todos os erros do grupo

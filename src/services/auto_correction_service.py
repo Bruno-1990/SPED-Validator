@@ -35,7 +35,7 @@ def auto_correct_errors(
     ).fetchall()
 
     # Tipos que requerem confirmacao do usuario (nao auto-corrigir)
-    _MANUAL_ONLY = {"ALIQ_ICMS_AUSENTE"}
+    _MANUAL_ONLY = {"ALIQ_ICMS_AUSENTE", "CST_HIPOTESE"}
 
     for row in rows:
         error_id = row[0]
