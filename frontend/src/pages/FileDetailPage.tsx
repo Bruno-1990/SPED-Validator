@@ -418,6 +418,27 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
     } catch { /* */ }
   }
 
+  const [correctingAll, setCorrectingAll] = useState(false)
+
+  const handleCorrectAll = async () => {
+    const correctable = openItems.filter(e => e.auto_correctable && e.expected_value && e.record_id)
+    if (correctable.length === 0) return
+    if (!confirm(`Aplicar ${correctable.length} correcoes sugeridas?`)) return
+    setCorrectingAll(true)
+    try {
+      for (const error of correctable) {
+        await api.updateRecord(fileId, error.record_id!, {
+          field_no: error.field_no || 0,
+          field_name: error.field_name || '',
+          new_value: error.expected_value!,
+          error_id: error.id,
+        })
+      }
+      onReload()
+    } catch { /* */ }
+    setCorrectingAll(false)
+  }
+
   const isError = variant === 'error'
 
   return (
@@ -436,10 +457,11 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
       <div className="flex flex-wrap items-center gap-3 mb-4">
         {isError && autoCorrectableCount > 0 && (
           <button
-            onClick={onRevalidate}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm font-semibold"
+            onClick={handleCorrectAll}
+            disabled={correctingAll}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm font-semibold disabled:opacity-50"
           >
-            Corrigir Todos ({autoCorrectableCount})
+            {correctingAll ? 'Corrigindo...' : `Corrigir Todos (${autoCorrectableCount})`}
           </button>
         )}
         {openItems.length > 0 && (
