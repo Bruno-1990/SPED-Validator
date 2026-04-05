@@ -7,8 +7,6 @@ echo ============================================
 echo   SPED EFD Audit System
 echo ============================================
 echo.
-echo   Diretorio: %CD%
-echo.
 
 REM --- Verificar Python ---
 where python >nul 2>&1
@@ -28,32 +26,58 @@ if errorlevel 1 (
 
 REM --- Verificar/criar venv ---
 if not exist ".venv-win\Scripts\activate.bat" (
-    echo   Criando ambiente virtual...
+    echo   [SETUP] Criando ambiente virtual...
     python -m venv .venv-win
+    if errorlevel 1 (
+        echo [ERRO] Falha ao criar venv. Verifique Python.
+        pause
+        exit /b 1
+    )
 )
 
-REM --- Ativar venv e atualizar pip ---
+REM --- Ativar venv ---
 call ".venv-win\Scripts\activate.bat"
 set PYTHONPATH=%CD%
 
-echo   Atualizando pip...
-python -m pip install --upgrade pip >nul 2>&1
-
+REM --- Instalar deps Python somente se necessario ---
 pip show fastapi >nul 2>&1
 if errorlevel 1 (
-    echo   Instalando dependencias Python...
+    echo   [SETUP] Instalando dependencias Python...
+    python -m pip install --upgrade pip >nul 2>&1
     python -m pip install -r requirements.txt
+    if errorlevel 1 (
+        echo [ERRO] Falha ao instalar dependencias Python.
+        pause
+        exit /b 1
+    )
+) else (
+    echo   [OK] Dependencias Python instaladas.
 )
 
-REM --- Verificar deps Frontend ---
+REM --- Instalar deps Frontend somente se necessario ---
 if not exist "frontend\node_modules" (
-    echo   Instalando dependencias Frontend...
+    echo   [SETUP] Instalando dependencias Frontend...
     pushd frontend
     call npm install
+    if errorlevel 1 (
+        echo [ERRO] Falha ao instalar dependencias Frontend.
+        popd
+        pause
+        exit /b 1
+    )
     popd
+) else (
+    echo   [OK] Dependencias Frontend instaladas.
 )
 
-REM --- Criar scripts temporarios para evitar problema de aspas ---
+REM --- Criar banco de dados se nao existir ---
+if not exist "db" mkdir db
+if not exist "db\audit.db" (
+    echo   [SETUP] Criando banco de dados...
+    python -c "from src.services.database import init_audit_db; init_audit_db('db/audit.db')" 2>nul
+)
+
+REM --- Criar scripts temporarios ---
 echo @echo off > "%~dp0_run_api.bat"
 echo title SPED-API (porta 8000) >> "%~dp0_run_api.bat"
 echo cd /d "%~dp0" >> "%~dp0_run_api.bat"
@@ -97,11 +121,9 @@ pause >nul
 echo.
 echo   Encerrando processos...
 
-REM --- Matar processos ---
 taskkill /fi "WINDOWTITLE eq SPED-API*" /f >nul 2>&1
 taskkill /fi "WINDOWTITLE eq SPED-Frontend*" /f >nul 2>&1
 
-REM --- Limpar scripts temporarios ---
 del /q "%~dp0_run_api.bat" >nul 2>&1
 del /q "%~dp0_run_frontend.bat" >nul 2>&1
 
