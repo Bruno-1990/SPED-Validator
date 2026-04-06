@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from ..models import SpedRecord, ValidationError
 from ..parser import group_by_register
+from ..services.context_builder import ValidationContext
 from .helpers import (
-    TOLERANCE,
     get_field,
     to_float,
 )
-
 
 # ──────────────────────────────────────────────
 # Helpers
@@ -41,7 +40,10 @@ def _error(
 # API publica
 # ──────────────────────────────────────────────
 
-def validate_cross_blocks(records: list[SpedRecord]) -> list[ValidationError]:
+def validate_cross_blocks(
+    records: list[SpedRecord],
+    context: ValidationContext | None = None,
+) -> list[ValidationError]:
     """Executa todas as validacoes de cruzamento entre blocos."""
     groups = group_by_register(records)
     errors: list[ValidationError] = []
@@ -64,19 +66,19 @@ def validate_cadastro_refs(groups: dict[str, list[SpedRecord]]) -> list[Validati
     # Coletar cadastros do bloco 0
     cod_parts = set()
     for rec in groups.get("0150", []):
-        cod = get_field(rec, 1)
+        cod = get_field(rec, "COD_PART")
         if cod:
             cod_parts.add(cod)
 
     cod_items = set()
     for rec in groups.get("0200", []):
-        cod = get_field(rec, 1)
+        cod = get_field(rec, "COD_ITEM")
         if cod:
             cod_items.add(cod)
 
     # Verificar referencias em C100 (COD_PART no campo 3)
     for rec in groups.get("C100", []):
-        cod_part = get_field(rec, 3)
+        cod_part = get_field(rec, "COD_PART")
         if cod_part and cod_parts and cod_part not in cod_parts:
             errors.append(_error(
                 "C100", rec.line_number, "REF_INEXISTENTE",
@@ -87,7 +89,7 @@ def validate_cadastro_refs(groups: dict[str, list[SpedRecord]]) -> list[Validati
 
     # Verificar referencias em C170 (COD_ITEM no campo 2)
     for rec in groups.get("C170", []):
-        cod_item = get_field(rec, 2)
+        cod_item = get_field(rec, "COD_ITEM")
         if cod_item and cod_items and cod_item not in cod_items:
             errors.append(_error(
                 "C170", rec.line_number, "REF_INEXISTENTE",
@@ -98,11 +100,22 @@ def validate_cadastro_refs(groups: dict[str, list[SpedRecord]]) -> list[Validati
 
     # Verificar referencias em D100 (COD_PART no campo 3)
     for rec in groups.get("D100", []):
-        cod_part = get_field(rec, 3)
+        cod_part = get_field(rec, "COD_PART")
         if cod_part and cod_parts and cod_part not in cod_parts:
             errors.append(_error(
                 "D100", rec.line_number, "REF_INEXISTENTE",
                 f"COD_PART '{cod_part}' referenciado no D100 nao existe no 0150.",
+                field_name="COD_PART",
+                value=cod_part,
+            ))
+
+    # MOD-17: Verificar referencias em C500 (COD_PART)
+    for rec in groups.get("C500", []):
+        cod_part = get_field(rec, "COD_PART")
+        if cod_part and cod_parts and cod_part not in cod_parts:
+            errors.append(_error(
+                "C500", rec.line_number, "REF_INEXISTENTE",
+                f"COD_PART '{cod_part}' referenciado no C500 nao existe no 0150.",
                 field_name="COD_PART",
                 value=cod_part,
             ))
@@ -115,16 +128,14 @@ def validate_cadastro_refs(groups: dict[str, list[SpedRecord]]) -> list[Validati
 # ──────────────────────────────────────────────
 
 def validate_c_vs_e(groups: dict[str, list[SpedRecord]]) -> list[ValidationError]:
-    """Cruza totais dos C190 com valores declarados no E110.
+    """Cruza totais dos C190/D190/D690 com valores declarados no E110.
 
-    NOTA: validacao E110 completa (com deteccao de E111, D190, DIFAL)
-    e feita pelo tax_recalc.recalc_e110_totals(). Esta funcao nao
-    duplica essa validacao.
+    NOTA: validacao E110 completa (com deteccao de E111, D190, D690, DIFAL)
+    e feita pelo tax_recalc.recalc_e110_totals() (C190+D690 vs E110) e
+    bloco_d_validator._check_d_004() (D190+D690 vs E110).
     """
-    # Delegado ao tax_recalc.py que considera E111, D190, C390, DIFAL
+    # Delegado ao tax_recalc.py e bloco_d_validator.py (MOD-08)
     return []
-
-    return errors
 
 
 # ──────────────────────────────────────────────
@@ -149,8 +160,8 @@ def validate_block9(
 
     # Verificar 9900 (contagem declarada por registro)
     for rec in groups.get("9900", []):
-        reg_name = get_field(rec, 1)
-        declared_count = int(to_float(get_field(rec, 2)))
+        reg_name = get_field(rec, "REG_BLC")
+        declared_count = int(to_float(get_field(rec, "QTD_REG_BLC")))
 
         if reg_name in real_counts:
             actual = real_counts[reg_name]
@@ -166,7 +177,7 @@ def validate_block9(
 
     # Verificar 9999 (total de linhas)
     for rec in groups.get("9999", []):
-        declared_total = int(to_float(get_field(rec, 1)))
+        declared_total = int(to_float(get_field(rec, "QTD_LIN")))
         actual_total = len(records)
         if declared_total != actual_total:
             errors.append(_error(

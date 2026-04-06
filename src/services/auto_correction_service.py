@@ -1,11 +1,32 @@
-"""Motor de auto-correção determinística para erros SPED."""
+"""Motor de auto-correção determinística para erros SPED.
+
+MOD-10: Apenas correções determinísticas (formato de data, CNPJ, numérico) são
+aplicadas automaticamente. Correções de CST, CFOP, alíquota e campos fiscais
+sensíveis são retornadas como sugestões (suggested=True), nunca aplicadas.
+"""
 
 from __future__ import annotations
 
-import json
 import sqlite3
 
 from .correction_service import apply_correction
+
+# Campos que NUNCA devem ser auto-corrigidos (exigem aprovação humana)
+_PROHIBITED_AUTO_FIELDS = frozenset({
+    "CST_ICMS", "CFOP", "ALIQ_ICMS", "CST_IPI", "COD_AJ_APUR", "VL_AJ_APUR",
+    "CST_PIS", "CST_COFINS",
+})
+
+# Tipos de erro que envolvem campos fiscais sensíveis (nunca auto-corrigir)
+_PROHIBITED_ERROR_TYPES = frozenset({
+    "CST_HIPOTESE", "ALIQ_ICMS_AUSENTE", "CALCULO_ARREDONDAMENTO",
+    "CST_INVALIDO", "CFOP_INVALIDO",
+})
+
+# Tipos determinísticos seguros para auto-correção
+_DETERMINISTIC_TYPES = frozenset({
+    "CALCULO_DIVERGENTE", "SOMA_DIVERGENTE", "CONTAGEM_DIVERGENTE",
+})
 
 
 def auto_correct_errors(
@@ -13,16 +34,14 @@ def auto_correct_errors(
     file_id: int,
     doc_db_path: str | None = None,
 ) -> list[dict]:
-    """Aplica correções automáticas para erros determinísticos.
+    """Aplica correções automáticas apenas para erros determinísticos seguros.
 
-    Três categorias de correção:
-    1. Recálculo numérico — CALCULO_DIVERGENTE/SOMA_DIVERGENTE com expected_value
-    2. Contagem — CONTAGEM_DIVERGENTE no Bloco 9 com expected_value
-    3. Valor único — INVALID_VALUE onde valid_values tem exatamente 1 opção
+    Correções de CST, CFOP, alíquota e campos sensíveis são retornadas como
+    sugestões (suggested=True) e nunca aplicadas automaticamente.
 
-    Retorna lista de correções aplicadas.
+    Retorna lista de correções aplicadas e sugestões.
     """
-    corrections_applied: list[dict] = []
+    results: list[dict] = []
 
     # Buscar erros auto-corrigíveis
     rows = db.execute(
@@ -33,9 +52,6 @@ def auto_correct_errors(
            ORDER BY ve.line_number""",
         (file_id,),
     ).fetchall()
-
-    # Tipos que requerem confirmacao do usuario (nao auto-corrigir)
-    _MANUAL_ONLY = {"ALIQ_ICMS_AUSENTE", "CST_HIPOTESE", "CALCULO_ARREDONDAMENTO"}
 
     for row in rows:
         error_id = row[0]
@@ -50,10 +66,39 @@ def auto_correct_errors(
         if not expected_value or not record_id or not field_no:
             continue
 
-        if error_type in _MANUAL_ONLY:
+        # Campos proibidos → sugestão apenas
+        if field_name in _PROHIBITED_AUTO_FIELDS or error_type in _PROHIBITED_ERROR_TYPES:
+            results.append({
+                "error_id": error_id,
+                "record_id": record_id,
+                "register": register,
+                "field_no": field_no,
+                "field_name": field_name,
+                "old_value": current_value,
+                "suggested_value": expected_value,
+                "error_type": error_type,
+                "suggested": True,
+                "applied": False,
+            })
             continue
 
-        # Aplicar correção usando o serviço existente
+        # Apenas tipos determinísticos são auto-aplicados
+        if error_type not in _DETERMINISTIC_TYPES:
+            results.append({
+                "error_id": error_id,
+                "record_id": record_id,
+                "register": register,
+                "field_no": field_no,
+                "field_name": field_name,
+                "old_value": current_value,
+                "suggested_value": expected_value,
+                "error_type": error_type,
+                "suggested": True,
+                "applied": False,
+            })
+            continue
+
+        # Aplicar correção determinística
         success = apply_correction(
             db=db,
             file_id=file_id,
@@ -62,25 +107,25 @@ def auto_correct_errors(
             field_name=field_name,
             new_value=expected_value,
             error_id=error_id,
+            justificativa="Correção determinística automática — valor calculado sem ambiguidade",
+            correction_type="deterministic",
+            rule_id=error_type,
         )
 
         if success:
-            # Marcar como auto-corrigido (applied_by já é 'user' por padrão,
-            # vamos atualizar para 'auto')
             db.execute(
                 """UPDATE corrections
                    SET applied_by = 'auto'
                    WHERE id = (
                        SELECT id FROM corrections
                        WHERE file_id = ? AND record_id = ? AND field_no = ?
-                       AND applied_by = 'user'
                        ORDER BY applied_at DESC LIMIT 1
                    )""",
                 (file_id, record_id, field_no),
             )
             db.commit()
 
-            corrections_applied.append({
+            results.append({
                 "error_id": error_id,
                 "record_id": record_id,
                 "register": register,
@@ -89,101 +134,8 @@ def auto_correct_errors(
                 "old_value": current_value,
                 "new_value": expected_value,
                 "error_type": error_type,
+                "suggested": False,
+                "applied": True,
             })
 
-    # Buscar e corrigir INVALID_VALUE com valor único
-    corrections_applied.extend(
-        _auto_correct_single_valid_value(db, file_id, doc_db_path)
-    )
-
-    return corrections_applied
-
-
-def _auto_correct_single_valid_value(
-    db: sqlite3.Connection,
-    file_id: int,
-    doc_db_path: str | None,
-) -> list[dict]:
-    """Corrige INVALID_VALUE quando há exatamente 1 valor válido."""
-    corrections: list[dict] = []
-
-    if not doc_db_path:
-        return corrections
-
-    # Buscar erros INVALID_VALUE que ainda estão abertos
-    rows = db.execute(
-        """SELECT id, record_id, register, field_no, field_name, value
-           FROM validation_errors
-           WHERE file_id = ? AND status = 'open' AND error_type = 'INVALID_VALUE'
-           ORDER BY line_number""",
-        (file_id,),
-    ).fetchall()
-
-    if not rows:
-        return corrections
-
-    # Carregar definições de campo para consultar valid_values
-    doc_conn = sqlite3.connect(doc_db_path)
-    field_defs_cache: dict[tuple[str, int], list[str] | None] = {}
-
-    for row in rows:
-        error_id, record_id, register, field_no, field_name, value = (
-            row[0], row[1], row[2], row[3], row[4] or "", row[5] or "",
-        )
-
-        if not record_id or not field_no:
-            continue
-
-        # Cache de valid_values por (register, field_no)
-        cache_key = (register, field_no)
-        if cache_key not in field_defs_cache:
-            fd_row = doc_conn.execute(
-                """SELECT valid_values FROM register_fields
-                   WHERE register = ? AND field_no = ?""",
-                (register, field_no),
-            ).fetchone()
-            if fd_row and fd_row[0]:
-                field_defs_cache[cache_key] = json.loads(fd_row[0])
-            else:
-                field_defs_cache[cache_key] = None
-
-        valid_values = field_defs_cache[cache_key]
-
-        # Só auto-corrige se há exatamente 1 valor válido
-        if valid_values and len(valid_values) == 1:
-            correct_value = valid_values[0]
-
-            success = apply_correction(
-                db=db,
-                file_id=file_id,
-                record_id=record_id,
-                field_no=field_no,
-                field_name=field_name,
-                new_value=correct_value,
-                error_id=error_id,
-            )
-
-            if success:
-                db.execute(
-                    """UPDATE corrections
-                       SET applied_by = 'auto'
-                       WHERE file_id = ? AND record_id = ? AND field_no = ?
-                       AND applied_by = 'user'
-                       ORDER BY applied_at DESC LIMIT 1""",
-                    (file_id, record_id, field_no),
-                )
-                db.commit()
-
-                corrections.append({
-                    "error_id": error_id,
-                    "record_id": record_id,
-                    "register": register,
-                    "field_no": field_no,
-                    "field_name": field_name,
-                    "old_value": value,
-                    "new_value": correct_value,
-                    "error_type": "INVALID_VALUE",
-                })
-
-    doc_conn.close()
-    return corrections
+    return results

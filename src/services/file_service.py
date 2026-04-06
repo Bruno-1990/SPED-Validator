@@ -9,6 +9,7 @@ from pathlib import Path
 
 from ..models import SpedRecord
 from ..parser import parse_sped_file
+from .context_builder import build_context
 
 
 def upload_file(db: sqlite3.Connection, filepath: str | Path) -> int:
@@ -25,7 +26,7 @@ def upload_file(db: sqlite3.Connection, filepath: str | Path) -> int:
         "SELECT id FROM sped_files WHERE hash_sha256 = ?", (sha256,)
     ).fetchone()
     if existing:
-        return existing[0] if isinstance(existing, tuple) else existing["id"]
+        return int(existing[0] if isinstance(existing, tuple) else existing["id"])
 
     # Criar registro do arquivo
     cursor = db.execute(
@@ -43,8 +44,18 @@ def upload_file(db: sqlite3.Connection, filepath: str | Path) -> int:
     # Extrair metadados do 0000
     _update_metadata(db, file_id, records)
 
+    # Detectar COD_VER e vincular retificador
+    _handle_retificador(db, file_id, records)
+
     # Persistir registros
     _insert_records(db, file_id, records)
+
+    # Construir contexto e salvar regime tributário
+    ctx = build_context(file_id, db)
+    db.execute(
+        "UPDATE sped_files SET regime_tributario = ? WHERE id = ?",
+        (ctx.regime.value, file_id),
+    )
 
     # Atualizar status
     db.execute(
@@ -54,7 +65,10 @@ def upload_file(db: sqlite3.Connection, filepath: str | Path) -> int:
     db.commit()
 
     # Log
-    _log(db, file_id, "upload", f"Arquivo {filepath.name} processado: {len(records)} registros.")
+    _log(
+        db, file_id, "upload",
+        f"Arquivo {filepath.name} processado: {len(records)} registros. Regime: {ctx.regime.value}.",
+    )
 
     return file_id
 
@@ -147,25 +161,70 @@ def delete_file(db: sqlite3.Connection, file_id: int) -> bool:
 # Helpers
 # ──────────────────────────────────────────────
 
-def _update_metadata(db: sqlite3.Connection, file_id: int, records: list[SpedRecord]) -> None:
-    """Extrai metadados do registro 0000.
+def _handle_retificador(db: sqlite3.Connection, file_id: int, records: list[SpedRecord]) -> None:
+    """Detecta COD_FIN do registro 0000 e vincula retificador ao original.
 
-    Layout 0000: REG|COD_VER|COD_FIN|DT_INI|DT_FIN|NOME|CNPJ|CPF|UF|IE|...
-    Posições:     0    1       2       3       4      5    6    7   8  9
+    COD_FIN: 0=original, 1=retificadora, 2=retificadora sem alteracao de itens.
+    O valor e armazenado na coluna cod_ver por compatibilidade com o modelo.
     """
     for rec in records:
+        if rec.register == "0000":
+            cod_fin_raw = rec.fields.get("COD_FIN", "0")
+            try:
+                cod_ver = int(cod_fin_raw)
+            except (ValueError, TypeError):
+                cod_ver = 0
+
+            is_retificador = 1 if cod_ver > 0 else 0
+            original_file_id = None
+
+            if is_retificador:
+                cnpj = rec.fields.get("CNPJ", "")
+                dt_ini = rec.fields.get("DT_INI", "")
+                dt_fin = rec.fields.get("DT_FIN", "")
+                if cnpj and dt_ini and dt_fin:
+                    row = db.execute(
+                        """SELECT id FROM sped_files
+                           WHERE cnpj = ? AND period_start = ? AND period_end = ?
+                             AND cod_ver = 0 AND id != ?
+                           ORDER BY id LIMIT 1""",
+                        (cnpj, dt_ini, dt_fin, file_id),
+                    ).fetchone()
+                    if row:
+                        original_file_id = row[0] if isinstance(row, tuple) else row["id"]
+                        db.execute(
+                            """INSERT INTO sped_file_versions
+                               (original_file_id, retificador_file_id, cod_ver)
+                               VALUES (?, ?, ?)""",
+                            (original_file_id, file_id, cod_ver),
+                        )
+
+            db.execute(
+                """UPDATE sped_files
+                   SET cod_ver = ?, is_retificador = ?, original_file_id = ?
+                   WHERE id = ?""",
+                (cod_ver, is_retificador, original_file_id, file_id),
+            )
+            db.commit()
+            break
+
+
+def _update_metadata(db: sqlite3.Connection, file_id: int, records: list[SpedRecord]) -> None:
+    """Extrai metadados do registro 0000."""
+    for rec in records:
         if rec.register == "0000" and len(rec.fields) >= 7:
+            f = rec.fields
             db.execute(
                 """UPDATE sped_files
                    SET period_start = ?, period_end = ?, company_name = ?,
                        cnpj = ?, uf = ?
                    WHERE id = ?""",
                 (
-                    rec.fields[3] if len(rec.fields) > 3 else None,
-                    rec.fields[4] if len(rec.fields) > 4 else None,
-                    rec.fields[5] if len(rec.fields) > 5 else None,
-                    rec.fields[6] if len(rec.fields) > 6 else None,
-                    rec.fields[8] if len(rec.fields) > 8 else None,
+                    f.get("DT_INI"),
+                    f.get("DT_FIN"),
+                    f.get("NOME"),
+                    f.get("CNPJ"),
+                    f.get("UF"),
                     file_id,
                 ),
             )
@@ -173,13 +232,13 @@ def _update_metadata(db: sqlite3.Connection, file_id: int, records: list[SpedRec
 
 
 def _insert_records(db: sqlite3.Connection, file_id: int, records: list[SpedRecord]) -> None:
-    """Persiste registros parseados no banco."""
+    """Persiste registros parseados no banco (fields_json como dict nomeado)."""
     for rec in records:
         block = rec.register[0] if rec.register else "?"
         db.execute(
             """INSERT INTO sped_records (file_id, line_number, register, block, fields_json, raw_line)
                VALUES (?, ?, ?, ?, ?, ?)""",
-            (file_id, rec.line_number, rec.register, block, json.dumps(rec.fields), rec.raw_line),
+            (file_id, rec.line_number, rec.register, block, json.dumps(rec.fields, ensure_ascii=False), rec.raw_line),
         )
     db.commit()
 

@@ -11,10 +11,9 @@ from __future__ import annotations
 import pytest
 
 from src.models import ValidationError
-from src.services.pipeline import _deduplicate_errors
 from src.services.error_messages import format_friendly_message, get_guidance
+from src.services.pipeline import _deduplicate_errors
 from src.services.validation_service import _severity_for
-
 
 # ──────────────────────────────────────────────
 # Helpers

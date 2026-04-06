@@ -14,7 +14,7 @@ from src.parser import (
     group_by_register,
     parse_sped_file,
 )
-
+from src.validators.helpers import fields_to_dict
 
 # ──────────────────────────────────────────────
 # parse_sped_file
@@ -34,7 +34,7 @@ class TestParseSped:
     def test_fields_include_register_code(self, sped_minimal_path: Path) -> None:
         records = parse_sped_file(sped_minimal_path)
         for rec in records:
-            assert rec.fields[0] == rec.register
+            assert rec.fields.get("REG") == rec.register
 
     def test_line_numbers_are_sequential(self, sped_valid_path: Path) -> None:
         records = parse_sped_file(sped_valid_path)
@@ -50,8 +50,8 @@ class TestParseSped:
         records = parse_sped_file(sped_valid_path)
         r0000 = records[0]
         assert r0000.register == "0000"
-        assert r0000.fields[5] == "EMPRESA VALIDA LTDA"  # NOME
-        assert r0000.fields[6] == "11222333000181"  # CNPJ
+        assert r0000.fields["NOME"] == "EMPRESA VALIDA LTDA"
+        assert r0000.fields["CNPJ"] == "11222333000181"
 
     def test_errors_file_parses(self, sped_errors_path: Path) -> None:
         records = parse_sped_file(sped_errors_path)
@@ -99,7 +99,7 @@ class TestMalformedLines:
 class TestEncodingFallback:
     def test_utf8(self, tmp_path: Path) -> None:
         f = tmp_path / "test.txt"
-        f.write_bytes("|0000|Descrição|café|\n".encode("utf-8"))
+        f.write_bytes("|0000|Descrição|café|\n".encode())
         records = parse_sped_file(f)
         assert len(records) == 1
 
@@ -222,9 +222,21 @@ class TestParserEdgeCases:
     def test_hierarchy_ends_with_parent(self) -> None:
         """Testa que o último parent é adicionado à hierarquia."""
         records = [
-            SpedRecord(line_number=1, register="C001", fields=["C001", "0"], raw_line="|C001|0|"),
-            SpedRecord(line_number=2, register="C100", fields=["C100", "0"], raw_line="|C100|0|"),
-            SpedRecord(line_number=3, register="C170", fields=["C170", "1"], raw_line="|C170|1|"),
+            SpedRecord(
+                line_number=1, register="C001",
+                fields=fields_to_dict("C001", ["C001", "0"]),
+                raw_line="|C001|0|",
+            ),
+            SpedRecord(
+                line_number=2, register="C100",
+                fields=fields_to_dict("C100", ["C100", "0"]),
+                raw_line="|C100|0|",
+            ),
+            SpedRecord(
+                line_number=3, register="C170",
+                fields=fields_to_dict("C170", ["C170", "1"]),
+                raw_line="|C170|1|",
+            ),
         ]
         hierarchy = get_register_hierarchy(records)
         assert len(hierarchy) == 1

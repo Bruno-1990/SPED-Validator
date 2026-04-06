@@ -11,27 +11,24 @@ from collections import defaultdict
 
 from ..models import SpedRecord, ValidationError
 from ..parser import group_by_register
+from ..services.context_builder import ValidationContext
 from .helpers import (
-    ALIQ_INTERESTADUAIS,
     CFOP_REMESSA_SAIDA,
     CFOP_RETORNO_ENTRADA,
     CFOP_VENDA,
     CST_ISENTO_NT,
-    CST_TRIBUTADO,
     F_0000_UF,
     F_0150_COD_PART,
     F_0150_UF,
     F_C100_COD_PART,
-    F_C100_IND_OPER,
-    F_C170_ALIQ_ICMS,
     F_C170_CFOP,
     F_C170_COD_ITEM,
     F_C170_CST_ICMS,
     F_C170_CST_IPI,
     F_C170_VL_BC_ICMS,
     F_C170_VL_ICMS,
-    F_C170_VL_ITEM,
     F_C170_VL_IPI,
+    F_C170_VL_ITEM,
     F_C190_CST,
     F_C190_VL_OPR,
     F_H010_COD_ITEM,
@@ -146,7 +143,10 @@ class _AuditContext:
 # API publica
 # ──────────────────────────────────────────────
 
-def validate_audit_rules(records: list[SpedRecord]) -> list[ValidationError]:
+def validate_audit_rules(
+    records: list[SpedRecord],
+    context: ValidationContext | None = None,
+) -> list[ValidationError]:
     """Executa regras de auditoria fiscal nos registros SPED.
 
     Regras implementadas:

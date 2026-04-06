@@ -15,6 +15,7 @@ from collections import defaultdict
 
 from ..models import SpedRecord, ValidationError
 from ..parser import group_by_register
+from ..services.context_builder import ValidationContext
 from .helpers import (
     CFOP_DEVOLUCAO,
     CFOP_EXPORTACAO,
@@ -27,12 +28,14 @@ from .helpers import (
     trib,
 )
 
-
 # ──────────────────────────────────────────────
 # API publica
 # ──────────────────────────────────────────────
 
-def validate_pendentes(records: list[SpedRecord]) -> list[ValidationError]:
+def validate_pendentes(
+    records: list[SpedRecord],
+    context: ValidationContext | None = None,
+) -> list[ValidationError]:
     """Executa validacoes pendentes nos registros SPED."""
     groups = group_by_register(records)
     errors: list[ValidationError] = []
@@ -61,7 +64,7 @@ def validate_pendentes(records: list[SpedRecord]) -> list[ValidationError]:
 
 def _check_beneficio_fiscal(record: SpedRecord) -> list[ValidationError]:
     """CST tributado com aliquota zero sem beneficio fiscal vinculado."""
-    cst = get_field(record, 9)
+    cst = get_field(record, "CST_ICMS")
     if not cst:
         return []
 
@@ -69,11 +72,11 @@ def _check_beneficio_fiscal(record: SpedRecord) -> list[ValidationError]:
     if t not in CST_TRIBUTADO:
         return []
 
-    aliq = to_float(get_field(record, 13))
+    aliq = to_float(get_field(record, "ALIQ_ICMS"))
     if aliq != 0.0:
         return []
 
-    cfop = get_field(record, 10)
+    cfop = get_field(record, "CFOP")
     if not cfop:
         return []
 
@@ -107,14 +110,15 @@ def _check_desoneracao_motivo(record: SpedRecord) -> list[ValidationError]:
     if len(record.fields) <= 18:
         return []
 
-    vl_deson = to_float(get_field(record, 18))
+    vl_deson = to_float(get_field(record, "IND_APUR"))
     if vl_deson <= 0:
         return []
 
     # Procurar MOT_DES_ICMS (codigo 1-9) em campos apos posicao 30
     mot_des_encontrado = False
-    for idx in range(30, len(record.fields)):
-        campo = get_field(record, idx)
+    values = list(record.fields.values())
+    for campo in values[30:]:
+        campo = campo.strip()
         if campo in {"1", "2", "3", "4", "5", "6", "7", "8", "9"}:
             mot_des_encontrado = True
             break
@@ -140,11 +144,11 @@ def _check_desoneracao_motivo(record: SpedRecord) -> list[ValidationError]:
 
 def _check_devolucao_vs_origem(record: SpedRecord) -> list[ValidationError]:
     """Devolucao (CFOP de devolucao) com CST isento/NT -- possivel divergencia."""
-    cfop = get_field(record, 10)
+    cfop = get_field(record, "CFOP")
     if not cfop or cfop not in CFOP_DEVOLUCAO:
         return []
 
-    cst = get_field(record, 9)
+    cst = get_field(record, "CST_ICMS")
     if not cst:
         return []
 
@@ -186,8 +190,8 @@ def _check_perfil_historico(
     item_sample: dict[str, SpedRecord] = {}
 
     for rec in groups.get("C170", []):
-        cod_item = get_field(rec, 2)
-        cst = get_field(rec, 9)
+        cod_item = get_field(rec, "COD_ITEM")
+        cst = get_field(rec, "CST_ICMS")
         if not cod_item or not cst:
             continue
 
@@ -252,8 +256,8 @@ def _check_ncm_vs_tipi_aliq(
     # Mapear COD_ITEM -> NCM via 0200
     item_ncm: dict[str, str] = {}
     for rec in groups.get("0200", []):
-        cod = get_field(rec, 1)
-        ncm = get_field(rec, 7)
+        cod = get_field(rec, "COD_ITEM")
+        ncm = get_field(rec, "COD_NCM")
         if cod and ncm:
             item_ncm[cod] = ncm
 
@@ -262,8 +266,8 @@ def _check_ncm_vs_tipi_aliq(
     ncm_sample: dict[str, SpedRecord] = {}
 
     for rec in groups.get("C170", []):
-        cod_item = get_field(rec, 2)
-        aliq_ipi = to_float(get_field(rec, 22))
+        cod_item = get_field(rec, "COD_ITEM")
+        aliq_ipi = to_float(get_field(rec, "ALIQ_IPI"))
 
         if not cod_item or aliq_ipi <= 0:
             continue

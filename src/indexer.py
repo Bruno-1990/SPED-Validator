@@ -8,6 +8,8 @@ from pathlib import Path
 
 from tqdm import tqdm
 
+from config import EMBEDDING_MODEL
+
 from .embeddings import embed_texts, embedding_to_blob
 from .models import Chunk, RegisterField
 
@@ -71,6 +73,14 @@ CREATE TABLE IF NOT EXISTS indexed_files (
     source_file TEXT PRIMARY KEY,
     category    TEXT NOT NULL DEFAULT 'guia',
     indexed_at  TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS embedding_metadata (
+    id          INTEGER PRIMARY KEY,
+    model_name  TEXT NOT NULL,
+    model_version TEXT,
+    indexed_at  TEXT DEFAULT (datetime('now')),
+    chunks_count INTEGER
 );
 """
 
@@ -457,6 +467,14 @@ def _insert_chunks(conn: sqlite3.Connection, chunks: list[Chunk], category: str 
                 embedding_to_blob(emb),
             ),
         )
+
+    # Registrar modelo de embeddings usado
+    conn.execute(
+        """INSERT OR REPLACE INTO embedding_metadata (id, model_name, model_version, chunks_count)
+           VALUES (1, ?, ?, ?)""",
+        (EMBEDDING_MODEL, None, conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]),
+    )
+    conn.commit()
 
     return len(chunks)
 

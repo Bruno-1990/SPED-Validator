@@ -10,9 +10,18 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from api.deps import get_db, get_doc_db_path
-from api.schemas.models import ErrorSummary, ValidationErrorInfo, ValidationResponse
-from src.services.pipeline import cleanup_pipeline, get_pipeline_progress, run_pipeline
-from src.services.validation_service import get_error_summary, get_errors, run_full_validation
+from api.schemas.models import (
+    AuditCheckInfo,
+    AuditScope,
+    ErrorSummary,
+    PaginatedResponse,
+    ValidationErrorInfo,
+    ValidationResponse,
+)
+from src.services.context_builder import TaxRegime, build_context
+from src.services.pipeline import PipelineProgress, cleanup_pipeline, get_pipeline_progress, run_pipeline
+from src.services.reference_loader import ReferenceLoader
+from src.services.validation_service import get_error_summary, get_errors
 
 router = APIRouter(prefix="/api/files/{file_id}", tags=["validation"])
 
@@ -45,9 +54,9 @@ async def validate_stream(file_id: int) -> StreamingResponse:
 
     doc_db = str(DOC_DB_PATH) if DOC_DB_PATH.exists() else None
 
-    async def event_generator():
+    async def event_generator():  # type: ignore[no-untyped-def]
         # Executar pipeline em thread separada para não bloquear o event loop
-        def _run():
+        def _run() -> PipelineProgress:
             conn = get_connection(AUDIT_DB_PATH)
             try:
                 return run_pipeline(conn, file_id, doc_db_path=doc_db)
@@ -128,24 +137,153 @@ async def validate_stream(file_id: int) -> StreamingResponse:
     )
 
 
-@router.get("/errors", response_model=list[ValidationErrorInfo])
+@router.get("/errors")
 def list_errors(
     file_id: int,
     error_type: str | None = None,
     severity: str | None = None,
-    limit: int = 100,
-    offset: int = 0,
+    categoria: str | None = "fiscal",
+    certeza: str | None = None,
+    impacto: str | None = None,
+    page: int = 1,
+    page_size: int = 100,
     db: sqlite3.Connection = Depends(get_db),
-) -> list[ValidationErrorInfo]:
-    """Lista erros de validação com filtros."""
-    rows = get_errors(db, file_id, error_type=error_type, severity=severity, limit=limit, offset=offset)
-    return [ValidationErrorInfo(**r) for r in rows]
+) -> PaginatedResponse[ValidationErrorInfo]:
+    """Lista erros de validação com filtros e paginação."""
+    from src.services.validation_service import get_errors_count
+
+    total = get_errors_count(
+        db, file_id,
+        error_type=error_type, severity=severity,
+        categoria=categoria, certeza=certeza, impacto=impacto,
+    )
+
+    offset = (page - 1) * page_size
+    rows = get_errors(
+        db, file_id,
+        error_type=error_type, severity=severity,
+        categoria=categoria, certeza=certeza, impacto=impacto,
+        limit=page_size, offset=offset,
+    )
+    return PaginatedResponse(
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_next=(page * page_size) < total,
+        data=[ValidationErrorInfo(**r) for r in rows],
+    )
 
 
 @router.get("/summary", response_model=ErrorSummary)
 def summary(file_id: int, db: sqlite3.Connection = Depends(get_db)) -> ErrorSummary:
     """Resumo dos erros por tipo e severidade."""
     return ErrorSummary(**get_error_summary(db, file_id))
+
+
+@router.get("/audit-scope", response_model=AuditScope)
+def audit_scope(
+    file_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+) -> AuditScope:
+    """Dashboard de escopo da auditoria — MOD-11."""
+
+    context = build_context(file_id, db)
+
+    # Determinar tabelas externas disponíveis
+    ref_loader = ReferenceLoader()
+    available = ref_loader.available_tables()
+    tabelas_externas = {
+        "aliquotas_internas_uf": "disponivel" if "aliquotas_internas_uf" in available else "indisponivel",
+        "fcp_por_uf": "disponivel" if "fcp_por_uf" in available else "indisponivel",
+        "ncm_tipi": "indisponivel",
+        "mva_por_ncm_uf": "indisponivel",
+        "codigos_ajuste_uf": "indisponivel",
+    }
+
+    has_aliq_tables = tabelas_externas["aliquotas_internas_uf"] == "disponivel"
+    is_simples = context.regime == TaxRegime.SIMPLES_NACIONAL
+
+    # Definir checks executados
+    checks: list[AuditCheckInfo] = [
+        AuditCheckInfo(id="format_validation", status="ok", regras=9),
+        AuditCheckInfo(id="field_validation", status="ok", regras=4),
+        AuditCheckInfo(id="intra_register", status="ok", regras=10),
+        AuditCheckInfo(id="cross_block", status="ok", regras=7),
+        AuditCheckInfo(id="tax_recalculation", status="ok", regras=8),
+        AuditCheckInfo(id="cst_validation", status="ok", regras=6),
+        AuditCheckInfo(id="fiscal_semantics", status="ok", regras=13),
+        AuditCheckInfo(
+            id="audit_beneficios",
+            status="parcial" if tabelas_externas["codigos_ajuste_uf"] == "indisponivel" else "ok",
+            regras=50,
+            motivo_parcial=(
+                "Tabela 5.1.1 de codigos de ajuste por UF nao disponivel"
+                if tabelas_externas["codigos_ajuste_uf"] == "indisponivel" else None
+            ),
+        ),
+        AuditCheckInfo(
+            id="difal_validation",
+            status="ok" if has_aliq_tables else "nao_executado",
+            regras=8,
+            motivo_parcial=(
+                "Tabelas de aliquotas internas por UF nao disponiveis"
+                if not has_aliq_tables else None
+            ),
+        ),
+        AuditCheckInfo(
+            id="st_com_mva",
+            status="nao_executado",
+            regras=4,
+            motivo_parcial="Tabelas MVA/pauta fiscal nao disponiveis",
+        ),
+        AuditCheckInfo(
+            id="simples_nacional_cst",
+            status="nao_aplicavel" if not is_simples else "ok",
+            regras=10,
+            motivo_parcial=(
+                "Contribuinte em Regime Normal"
+                if not is_simples else None
+            ),
+        ),
+    ]
+
+    # Calcular cobertura
+    total_checks = len(checks)
+    ok_count = sum(1 for c in checks if c.status == "ok")
+    parcial_count = sum(1 for c in checks if c.status == "parcial")
+    na_count = sum(1 for c in checks if c.status == "nao_aplicavel")
+
+    applicable = total_checks - na_count
+    cobertura = int(((ok_count + parcial_count * 0.5) / applicable) * 100) if applicable > 0 else 100
+
+    # Período formatado
+    periodo = ""
+    if context.periodo_ini:
+        periodo = f"{context.periodo_ini.month:02d}/{context.periodo_ini.year}"
+
+    # Aviso
+    aviso = None
+    if cobertura < 100:
+        nao_exec = [c.id for c in checks if c.status == "nao_executado"]
+        parciais = [c.id for c in checks if c.status == "parcial"]
+        partes = []
+        if nao_exec:
+            partes.append(f"Verificacoes nao executadas: {', '.join(nao_exec)}.")
+        if parciais:
+            partes.append(f"Verificacoes parciais: {', '.join(parciais)}.")
+        aviso = (
+            f"Este arquivo foi auditado com cobertura parcial ({cobertura}%). "
+            + " ".join(partes)
+        )
+
+    return AuditScope(
+        regime_identificado=context.regime.value,
+        periodo=periodo,
+        checks_executados=checks,
+        tabelas_externas=tabelas_externas,
+        cobertura_estimada_pct=cobertura,
+        aviso=aviso,
+    )
 
 
 @router.delete("/errors/{error_id}")

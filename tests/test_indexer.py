@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
-import pytest
 
 from src.indexer import (
     _chunk_markdown,
@@ -26,7 +25,6 @@ from src.indexer import (
     init_db,
 )
 from src.models import Chunk, RegisterField
-
 
 # ──────────────────────────────────────────────
 # init_db

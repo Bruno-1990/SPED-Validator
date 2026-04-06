@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ..models import SpedRecord, ValidationError
 from ..parser import group_by_register
 from .helpers import (
+    CFOP_EXPORTACAO,
+    CFOP_REMESSA_RETORNO,
+    CST_DIFERIMENTO,
     CST_ISENTO_NT,
     CST_TRIBUTADO,
     get_field,
     make_error,
     to_float,
+    trib,
 )
+
+if TYPE_CHECKING:
+    from ..services.context_builder import ValidationContext
 
 # ──────────────────────────────────────────────
 # CSTs validos por tipo de imposto (locais)
@@ -44,8 +53,9 @@ _CST_PIS_COFINS_VALIDOS = {
     "98", "99",
 }
 
-# CSTs de IPI que indicam tributacao
-_CST_IPI_TRIBUTADO = {"00", "49", "50", "99"}
+# CSTs de IPI que indicam tributacao efetiva (exigem BC/aliq/valor)
+# 49 (Outras Entradas) e 99 (Outras Saidas) sao residuais e nao exigem valores
+_CST_IPI_TRIBUTADO = {"00", "50"}
 
 # CSTs de IPI isentos/NT/imune/suspenso
 _CST_IPI_SEM_IMPOSTO = {"02", "03", "04", "05", "52", "53", "54", "55"}
@@ -55,16 +65,34 @@ _CST_IPI_SEM_IMPOSTO = {"02", "03", "04", "05", "52", "53", "54", "55"}
 # API publica
 # ──────────────────────────────────────────────
 
-def validate_cst_and_exemptions(records: list[SpedRecord]) -> list[ValidationError]:
-    """Valida CSTs, consistencia de isencoes e Bloco H."""
+def validate_cst_and_exemptions(
+    records: list[SpedRecord],
+    context: ValidationContext | None = None,
+) -> list[ValidationError]:
+    """Valida CSTs, consistencia de isencoes e Bloco H.
+
+    Se context.regime == SIMPLES_NACIONAL, pula validações de CST Tabela A
+    (CSTs 00-90) pois Simples usa Tabela B (CSTs 101-900).
+    """
     groups = group_by_register(records)
     errors: list[ValidationError] = []
 
+    # Detectar se é Simples Nacional
+    is_simples = False
+    if context is not None:
+        from ..services.context_builder import TaxRegime
+        is_simples = context.regime == TaxRegime.SIMPLES_NACIONAL
+
     # Validar CSTs nos C170
     for rec in groups.get("C170", []):
-        errors.extend(_validate_cst_c170(rec))
-        errors.extend(_validate_exemptions_c170(rec))
-        errors.extend(_validate_cst020_reducao(rec))
+        if not is_simples:
+            # Regras de CST Tabela A — só se aplicam ao Regime Normal
+            errors.extend(_validate_cst_c170(rec))
+            errors.extend(_validate_exemptions_c170(rec))
+            errors.extend(_validate_cst020_reducao(rec))
+            errors.extend(_validate_cst_tributado_aliq_zero(rec))
+            errors.extend(_validate_cst020_aliq_reduzida(rec))
+            errors.extend(_validate_diferimento_debito(rec))
         errors.extend(_validate_ipi_cst_campos(rec))
 
     # Validar Bloco H (estoque) vs cadastro
@@ -84,7 +112,7 @@ def _validate_cst_c170(record: SpedRecord) -> list[ValidationError]:
     O CST pode ter 2 digitos (Tabela B) ou 3 digitos (Origem + Tabela B).
     """
     errors: list[ValidationError] = []
-    cst_icms = get_field(record, 9)
+    cst_icms = get_field(record, "CST_ICMS")
 
     if not cst_icms:
         return errors
@@ -133,7 +161,7 @@ def _validate_exemptions_c170(record: SpedRecord) -> list[ValidationError]:
     Se CST indica isencao (40,41,50), BC e VL_ICMS devem ser zero.
     """
     errors: list[ValidationError] = []
-    cst_icms = get_field(record, 9)
+    cst_icms = get_field(record, "CST_ICMS")
 
     if not cst_icms:
         return errors
@@ -141,8 +169,8 @@ def _validate_exemptions_c170(record: SpedRecord) -> list[ValidationError]:
     # Extrair parte da tributacao (ultimos 2 digitos)
     t = cst_icms[-2:] if len(cst_icms) >= 2 else cst_icms
 
-    vl_bc_icms = to_float(get_field(record, 12))
-    vl_icms = to_float(get_field(record, 14))
+    vl_bc_icms = to_float(get_field(record, "VL_BC_ICMS"))
+    vl_icms = to_float(get_field(record, "VL_ICMS"))
 
     # CST isento/nao-tributado: valores devem ser zero
     if t in CST_ISENTO_NT and (vl_bc_icms > 0 or vl_icms > 0):
@@ -169,7 +197,7 @@ def _validate_cst020_reducao(record: SpedRecord) -> list[ValidationError]:
     CST 020 indica reducao de base de calculo. Se VL_BC_ICMS ~= VL_ITEM - VL_DESC,
     nao houve reducao real.
     """
-    cst_icms = get_field(record, 9)
+    cst_icms = get_field(record, "CST_ICMS")
     if not cst_icms:
         return []
 
@@ -177,9 +205,9 @@ def _validate_cst020_reducao(record: SpedRecord) -> list[ValidationError]:
     if t != "20":
         return []
 
-    vl_item = to_float(get_field(record, 6))
-    vl_desc = to_float(get_field(record, 7))
-    vl_bc_icms = to_float(get_field(record, 12))
+    vl_item = to_float(get_field(record, "VL_ITEM"))
+    vl_desc = to_float(get_field(record, "VL_DESC"))
+    vl_bc_icms = to_float(get_field(record, "VL_BC_ICMS"))
 
     if vl_item <= 0 or vl_bc_icms <= 0:
         return []
@@ -206,6 +234,123 @@ def _validate_cst020_reducao(record: SpedRecord) -> list[ValidationError]:
 
 
 # ──────────────────────────────────────────────
+# CST_001: CST tributado com aliquota zero
+# ──────────────────────────────────────────────
+
+def _validate_cst_tributado_aliq_zero(record: SpedRecord) -> list[ValidationError]:
+    """CST_001: CST tributado (00,10,20,70,90) com ALIQ_ICMS = 0 e VL_ITEM > 0.
+
+    CST 020 com aliquota zero apos reducao de 100% deveria ser CST 40.
+    Exportacoes e remessas com aliquota zero sao ignoradas.
+    """
+    cst_icms = get_field(record, "CST_ICMS")
+    if not cst_icms:
+        return []
+
+    t = trib(cst_icms)
+    if t not in CST_TRIBUTADO:
+        return []
+
+    aliq = to_float(get_field(record, "ALIQ_ICMS"))
+    if aliq > 0:
+        return []
+
+    vl_item = to_float(get_field(record, "VL_ITEM"))
+    if vl_item <= 0:
+        return []
+
+    cfop = get_field(record, "CFOP")
+    if cfop in CFOP_EXPORTACAO or cfop in CFOP_REMESSA_RETORNO:
+        return []
+
+    suggestion = "CST 40 (isento)" if t == "20" else "CST 40/41/50/51"
+    return [make_error(
+        record, "ALIQ_ICMS", "CST_TRIBUTADO_ALIQ_ZERO",
+        (
+            f"CST {cst_icms} indica tributacao, mas ALIQ_ICMS=0 com "
+            f"VL_ITEM={vl_item:.2f}. Se a operacao for isenta ou nao "
+            f"tributada, considere alterar para {suggestion}."
+        ),
+        value=f"CST={cst_icms} ALIQ=0 VL_ITEM={vl_item:.2f}",
+    )]
+
+
+# ──────────────────────────────────────────────
+# CST_004: CST 020 com aliquota reduzida sem decreto
+# ──────────────────────────────────────────────
+
+def _validate_cst020_aliq_reduzida(record: SpedRecord) -> list[ValidationError]:
+    """CST_004: CST 020 com aliquota menor que o piso interno (17%).
+
+    CST 020 = reducao de base de calculo. A aliquota deve permanecer a
+    padrao do estado; apenas a base e reduzida. Se a aliquota tambem
+    esta reduzida, pode indicar beneficio nao amparado por decreto.
+    """
+    cst_icms = get_field(record, "CST_ICMS")
+    if not cst_icms:
+        return []
+
+    t = trib(cst_icms)
+    if t != "20":
+        return []
+
+    aliq = to_float(get_field(record, "ALIQ_ICMS"))
+    if aliq <= 0 or aliq >= 17.0:
+        return []
+
+    cfop = get_field(record, "CFOP")
+    # Aliquotas interestaduais (4, 7, 12) sao normais para CFOPs 6xxx
+    if cfop and cfop.startswith("6"):
+        return []
+
+    return [make_error(
+        record, "ALIQ_ICMS", "CST_020_ALIQ_REDUZIDA",
+        (
+            f"CST {cst_icms} (reducao de base) com ALIQ_ICMS={aliq:.2f}%, "
+            f"abaixo do piso interno de 17%. No CST 020, apenas a base "
+            f"deve ser reduzida; a aliquota deve permanecer a padrao. "
+            f"Verifique se ha decreto estadual autorizando a reducao "
+            f"cumulativa de base e aliquota."
+        ),
+        value=f"CST={cst_icms} ALIQ={aliq:.2f}%",
+    )]
+
+
+# ──────────────────────────────────────────────
+# CST_005: Diferimento com debito indevido
+# ──────────────────────────────────────────────
+
+def _validate_diferimento_debito(record: SpedRecord) -> list[ValidationError]:
+    """CST_005: CST 051 (diferimento) com VL_ICMS > 0.
+
+    No diferimento total, o imposto e adiado para a etapa seguinte e
+    nao deve gerar debito no periodo corrente.
+    """
+    cst_icms = get_field(record, "CST_ICMS")
+    if not cst_icms:
+        return []
+
+    t = trib(cst_icms)
+    if t not in CST_DIFERIMENTO:
+        return []
+
+    vl_icms = to_float(get_field(record, "VL_ICMS"))
+    if vl_icms <= 0:
+        return []
+
+    return [make_error(
+        record, "VL_ICMS", "CST_051_DIFERIMENTO_DEBITO",
+        (
+            f"CST {cst_icms} indica diferimento, mas VL_ICMS={vl_icms:.2f}. "
+            f"No diferimento total, o imposto e adiado e nao deve gerar "
+            f"debito no periodo. Verifique se o diferimento e total ou "
+            f"parcial e se o debito esta correto."
+        ),
+        value=f"CST={cst_icms} VL_ICMS={vl_icms:.2f}",
+    )]
+
+
+# ──────────────────────────────────────────────
 # IPI_003: CST IPI incompativel com campos monetarios
 # ──────────────────────────────────────────────
 
@@ -216,24 +361,24 @@ def _validate_ipi_cst_campos(record: SpedRecord) -> list[ValidationError]:
     - CST isento/NT com base/valor > 0 -> erro
     """
     errors: list[ValidationError] = []
-    cst_ipi = get_field(record, 19)
+    cst_ipi = get_field(record, "CST_IPI")
 
     if not cst_ipi:
         return errors
 
-    vl_bc_ipi = to_float(get_field(record, 21))
-    aliq_ipi = to_float(get_field(record, 22))
-    vl_ipi = to_float(get_field(record, 23))
+    vl_bc_ipi = to_float(get_field(record, "VL_BC_IPI"))
+    _aliq_ipi = to_float(get_field(record, "ALIQ_IPI"))
+    vl_ipi = to_float(get_field(record, "VL_IPI"))
 
-    # CST tributado com tudo zero
-    if cst_ipi in _CST_IPI_TRIBUTADO and vl_bc_ipi == 0 and aliq_ipi == 0 and vl_ipi == 0:
+    # CST tributado com base zerada (aliquota 0% na TIPI e valido, so exige BC)
+    if cst_ipi in _CST_IPI_TRIBUTADO and vl_bc_ipi == 0:
         errors.append(make_error(
             record, "CST_IPI", "IPI_CST_INCOMPATIVEL",
             (
-                f"CST_IPI {cst_ipi} indica tributacao, mas base, aliquota e "
-                f"valor estao zerados. O CST deveria ser 02 (isento), "
-                f"03 (nao tributado), 04 (imune) ou 05 (suspenso), ou os "
-                f"campos monetarios estao faltando."
+                f"CST_IPI {cst_ipi} indica tributacao, mas VL_BC_IPI esta "
+                f"zerado. O CST deveria ser 02 (isento), "
+                f"03 (nao tributado), 04 (imune) ou 05 (suspenso), ou a "
+                f"base de calculo do IPI esta faltando."
             ),
         ))
 
@@ -274,14 +419,14 @@ def _validate_bloco_h(groups: dict[str, list[SpedRecord]]) -> list[ValidationErr
     # Cadastro de itens
     cod_items_cadastro = set()
     for rec in groups.get("0200", []):
-        cod = get_field(rec, 1)
+        cod = get_field(rec, "COD_ITEM")
         if cod:
             cod_items_cadastro.add(cod)
 
     for rec in h010_records:
-        cod_item = get_field(rec, 1)
-        qtd = to_float(get_field(rec, 3))
-        vl_item = to_float(get_field(rec, 5))
+        cod_item = get_field(rec, "COD_ITEM")
+        qtd = to_float(get_field(rec, "QTD"))
+        vl_item = to_float(get_field(rec, "VL_ITEM"))
 
         # Item deve existir no cadastro
         if cod_item and cod_items_cadastro and cod_item not in cod_items_cadastro:

@@ -11,6 +11,7 @@ from collections import defaultdict
 
 from ..models import SpedRecord, ValidationError
 from ..parser import group_by_register
+from ..services.context_builder import ValidationContext
 from .helpers import (
     ALIQ_INTERESTADUAIS,
     CFOP_DEVOLUCAO,
@@ -52,13 +53,13 @@ from .helpers import (
     F_H010_COD_ITEM,
     F_H010_QTD,
     F_H010_VL_ITEM,
-    TOLERANCE,
     get_field,
     make_error,
     make_generic_error,
     to_float,
     trib,
 )
+from .tolerance import get_tolerance
 
 # ──────────────────────────────────────────────
 # Posicoes de campo locais (nao presentes em helpers)
@@ -77,7 +78,7 @@ _E200_UF = 1
 _E200_DT_INI = 2
 
 _E210_IND_MOV_ST = 1
-_E210_VL_SLD_APURADO_ST = 4
+_E210_VL_SLD_APURADO_ST = "VL_SLD_DEV_ANT_ST"
 
 _H005_DT_INV = 1
 _H005_VL_INV = 2
@@ -129,9 +130,9 @@ class _E111Agrupado:
 
         Formato COD_AJ_APUR: UUTNNnnn
         [0-1]=UF, [2]=Tipo (0=ICMS proprio), [3]=Natureza:
-        0=Outros debitos        -> E110.VL_AJ_DEBITOS
+        0=Outros debitos        -> E110.VL_TOT_AJ_DEBITOS
         1=Estorno de creditos   -> E110.VL_ESTORNOS_CRED
-        2=Outros creditos       -> E110.VL_AJ_CREDITOS
+        2=Outros creditos       -> E110.VL_TOT_AJ_CREDITOS
         3=Estorno de debitos    -> E110.VL_ESTORNOS_DEB
         4=Deducoes              -> E110.VL_TOT_DED
         """
@@ -170,8 +171,11 @@ class _E111Agrupado:
 
     @property
     def eh_credito_presumido(self) -> bool:
-        """Credito presumido: natureza indica credito (pos[3]=2)."""
-        return self.eh_credito
+        """Credito presumido: natureza credito + descricao confirma presumido/outorgado."""
+        if not self.eh_credito:
+            return False
+        descr_lower = (self.descr or "").lower()
+        return any(kw in descr_lower for kw in ("presumido", "outorgado"))
 
 
 # ──────────────────────────────────────────────
@@ -362,12 +366,12 @@ class _BeneficioContext:
 
     @property
     def total_e111_creditos(self) -> float:
-        """Natureza 2: outros creditos -> E110.VL_AJ_CREDITOS."""
+        """Natureza 2: outros creditos -> E110.VL_TOT_AJ_CREDITOS."""
         return sum(e.valor for e in self.e111_list if e.eh_credito)
 
     @property
     def total_e111_debitos(self) -> float:
-        """Natureza 0: outros debitos -> E110.VL_AJ_DEBITOS."""
+        """Natureza 0: outros debitos -> E110.VL_TOT_AJ_DEBITOS."""
         return sum(e.valor for e in self.e111_list if e.eh_debito)
 
     @property
@@ -394,7 +398,10 @@ class _BeneficioContext:
 # API publica
 # ──────────────────────────────────────────────
 
-def validate_beneficio_audit(records: list[SpedRecord]) -> list[ValidationError]:
+def validate_beneficio_audit(
+    records: list[SpedRecord],
+    context: ValidationContext | None = None,
+) -> list[ValidationError]:
     """Executa regras de auditoria de beneficios fiscais nos registros SPED.
 
     Regras implementadas (27):
@@ -442,6 +449,8 @@ def validate_beneficio_audit(records: list[SpedRecord]) -> list[ValidationError]
     # ── Meta-regras (dependem dos erros anteriores) ──
     errors.extend(_check_classificacao_erro(errors))
     errors.extend(_check_escopo_apenas_sped(errors))
+    errors.extend(_check_grau_confianca(errors))
+    errors.extend(_check_amostragem_materialidade(errors, ctx))
 
     return errors
 
@@ -456,7 +465,7 @@ def _check_debito_integral(ctx: _BeneficioContext) -> list[ValidationError]:
         return []
 
     diff = abs(ctx.c190_icms_saida_tributado - ctx.e110_vl_tot_debitos)
-    if diff <= TOLERANCE:
+    if diff <= get_tolerance("apuracao_e110"):
         return []
 
     # Verifica se ha ajuste E111 que justifique a diferenca
@@ -510,9 +519,9 @@ def _check_e111_soma_vs_e110(ctx: _BeneficioContext) -> list[ValidationError]:
     """Soma E111 por natureza vs campo correspondente do E110.
 
     COD_AJ_APUR posicao [3] define a natureza:
-    0 = Outros debitos        -> E110.VL_AJ_DEBITOS
+    0 = Outros debitos        -> E110.VL_TOT_AJ_DEBITOS
     1 = Estorno de creditos   -> E110.VL_ESTORNOS_CRED
-    2 = Outros creditos       -> E110.VL_AJ_CREDITOS
+    2 = Outros creditos       -> E110.VL_TOT_AJ_CREDITOS
     3 = Estorno de debitos    -> E110.VL_ESTORNOS_DEB
     4 = Deducoes              -> E110.VL_TOT_DED
     """
@@ -522,11 +531,17 @@ def _check_e111_soma_vs_e110(ctx: _BeneficioContext) -> list[ValidationError]:
     errors: list[ValidationError] = []
 
     # Comparacoes por natureza: (soma_e111, campo_e110, label)
+    # E111 natureza 0 -> E110.VL_TOT_AJ_DEBITOS (idx 3)
+    # E111 natureza 1 -> E110.VL_ESTORNOS_CRED  (idx 4)
+    # E111 natureza 2 -> E110.VL_TOT_AJ_CREDITOS (idx 7)
+    # E111 natureza 3 -> E110.VL_ESTORNOS_DEB   (idx 8)
+    # E111 natureza 4 -> E110.VL_TOT_DED         (idx 11)
+    # NB: VL_AJ_DEBITOS/VL_AJ_CREDITOS sao ajustes de documento (C197/D197)
     checks = [
-        (ctx.total_e111_debitos, ctx.e110_vl_aj_debitos,
-         "outros debitos", "VL_AJ_DEBITOS"),
-        (ctx.total_e111_creditos, ctx.e110_vl_aj_creditos,
-         "outros creditos", "VL_AJ_CREDITOS"),
+        (ctx.total_e111_debitos, ctx.e110_vl_tot_aj_debitos,
+         "outros debitos", "VL_TOT_AJ_DEBITOS"),
+        (ctx.total_e111_creditos, ctx.e110_vl_tot_aj_creditos,
+         "outros creditos", "VL_TOT_AJ_CREDITOS"),
         (ctx.total_e111_estornos_deb, ctx.e110_vl_estornos_deb,
          "estornos de debito", "VL_ESTORNOS_DEB"),
         (ctx.total_e111_estornos_cred, ctx.e110_vl_estornos_cred,
@@ -538,7 +553,7 @@ def _check_e111_soma_vs_e110(ctx: _BeneficioContext) -> list[ValidationError]:
     for soma_e111, campo_e110, label, campo_nome in checks:
         if soma_e111 > 0 or campo_e110 > 0:
             diff = abs(soma_e111 - campo_e110)
-            if diff > TOLERANCE:
+            if diff > get_tolerance("apuracao_e110"):
                 errors.append(make_generic_error(
                     "AJUSTE_SOMA_DIVERGENTE",
                     (
@@ -576,7 +591,8 @@ def _check_devolucao_sem_reversao(ctx: _BeneficioContext) -> list[ValidationErro
             f"Devolucoes representam {pct_devolucao:.1f}% das operacoes "
             f"(R$ {ctx.c190_vl_opr_devolucao:,.2f}), mas os ajustes E111 "
             f"totalizam R$ {total_ajuste:,.2f} sem reversao proporcional "
-            f"visivel. Beneficios fiscais devem ser revertidos nas devolucoes."
+            f"visivel. Verifique se os beneficios fiscais foram corretamente "
+            f"revertidos nas devolucoes conforme legislacao aplicavel."
         ),
         register="E111",
         value=f"DEV={ctx.c190_vl_opr_devolucao:,.2f} AJ={total_ajuste:,.2f}",
@@ -637,10 +653,10 @@ def _check_sobreposicao_beneficios(ctx: _BeneficioContext) -> list[ValidationErr
     errors.append(make_generic_error(
         "MISTURA_INSTITUTOS_TRIBUTARIOS",
         (
-            f"Itens com base de calculo reduzida (CST 020) coexistem com "
-            f"ajustes de credito presumido (E111). A mistura de institutos "
-            f"tributarios distintos requer validacao da legislacao aplicavel "
-            f"para confirmar se a cumulacao e permitida."
+            "Itens com base de calculo reduzida (CST 020) coexistem com "
+            "ajustes de credito presumido (E111). A mistura de institutos "
+            "tributarios distintos requer validacao da legislacao aplicavel "
+            "para confirmar se a cumulacao e permitida."
         ),
         register="E111",
         value=f"CST020={len(ctx.c170_cst020_items)} + CRED_PRESUMIDO",
@@ -654,24 +670,26 @@ def _check_sobreposicao_beneficios(ctx: _BeneficioContext) -> list[ValidationErr
 # ──────────────────────────────────────────────
 
 def _check_beneficio_desproporcional(ctx: _BeneficioContext) -> list[ValidationError]:
-    """E111 total > ICMS interestadual tributado."""
+    """E111 creditos (natureza 2) > ICMS interestadual tributado."""
     if not ctx.e111_list or ctx.c190_icms_interestadual <= 0:
         return []
 
-    total_ajuste = ctx.total_e111_ajustes
-    if total_ajuste <= ctx.c190_icms_interestadual:
+    # Apenas E111 de natureza 2 (outros creditos) sao beneficios.
+    # Estornos de credito (natureza 1) sao debitos na apuracao, nao beneficios.
+    total_creditos = ctx.total_e111_creditos
+    if total_creditos <= 0 or total_creditos <= ctx.c190_icms_interestadual:
         return []
 
     return [make_generic_error(
         "BENEFICIO_VALOR_DESPROPORCIONAL",
         (
-            f"Soma dos ajustes E111 (R$ {total_ajuste:,.2f}) excede o ICMS "
+            f"Soma dos ajustes E111 de credito (R$ {total_creditos:,.2f}) excede o ICMS "
             f"total das operacoes interestaduais tributadas (R$ {ctx.c190_icms_interestadual:,.2f}). "
             f"O valor do beneficio nao pode ultrapassar o imposto devido "
             f"nas operacoes elegiveis."
         ),
         register="E111",
-        value=f"AJ={total_ajuste:,.2f} ICMS_INTER={ctx.c190_icms_interestadual:,.2f}",
+        value=f"AJ={total_creditos:,.2f} ICMS_INTER={ctx.c190_icms_interestadual:,.2f}",
     )]
 
 
@@ -696,7 +714,7 @@ def _check_st_apuracao(ctx: _BeneficioContext) -> list[ValidationError]:
     if count_st == 0:
         return []
 
-    if abs(vl_icms_st_c170 - ctx.e210_vl_sld_st) <= TOLERANCE:
+    if abs(vl_icms_st_c170 - ctx.e210_vl_sld_st) <= get_tolerance("apuracao_e110"):
         return []
 
     return [make_generic_error(
@@ -776,7 +794,7 @@ def _check_checklist_auditoria(ctx: _BeneficioContext) -> list[ValidationError]:
         return []
 
     ausentes = _REGISTROS_AUDITORIA - ctx.registros_presentes
-    return [make_generic_error(
+    err = make_generic_error(
         "CHECKLIST_INCOMPLETO",
         (
             f"Apenas {presentes} de {len(_REGISTROS_AUDITORIA)} registros essenciais "
@@ -786,7 +804,9 @@ def _check_checklist_auditoria(ctx: _BeneficioContext) -> list[ValidationError]:
         ),
         register="SPED",
         value=f"{presentes}/{len(_REGISTROS_AUDITORIA)} registros",
-    )]
+    )
+    err.categoria = "governance"
+    return [err]
 
 
 # ──────────────────────────────────────────────
@@ -800,7 +820,7 @@ def _check_trilha_beneficio_incompleta(ctx: _BeneficioContext) -> list[Validatio
 
     errors: list[ValidationError] = []
     for e in ctx.e111_list:
-        if e.valor <= TOLERANCE or e.tem_lastro:
+        if e.valor <= get_tolerance("apuracao_e110") or e.tem_lastro:
             continue
 
         # Sem lastro E112/E113 e sem proporcionalidade com interestadual
@@ -923,13 +943,13 @@ def _check_diagnostico_causa_raiz(ctx: _BeneficioContext) -> list[ValidationErro
     for key in set(c170_totais.keys()) | set(c190_totais.keys()):
         v170 = c170_totais.get(key, 0.0)
         v190 = c190_totais.get(key, 0.0)
-        if abs(v170 - v190) > TOLERANCE:
+        if abs(v170 - v190) > get_tolerance("consolidacao"):
             erros_c170_c190 += 1
 
     # C190 -> E110: soma total de ICMS saida vs debito
     if ctx.e110_presente and ctx.c190_icms_saida_tributado > 0:
         diff = abs(ctx.c190_icms_saida_tributado - ctx.e110_vl_tot_debitos)
-        if diff > TOLERANCE:
+        if diff > get_tolerance("apuracao_e110"):
             erros_c190_e110 += 1
 
     if erros_c170_c190 > 0 and erros_c190_e110 > 0:
@@ -1054,7 +1074,7 @@ def _check_beneficio_sem_governanca(ctx: _BeneficioContext) -> list[ValidationEr
     errors: list[ValidationError] = []
 
     for e in ctx.e111_list:
-        if e.valor <= TOLERANCE:
+        if e.valor <= get_tolerance("apuracao_e110"):
             continue
         if e.filhos_e112:
             continue
@@ -1453,12 +1473,14 @@ def _check_classificacao_erro(errors: list[ValidationError]) -> list[ValidationE
             f"revisao individualizada de cada achado."
         )
 
-    return [make_generic_error(
+    err = make_generic_error(
         "CLASSIFICACAO_TIPO_ERRO",
         msg,
         register="SPED",
         value=f"tipo={classificacao} total={total}",
-    )]
+    )
+    err.categoria = "governance"
+    return [err]
 
 
 # ──────────────────────────────────────────────
@@ -1470,7 +1492,7 @@ def _check_escopo_apenas_sped(errors: list[ValidationError]) -> list[ValidationE
     if not errors:
         return []
 
-    return [make_generic_error(
+    err = make_generic_error(
         "ACHADO_LIMITADO_AO_SPED",
         (
             f"Todos os {len(errors)} achados desta auditoria sao baseados "
@@ -1481,4 +1503,83 @@ def _check_escopo_apenas_sped(errors: list[ValidationError]) -> list[ValidationE
         ),
         register="SPED",
         value=f"total_achados={len(errors)}",
-    )]
+    )
+    err.categoria = "governance"
+    return [err]
+
+
+# ──────────────────────────────────────────────
+# Regra 34: GOV_002 — Explicitar grau de confianca
+# ──────────────────────────────────────────────
+
+def _check_grau_confianca(errors: list[ValidationError]) -> list[ValidationError]:
+    """GOV_002: resume o grau de confianca dos achados por certeza."""
+    if not errors:
+        return []
+
+    # Contar achados por grau de certeza
+    contagem: dict[str, int] = {"objetivo": 0, "provavel": 0, "indicio": 0}
+    for e in errors:
+        if e.categoria == "governance":
+            continue
+        certeza = e.certeza if e.certeza in contagem else "indicio"
+        contagem[certeza] += 1
+
+    total = sum(contagem.values())
+    if total == 0:
+        return []
+
+    partes = []
+    for grau, qtd in contagem.items():
+        if qtd > 0:
+            partes.append(f"{qtd} {grau}(s)")
+
+    err = make_generic_error(
+        "GRAU_CONFIANCA_ACHADOS",
+        (
+            f"Dos {total} achados fiscais: {', '.join(partes)}. "
+            f"Achados 'objetivo' sao baseados em regras deterministicas. "
+            f"'Provavel' depende de heuristica com alta confianca. "
+            f"'Indicio' requer validacao manual pelo analista."
+        ),
+        register="SPED",
+        value=f"total={total} " + " ".join(f"{k}={v}" for k, v in contagem.items()),
+    )
+    err.categoria = "governance"
+    return [err]
+
+
+# ──────────────────────────────────────────────
+# Regra 35: AMOSTRA_001 — Amostragem por materialidade e risco
+# ──────────────────────────────────────────────
+
+def _check_amostragem_materialidade(
+    errors: list[ValidationError],
+    ctx: _BeneficioContext,
+) -> list[ValidationError]:
+    """AMOSTRA_001: resume amostragem de registros vs total do arquivo."""
+    total_c170 = len(ctx.groups.get("C170", []))
+    total_c190 = len(ctx.groups.get("C190", []))
+    total_registros = total_c170 + total_c190
+
+    if total_registros == 0:
+        return []
+
+    # Linhas com erro fiscal (nao governance)
+    linhas_com_erro = {e.line_number for e in errors if e.categoria != "governance" and e.line_number > 0}
+    cobertura = len(linhas_com_erro) / total_registros * 100 if total_registros > 0 else 0
+
+    err = make_generic_error(
+        "AMOSTRAGEM_MATERIALIDADE",
+        (
+            f"Universo auditado: {total_c170} itens (C170) e {total_c190} "
+            f"consolidacoes (C190). Achados abrangem {len(linhas_com_erro)} "
+            f"registros ({cobertura:.1f}% do universo). Registros sem achados "
+            f"nao foram necessariamente validados em todas as dimensoes — "
+            f"consulte o escopo das regras ativas."
+        ),
+        register="SPED",
+        value=f"C170={total_c170} C190={total_c190} com_erro={len(linhas_com_erro)}",
+    )
+    err.categoria = "governance"
+    return [err]

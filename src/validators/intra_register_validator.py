@@ -5,12 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..models import SpedRecord, ValidationError
+from ..services.context_builder import ValidationContext
 from .format_validator import cfop_matches_operation, date_in_period, validate_date
 from .helpers import (
-    TOLERANCE,
     get_field,
     make_error,
 )
+from .tolerance import get_tolerance
 
 
 @dataclass
@@ -40,16 +41,24 @@ def _to_float(value: str) -> float | None:
 
 def validate_intra_register(
     records: list[SpedRecord],
-    context: SpedContext | None = None,
+    context: ValidationContext | SpedContext | None = None,
 ) -> list[ValidationError]:
     """Executa validações intra-registro em todos os registros.
 
     Args:
         records: Lista de registros parseados.
-        context: Contexto com DT_INI/DT_FIN do 0000.
+        context: ValidationContext do pipeline ou SpedContext legado.
     """
-    if context is None:
-        context = _build_context(records)
+    # Aceita ValidationContext do pipeline — extrai SpedContext interno
+    if isinstance(context, ValidationContext):
+        sped_ctx = SpedContext(
+            dt_ini=context.periodo_ini.strftime("%d%m%Y") if context.periodo_ini else "",
+            dt_fin=context.periodo_fim.strftime("%d%m%Y") if context.periodo_fim else "",
+        )
+    elif isinstance(context, SpedContext):
+        sped_ctx = context
+    else:
+        sped_ctx = _build_context(records)
 
     errors: list[ValidationError] = []
     hierarchy = _build_parent_map(records)
@@ -57,7 +66,7 @@ def validate_intra_register(
     for record in records:
         reg = record.register
         if reg == "C100":
-            errors.extend(_validate_c100(record, context))
+            errors.extend(_validate_c100(record, sped_ctx))
         elif reg == "C170":
             parent = hierarchy.get(record.line_number)
             errors.extend(_validate_c170(record, parent))
@@ -76,8 +85,8 @@ def _build_context(records: list[SpedRecord]) -> SpedContext:
     for rec in records:
         if rec.register == "0000":
             return SpedContext(
-                dt_ini=get_field(rec, 3),
-                dt_fin=get_field(rec, 4),
+                dt_ini=get_field(rec, "DT_INI"),
+                dt_fin=get_field(rec, "DT_FIN"),
             )
     return SpedContext()
 
@@ -120,7 +129,7 @@ def _get_c170_siblings(
         return []
 
     # Verificar se o C100 pai é documento cancelado/inutilizado
-    cod_sit = get_field(parent, 5)
+    cod_sit = get_field(parent, "COD_SIT")
     if cod_sit in ("02", "03", "04"):
         return []  # Documentos cancelados não participam da soma
 
@@ -152,11 +161,11 @@ def _validate_c100(record: SpedRecord, context: SpedContext) -> list[ValidationE
     """
     errors: list[ValidationError] = []
 
-    ind_oper = get_field(record, 1)
-    cod_sit = get_field(record, 5)
-    dt_doc = get_field(record, 9)
-    dt_e_s = get_field(record, 10)
-    vl_doc = _to_float(get_field(record, 11))
+    ind_oper = get_field(record, "IND_OPER")
+    cod_sit = get_field(record, "COD_SIT")
+    dt_doc = get_field(record, "DT_DOC")
+    dt_e_s = get_field(record, "DT_E_S")
+    vl_doc = _to_float(get_field(record, "VL_DOC"))
 
     # Regra: Se IND_OPER=0 (entrada) e documento regular/extemporâneo, DT_E_S deve existir.
     # Documentos cancelados, inutilizados ou denegados (COD_SIT 02-08) não exigem DT_E_S.
@@ -240,14 +249,14 @@ def _validate_c170(
     """
     errors: list[ValidationError] = []
 
-    cfop = get_field(record, 10)
-    vl_bc_icms = _to_float(get_field(record, 12))
-    aliq_icms = _to_float(get_field(record, 13))
-    vl_icms = _to_float(get_field(record, 14))
+    cfop = get_field(record, "CFOP")
+    _vl_bc_icms = _to_float(get_field(record, "VL_BC_ICMS"))
+    _aliq_icms = _to_float(get_field(record, "ALIQ_ICMS"))
+    _vl_icms = _to_float(get_field(record, "VL_ICMS"))
 
     # Regra: CFOP coerente com IND_OPER do C100 pai
     if parent and cfop:
-        ind_oper = get_field(parent, 1)
+        ind_oper = get_field(parent, "IND_OPER")
         if not cfop_matches_operation(cfop, ind_oper):
             op_tipo = "entrada" if ind_oper == "0" else "saída"
             errors.append(make_error(
@@ -284,12 +293,12 @@ def _validate_c190(
     if not c170_siblings:
         return errors
 
-    c190_cst = get_field(record, 1)
-    c190_cfop = get_field(record, 2)
-    c190_aliq = get_field(record, 3)
-    c190_vl_opr = _to_float(get_field(record, 4))
-    c190_vl_bc = _to_float(get_field(record, 5))
-    c190_vl_icms = _to_float(get_field(record, 6))
+    c190_cst = get_field(record, "CST_ICMS")
+    c190_cfop = get_field(record, "CFOP")
+    c190_aliq = get_field(record, "ALIQ_ICMS")
+    _c190_vl_opr = _to_float(get_field(record, "VL_OPR"))
+    c190_vl_bc = _to_float(get_field(record, "VL_BC_ICMS"))
+    c190_vl_icms = _to_float(get_field(record, "VL_ICMS"))
 
     # Normalizar alíquota para comparação (ex: "18,00" e "18" devem bater)
     c190_aliq_f = _to_float(c190_aliq)
@@ -298,17 +307,17 @@ def _validate_c190(
     # C170: pos 9=CST_ICMS, pos 10=CFOP, pos 13=ALIQ_ICMS
     matching_c170: list[SpedRecord] = []
     for c in c170_siblings:
-        c170_cfop = get_field(c, 10)
+        c170_cfop = get_field(c, "CFOP")
         if c170_cfop != c190_cfop:
             continue
         # CST: comparar últimos 2 dígitos (tributação) para compatibilidade 2/3 dígitos
-        c170_cst = get_field(c, 9)
+        c170_cst = get_field(c, "CST_ICMS")
         c170_trib = c170_cst[-2:] if len(c170_cst) >= 2 else c170_cst
         c190_trib = c190_cst[-2:] if len(c190_cst) >= 2 else c190_cst
         if c170_trib != c190_trib:
             continue
         # Alíquota: comparar como float para evitar diferença de formatação
-        c170_aliq_f = _to_float(get_field(c, 13))
+        c170_aliq_f = _to_float(get_field(c, "ALIQ_ICMS"))
         if (c190_aliq_f is not None and c170_aliq_f is not None
                 and abs(c190_aliq_f - c170_aliq_f) > 0.01):
             continue
@@ -318,8 +327,8 @@ def _validate_c190(
         return errors
 
     # Soma dos valores dos C170 com mesma combinação CST+CFOP+ALIQ
-    soma_vl_bc = sum(_to_float(get_field(c, 12)) or 0.0 for c in matching_c170)
-    soma_vl_icms = sum(_to_float(get_field(c, 14)) or 0.0 for c in matching_c170)
+    soma_vl_bc = sum(_to_float(get_field(c, "VL_BC_ICMS")) or 0.0 for c in matching_c170)
+    soma_vl_icms = sum(_to_float(get_field(c, "VL_ICMS")) or 0.0 for c in matching_c170)
 
     chave = f"CST={c190_cst} CFOP={c190_cfop} ALIQ={c190_aliq}"
 
@@ -327,8 +336,11 @@ def _validate_c190(
     # e despesas do C100 (não disponíveis neste contexto). A validação de
     # VL_OPR com rateio proporcional está em c190_validator.py.
 
+    # Tolerancia de consolidacao baseada no numero de itens
+    tol_consol = get_tolerance("consolidacao", n_items=len(matching_c170))
+
     # Regra: VL_BC_ICMS do C190 = soma VL_BC_ICMS dos C170
-    if c190_vl_bc is not None and abs(soma_vl_bc - c190_vl_bc) > TOLERANCE:
+    if c190_vl_bc is not None and abs(soma_vl_bc - c190_vl_bc) > tol_consol:
         errors.append(make_error(
             record, "VL_BC_ICMS", "SOMA_DIVERGENTE",
             (
@@ -342,7 +354,7 @@ def _validate_c190(
         ))
 
     # Regra: VL_ICMS do C190 = soma VL_ICMS dos C170
-    if c190_vl_icms is not None and abs(soma_vl_icms - c190_vl_icms) > TOLERANCE:
+    if c190_vl_icms is not None and abs(soma_vl_icms - c190_vl_icms) > tol_consol:
         errors.append(make_error(
             record, "VL_ICMS", "SOMA_DIVERGENTE",
             (
@@ -374,19 +386,19 @@ def _validate_e110(record: SpedRecord) -> list[ValidationError]:
     """
     errors: list[ValidationError] = []
 
-    vl_tot_debitos = _to_float(get_field(record, 1)) or 0.0
-    vl_aj_debitos = _to_float(get_field(record, 2)) or 0.0
-    vl_tot_aj_debitos = _to_float(get_field(record, 3)) or 0.0
-    vl_estornos_cred = _to_float(get_field(record, 4)) or 0.0
-    vl_tot_creditos = _to_float(get_field(record, 5)) or 0.0
-    vl_aj_creditos = _to_float(get_field(record, 6)) or 0.0
-    vl_tot_aj_creditos = _to_float(get_field(record, 7)) or 0.0
-    vl_estornos_deb = _to_float(get_field(record, 8)) or 0.0
-    vl_sld_credor_ant = _to_float(get_field(record, 9)) or 0.0
-    vl_sld_apurado = _to_float(get_field(record, 10))
-    vl_tot_ded = _to_float(get_field(record, 11)) or 0.0
-    vl_icms_recolher = _to_float(get_field(record, 12))
-    vl_sld_credor_transp = _to_float(get_field(record, 13))
+    vl_tot_debitos = _to_float(get_field(record, "VL_TOT_DEBITOS")) or 0.0
+    vl_aj_debitos = _to_float(get_field(record, "VL_AJ_DEBITOS")) or 0.0
+    vl_tot_aj_debitos = _to_float(get_field(record, "VL_TOT_AJ_DEBITOS")) or 0.0
+    vl_estornos_cred = _to_float(get_field(record, "VL_ESTORNOS_CRED")) or 0.0
+    vl_tot_creditos = _to_float(get_field(record, "VL_TOT_CREDITOS")) or 0.0
+    vl_aj_creditos = _to_float(get_field(record, "VL_AJ_CREDITOS")) or 0.0
+    vl_tot_aj_creditos = _to_float(get_field(record, "VL_TOT_AJ_CREDITOS")) or 0.0
+    vl_estornos_deb = _to_float(get_field(record, "VL_ESTORNOS_DEB")) or 0.0
+    vl_sld_credor_ant = _to_float(get_field(record, "VL_SLD_CREDOR_ANT")) or 0.0
+    vl_sld_apurado = _to_float(get_field(record, "VL_SLD_APURADO"))
+    vl_tot_ded = _to_float(get_field(record, "VL_TOT_DED")) or 0.0
+    vl_icms_recolher = _to_float(get_field(record, "VL_ICMS_RECOLHER"))
+    vl_sld_credor_transp = _to_float(get_field(record, "VL_SLD_CREDOR_TRANSPORTAR"))
 
     # Fórmula: VL_SLD_APURADO = débitos - créditos
     sld_calc = (
@@ -395,9 +407,11 @@ def _validate_e110(record: SpedRecord) -> list[ValidationError]:
         - vl_estornos_deb - vl_sld_credor_ant
     )
 
+    tol_e110 = get_tolerance("apuracao_e110")
+
     if vl_sld_apurado is not None:
         diff = abs(sld_calc - vl_sld_apurado)
-        if diff > TOLERANCE:
+        if diff > tol_e110:
             errors.append(make_error(
                 record, "VL_SLD_APURADO", "CALCULO_DIVERGENTE",
                 f"VL_SLD_APURADO: calculado={sld_calc:.2f} vs declarado={vl_sld_apurado:.2f} (dif={diff:.2f}).",
@@ -410,7 +424,7 @@ def _validate_e110(record: SpedRecord) -> list[ValidationError]:
     if vl_sld_apurado is not None and vl_sld_apurado > 0 and vl_icms_recolher is not None:
         recolher_calc = vl_sld_apurado - vl_tot_ded
         diff = abs(recolher_calc - vl_icms_recolher)
-        if diff > TOLERANCE:
+        if diff > tol_e110:
             errors.append(make_error(
                 record, "VL_ICMS_RECOLHER", "CALCULO_DIVERGENTE",
                 f"VL_ICMS_RECOLHER: calculado={recolher_calc:.2f} vs declarado={vl_icms_recolher:.2f}.",
@@ -423,7 +437,7 @@ def _validate_e110(record: SpedRecord) -> list[ValidationError]:
     if vl_sld_apurado is not None and vl_sld_apurado <= 0 and vl_sld_credor_transp is not None:
         credor_calc = abs(vl_sld_apurado)
         diff = abs(credor_calc - vl_sld_credor_transp)
-        if diff > TOLERANCE:
+        if diff > tol_e110:
             errors.append(make_error(
                 record, "VL_SLD_CREDOR_TRANSPORTAR", "CALCULO_DIVERGENTE",
                 f"VL_SLD_CREDOR_TRANSPORTAR: calculado={credor_calc:.2f} vs declarado={vl_sld_credor_transp:.2f}.",

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -25,7 +25,6 @@ from src.converter import (
     convert_all_docs,
     convert_file_to_markdown,
 )
-
 
 # ──────────────────────────────────────────────
 # convert_file_to_markdown
@@ -244,15 +243,14 @@ class TestConvertDocx:
         mock_doc.paragraphs = [mock_para1, mock_para_empty, mock_para2, mock_para3, mock_para4, mock_para5]
         mock_doc.tables = []
 
-        with patch("src.converter.Document", mock_doc.__class__, create=True):
-            # Need to mock the import inside _convert_docx
-            import src.converter as conv
-            with patch.dict("sys.modules", {"docx": MagicMock()}):
-                with patch("src.converter.Document", return_value=mock_doc, create=True):
-                    # Directly call with mocked Document
-                    from importlib import reload
-                    # Simpler approach: directly test
-                    pass
+        with (
+            patch("src.converter.Document", mock_doc.__class__, create=True),
+            patch.dict("sys.modules", {"docx": MagicMock()}),
+            patch("src.converter.Document", return_value=mock_doc, create=True),
+        ):
+            # Directly call with mocked Document
+            # Simpler approach: directly test
+            pass
 
         # Test via direct function call with mock
         from src.converter import _convert_docx
@@ -313,8 +311,10 @@ class TestConvertDocx:
         f = tmp_path / "test.docx"
         f.write_text("dummy")
 
-        with patch.dict("sys.modules", {"docx": None}):
-            with patch("src.converter._convert_docx_fallback", return_value="# fallback") as mock_fb:
+        with (
+            patch.dict("sys.modules", {"docx": None}),
+            patch("src.converter._convert_docx_fallback", return_value="# fallback") as mock_fb,
+        ):
                 result = _convert_docx(f)
                 mock_fb.assert_called_once_with(f)
                 assert result == "# fallback"

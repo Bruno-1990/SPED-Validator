@@ -11,6 +11,12 @@ formato:
   condition: len(CNPJ) != 14 OR digitos iguais OR DV invalido
   implemented: true
   module: format_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: FMT_CPF
   register: '*'
   fields:
@@ -21,6 +27,12 @@ formato:
   condition: len(CPF) != 11 OR digitos iguais OR DV invalido
   implemented: true
   module: format_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: FMT_DATA
   register: '*'
   fields:
@@ -34,6 +46,12 @@ formato:
   condition: len != 8 OR ano < 1900 OR ano > 2100 OR dia/mes invalido
   implemented: true
   module: format_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: FMT_DATA_PERIODO
   register: C100, C170
   fields:
@@ -45,6 +63,12 @@ formato:
   condition: data < DT_INI OR data > DT_FIN
   implemented: true
   module: format_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: FMT_CEP
   register: '*'
   fields:
@@ -55,6 +79,12 @@ formato:
   condition: len(CEP) != 8 OR CEP == '00000000'
   implemented: true
   module: format_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: FMT_CFOP
   register: C170, D100
   fields:
@@ -65,6 +95,12 @@ formato:
   condition: nao bate com [1-7]\d{3}
   implemented: true
   module: format_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: FMT_NCM
   register: C170
   fields:
@@ -75,6 +111,12 @@ formato:
   condition: len(NCM) != 8 OR nao numerico
   implemented: true
   module: format_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: FMT_CHAVE_NFE
   register: C100
   fields:
@@ -85,6 +127,12 @@ formato:
   condition: len != 44 OR DV invalido (pesos 2-9 ciclicos)
   implemented: true
   module: format_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: FMT_COD_MUNICIPIO
   register: '*'
   fields:
@@ -95,6 +143,12 @@ formato:
   condition: len != 7 OR primeiro digito nao em (1-5)
   implemented: true
   module: format_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 campo_a_campo:
 - id: CAMPO_OBRIGATORIO
   register: '*'
@@ -106,6 +160,12 @@ campo_a_campo:
   condition: required='O' AND (campo ausente OR valor vazio)
   implemented: true
   module: validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: CAMPO_TIPO_NUMERICO
   register: '*'
   fields:
@@ -116,6 +176,12 @@ campo_a_campo:
   condition: field_type='N' AND valor nao parseavel como float
   implemented: true
   module: validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: CAMPO_TAMANHO
   register: '*'
   fields:
@@ -126,6 +192,12 @@ campo_a_campo:
   condition: len(valor) > field_size
   implemented: true
   module: validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: CAMPO_VALOR_VALIDO
   register: '*'
   fields:
@@ -136,6 +208,12 @@ campo_a_campo:
   condition: valid_values definido AND valor nao esta na lista
   implemented: true
   module: validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 intra_registro:
 - id: C100_DT_ES_OBRIGATORIA_ENTRADA
   register: C100
@@ -149,6 +227,12 @@ intra_registro:
   condition: IND_OPER='0' AND COD_SIT in ('00','01','') AND DT_E_S vazio
   implemented: true
   module: intra_register_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: C100_CANCELADA_VALOR_ZERO
   register: C100
   fields:
@@ -160,6 +244,12 @@ intra_registro:
   condition: COD_SIT in ('02','03','04') AND VL_DOC > 0
   implemented: true
   module: intra_register_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: C100_ORDEM_DATAS
   register: C100
   fields:
@@ -171,6 +261,12 @@ intra_registro:
   condition: DT_DOC > DT_E_S (ambas preenchidas)
   implemented: true
   module: intra_register_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: C170_CFOP_VS_OPERACAO
   register: C170
   fields:
@@ -182,6 +278,12 @@ intra_registro:
   condition: IND_OPER=0 AND CFOP inicia com 5/6/7; OU IND_OPER=1 AND CFOP inicia com 1/2/3
   implemented: true
   module: intra_register_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: C190_SOMA_VL_OPR
   register: C190
   fields:
@@ -190,8 +292,15 @@ intra_registro:
   severity: critical
   description: VL_OPR do C190 deve ser igual a soma dos VL_ITEM dos C170 com mesmo CFOP
   condition: '|soma(C170.VL_ITEM) - C190.VL_OPR| > tolerancia'
+  tolerance_type: consolidacao
   implemented: true
   module: intra_register_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: C190_SOMA_VL_BC_ICMS
   register: C190
   fields:
@@ -200,8 +309,15 @@ intra_registro:
   severity: critical
   description: VL_BC_ICMS do C190 deve ser igual a soma dos C170 com mesmo CFOP
   condition: '|soma(C170.VL_BC_ICMS) - C190.VL_BC_ICMS| > tolerancia'
+  tolerance_type: consolidacao
   implemented: true
   module: intra_register_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: C190_SOMA_VL_ICMS
   register: C190
   fields:
@@ -210,8 +326,15 @@ intra_registro:
   severity: critical
   description: VL_ICMS do C190 deve ser igual a soma dos C170 com mesmo CFOP
   condition: '|soma(C170.VL_ICMS) - C190.VL_ICMS| > tolerancia'
+  tolerance_type: consolidacao
   implemented: true
   module: intra_register_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: E110_SALDO_APURADO
   register: E110
   fields:
@@ -222,8 +345,15 @@ intra_registro:
   severity: critical
   description: VL_SLD_APURADO = (debitos + ajustes) - (creditos + ajustes + saldo anterior)
   condition: '|calculado - declarado| > tolerancia'
+  tolerance_type: apuracao_e110
   implemented: true
   module: intra_register_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: E110_ICMS_RECOLHER
   register: E110
   fields:
@@ -234,8 +364,15 @@ intra_registro:
   severity: critical
   description: 'Se saldo > 0: VL_ICMS_RECOLHER = VL_SLD_APURADO - VL_TOT_DED'
   condition: VL_SLD_APURADO > 0 AND |calculado - declarado| > tolerancia
+  tolerance_type: apuracao_e110
   implemented: true
   module: intra_register_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: E110_SALDO_CREDOR
   register: E110
   fields:
@@ -245,8 +382,15 @@ intra_registro:
   severity: critical
   description: 'Se saldo <= 0: VL_SLD_CREDOR_TRANSPORTAR = abs(VL_SLD_APURADO)'
   condition: VL_SLD_APURADO <= 0 AND |calculado - declarado| > tolerancia
+  tolerance_type: apuracao_e110
   implemented: true
   module: intra_register_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 cruzamento:
 - id: REF_COD_PART_C100
   register: C100
@@ -258,6 +402,12 @@ cruzamento:
   condition: COD_PART nao encontrado em nenhum registro 0150
   implemented: true
   module: cross_block_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: REF_COD_ITEM_C170
   register: C170
   fields:
@@ -268,6 +418,12 @@ cruzamento:
   condition: COD_ITEM nao encontrado em nenhum registro 0200
   implemented: true
   module: cross_block_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: REF_COD_PART_D100
   register: D100
   fields:
@@ -278,6 +434,12 @@ cruzamento:
   condition: COD_PART nao encontrado em nenhum registro 0150
   implemented: true
   module: cross_block_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: E110_VS_C190_DEBITOS
   register: E110
   fields:
@@ -286,8 +448,15 @@ cruzamento:
   severity: critical
   description: VL_TOT_DEBITOS do E110 = soma VL_ICMS dos C190 com CFOP de saida (5/6/7xxx)
   condition: '|soma(C190+D690 saida) - E110.VL_TOT_DEBITOS| > tolerancia'
+  tolerance_type: apuracao_e110
   implemented: true
   module: cross_block_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: E110_VS_C190_CREDITOS
   register: E110
   fields:
@@ -296,8 +465,15 @@ cruzamento:
   severity: critical
   description: VL_TOT_CREDITOS do E110 = soma VL_ICMS dos C190 com CFOP de entrada (1/2/3xxx)
   condition: '|soma(C190+D690 entrada) - E110.VL_TOT_CREDITOS| > tolerancia'
+  tolerance_type: apuracao_e110
   implemented: true
   module: cross_block_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: BLOCO9_CONTAGEM_REGISTROS
   register: '9900'
   fields:
@@ -309,6 +485,12 @@ cruzamento:
   condition: contagem_real(REG_NAME) != QTD_REG
   implemented: true
   module: cross_block_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: BLOCO9_TOTAL_LINHAS
   register: '9999'
   fields:
@@ -319,6 +501,112 @@ cruzamento:
   condition: total_linhas_real != QTD_LIN
   implemented: true
   module: cross_block_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
+# ── Bloco D — CT-e e Documentos de Transporte (MOD-08) ──
+- id: D_001
+  register: D100
+  fields:
+  - COD_PART
+  error_type: D_REF_INEXISTENTE
+  severity: warning
+  description: COD_PART do D100 deve existir no cadastro 0150
+  condition: COD_PART nao encontrado em nenhum registro 0150
+  implemented: true
+  module: bloco_d_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+- id: D_002
+  register: D190
+  fields:
+  - CFOP
+  error_type: D_CFOP_DIRECAO_INCOMPATIVEL
+  severity: critical
+  description: CFOP do D190 deve ser compativel com IND_OPER do D100 (entrada=1/2/3, saida=5/6/7)
+  condition: IND_OPER=0 + CFOP 5/6/7 OU IND_OPER=1 + CFOP 1/2/3
+  implemented: true
+  module: bloco_d_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
+- id: D_003
+  register: D190
+  fields:
+  - VL_OPR
+  - VL_ICMS
+  error_type: D190_DIVERGE_D100
+  severity: critical
+  description: D190 deve fechar com D100 — soma VL_OPR e VL_ICMS dos D190 vs D100
+  condition: '|soma(D190.VL_OPR) - D100.VL_DOC| > tolerancia OU |soma(D190.VL_ICMS) - D100.VL_ICMS| > tolerancia'
+  tolerance_type: consolidacao
+  implemented: true
+  module: bloco_d_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
+- id: D_004
+  register: E110
+  fields:
+  - VL_TOT_DEBITOS
+  error_type: D_DEBITOS_EXCEDE_E110
+  severity: critical
+  description: VL_ICMS de saida do Bloco D (D190+D690) deve estar contido em E110.VL_TOT_DEBITOS
+  condition: soma(D190+D690 saida VL_ICMS) > E110.VL_TOT_DEBITOS + tolerancia
+  tolerance_type: apuracao_e110
+  implemented: true
+  module: bloco_d_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
+- id: D_005
+  register: D190
+  fields:
+  - CST_ICMS
+  error_type: D_CST_REGIME_INCOMPATIVEL
+  severity: warning
+  description: CST_ICMS do D190 deve ser compativel com regime tributario (Tabela A para Normal, Tabela B para SN)
+  condition: Regime Normal + CSOSN OU Simples Nacional + CST Tabela A
+  implemented: true
+  module: bloco_d_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+- id: D_006
+  register: D100
+  fields:
+  - CHV_CTE
+  error_type: D_CHAVE_CTE_INVALIDA
+  severity: critical
+  description: Chave CT-e (CHV_CTE) deve ter 44 digitos numericos com DV valido modulo 11
+  condition: len(CHV_CTE) != 44 OU digito_verificador_invalido
+  implemented: true
+  module: bloco_d_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
 recalculo:
 - id: RECALC_ICMS_BC
   register: C170
@@ -330,8 +618,15 @@ recalculo:
   severity: critical
   description: BC ICMS = VL_ITEM - VL_DESC (quando tributado e BC declarada > 0)
   condition: '|VL_ITEM - VL_DESC - VL_BC_ICMS| > tolerancia'
+  tolerance_type: item_icms
   implemented: true
   module: tax_recalc.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: RECALC_ICMS_VALOR
   register: C170
   fields:
@@ -342,8 +637,15 @@ recalculo:
   severity: critical
   description: VL_ICMS = VL_BC_ICMS * ALIQ_ICMS / 100
   condition: '|VL_BC_ICMS * ALIQ_ICMS / 100 - VL_ICMS| > tolerancia'
+  tolerance_type: item_icms
   implemented: true
   module: tax_recalc.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: RECALC_ICMS_ST_FALTANTE
   register: C170
   fields:
@@ -354,8 +656,15 @@ recalculo:
   severity: critical
   description: Para CSTs de ST (10,30,60,70), BC_ST > 0 exige VL_ICMS_ST > 0
   condition: CST in ST AND VL_BC_ST > 0 AND VL_ICMS_ST = 0
+  tolerance_type: item_icms
   implemented: true
   module: tax_recalc.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: RECALC_ICMS_ST_VALOR
   register: C170
   fields:
@@ -366,8 +675,15 @@ recalculo:
   severity: critical
   description: VL_ICMS_ST = VL_BC_ICMS_ST * ALIQ_ST / 100
   condition: '|calculado - declarado| > tolerancia (quando ALIQ_ST > 0)'
+  tolerance_type: item_icms
   implemented: true
   module: tax_recalc.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: RECALC_IPI
   register: C170
   fields:
@@ -378,8 +694,15 @@ recalculo:
   severity: critical
   description: VL_IPI = VL_BC_IPI * ALIQ_IPI / 100
   condition: '|calculado - declarado| > tolerancia'
+  tolerance_type: item_ipi
   implemented: true
   module: tax_recalc.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: RECALC_PIS
   register: C170
   fields:
@@ -390,8 +713,15 @@ recalculo:
   severity: critical
   description: VL_PIS = VL_BC_PIS * ALIQ_PIS / 100
   condition: '|calculado - declarado| > tolerancia (quando BC > 0 e ALIQ > 0)'
+  tolerance_type: item_pis
   implemented: true
   module: tax_recalc.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: RECALC_COFINS
   register: C170
   fields:
@@ -402,8 +732,15 @@ recalculo:
   severity: critical
   description: VL_COFINS = VL_BC_COFINS * ALIQ_COFINS / 100
   condition: '|calculado - declarado| > tolerancia (quando BC > 0 e ALIQ > 0)'
+  tolerance_type: item_cofins
   implemented: true
   module: tax_recalc.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: RECALC_E110_TOTAIS
   register: E110
   fields:
@@ -413,8 +750,15 @@ recalculo:
   severity: critical
   description: Totais E110 recalculados a partir de C190 + D690
   condition: '|soma(C190+D690) - E110| > tolerancia'
+  tolerance_type: apuracao_e110
   implemented: true
   module: tax_recalc.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 cst_isencoes:
 - id: CST_ICMS_CODIGO_INVALIDO
   register: C170
@@ -426,6 +770,12 @@ cst_isencoes:
   condition: CST nao pertence a lista de codigos validos
   implemented: true
   module: cst_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: CST_ICMS_ISENCAO_COM_VALOR
   register: C170
   fields:
@@ -438,6 +788,12 @@ cst_isencoes:
   condition: CST in (40,41,50,60) AND (VL_BC_ICMS > 0 OR VL_ICMS > 0)
   implemented: true
   module: cst_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: CST_ICMS_TRIBUTADO_SEM_ICMS
   register: C170
   fields:
@@ -450,6 +806,12 @@ cst_isencoes:
   condition: CST in (00,10,20,70,90) AND VL_BC_ICMS > 0 AND VL_ICMS = 0
   implemented: true
   module: cst_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: H010_ITEM_INEXISTENTE
   register: H010
   fields:
@@ -460,6 +822,12 @@ cst_isencoes:
   condition: COD_ITEM nao encontrado no 0200
   implemented: true
   module: cst_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: H010_QTD_NEGATIVA
   register: H010
   fields:
@@ -470,6 +838,12 @@ cst_isencoes:
   condition: QTD < 0
   implemented: true
   module: cst_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 - id: H010_VALOR_NEGATIVO
   register: H010
   fields:
@@ -480,6 +854,12 @@ cst_isencoes:
   condition: VL_ITEM < 0
   implemented: true
   module: cst_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
 semantica_aliquota_zero:
 - id: ICMS_CST_TRIBUTADO_BC_ALIQ_ZERO
   register: C170
@@ -493,6 +873,12 @@ semantica_aliquota_zero:
   condition: CST in (00,10,20,70,90) AND VL_BC > 0 AND ALIQ = 0 AND CFOP nao e exportacao/remessa
   implemented: true
   module: fiscal_semantics.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: ICMS_CST_TRIBUTADO_TUDO_ZERO
   register: C170
   fields:
@@ -506,6 +892,12 @@ semantica_aliquota_zero:
   condition: CST in (00,10,20,70,90) AND BC=0 AND ALIQ=0 AND ICMS=0 AND CFOP nao e exportacao/remessa
   implemented: true
   module: fiscal_semantics.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: informativo
 - id: IPI_CST_TRIBUTADO_TUDO_ZERO
   register: C170
   fields:
@@ -519,6 +911,12 @@ semantica_aliquota_zero:
   condition: CST_IPI in (00,01,49,50,99) AND BC=0 AND ALIQ=0 AND VL=0
   implemented: true
   module: fiscal_semantics.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: informativo
 - id: PIS_CST_TRIBUTAVEL_TUDO_ZERO
   register: C170
   fields:
@@ -532,6 +930,12 @@ semantica_aliquota_zero:
   condition: CST_PIS in (01,02,03,49) AND BC=0 AND ALIQ=0 AND VL=0
   implemented: true
   module: fiscal_semantics.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: informativo
 - id: COFINS_CST_TRIBUTAVEL_TUDO_ZERO
   register: C170
   fields:
@@ -545,6 +949,12 @@ semantica_aliquota_zero:
   condition: CST_COFINS in (01,02,03,49) AND BC=0 AND ALIQ=0 AND VL=0
   implemented: true
   module: fiscal_semantics.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: informativo
 semantica_cst_cfop:
 - id: CFOP_VENDA_CST_ISENTO
   register: C170
@@ -557,6 +967,12 @@ semantica_cst_cfop:
   condition: CFOP in CFOPs_venda AND CST in (40,41,50,60)
   implemented: true
   module: fiscal_semantics.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 - id: CFOP_INTERESTADUAL_ALIQ_ZERO
   register: C170
   fields:
@@ -569,6 +985,12 @@ semantica_cst_cfop:
   condition: CFOP inicia com 2/6 AND CST tributado AND ALIQ=0 AND nao e remessa/devolucao
   implemented: true
   module: fiscal_semantics.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: CFOP_EXPORTACAO_CST_TRIBUTADO
   register: C170
   fields:
@@ -581,6 +1003,12 @@ semantica_cst_cfop:
   condition: CFOP in CFOPs_exportacao AND CST tributado AND ALIQ > 0
   implemented: true
   module: fiscal_semantics.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 monofasicos:
 - id: MONO_ALIQ_INVALIDA
   register: C170
@@ -596,6 +1024,12 @@ monofasicos:
   implemented: true
   module: fiscal_semantics.py
   legislation: Lei 10.147/00, Lei 10.485/02, Lei 10.833/03 Arts. 49-52
+  vigencia_de: '2001-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: MONO_VALOR_INDEVIDO
   register: C170
   fields:
@@ -610,6 +1044,12 @@ monofasicos:
   implemented: true
   module: fiscal_semantics.py
   legislation: Lei 10.147/00, Lei 10.485/02
+  vigencia_de: '2001-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: MONO_NCM_INCOMPATIVEL
   register: C170
   fields:
@@ -623,6 +1063,12 @@ monofasicos:
   implemented: true
   module: fiscal_semantics.py
   legislation: Lei 10.147/00, Lei 10.485/02, Lei 10.833/03, Lei 10.865/04
+  vigencia_de: '2001-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 - id: MONO_CST_INCORRETO
   register: C170
   fields:
@@ -637,6 +1083,12 @@ monofasicos:
   implemented: true
   module: fiscal_semantics.py
   legislation: Lei 10.147/00, Lei 10.485/02
+  vigencia_de: '2001-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: MONO_ENTRADA_CST04
   register: C170
   fields:
@@ -650,6 +1102,12 @@ monofasicos:
   implemented: true
   module: fiscal_semantics.py
   legislation: Lei 10.147/00 Art. 3
+  vigencia_de: '2001-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: informativo
 pendentes:
 - id: PEND_BENEFICIO_FISCAL
   register: C170
@@ -662,6 +1120,12 @@ pendentes:
   condition: CST tributado AND ALIQ=0 AND sem codigo de beneficio
   implemented: true
   module: pendentes_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 - id: PEND_DESONERACAO_MOTIVO
   register: C170
   fields:
@@ -673,6 +1137,12 @@ pendentes:
   condition: VL_ICMS_DESON > 0 AND MOT_DES_ICMS vazio
   implemented: true
   module: pendentes_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: PEND_DEVOLUCAO_VS_ORIGEM
   register: C170
   fields:
@@ -685,6 +1155,12 @@ pendentes:
   condition: CFOP de devolucao AND CST diverge do documento referenciado
   implemented: true
   module: pendentes_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 - id: PEND_PERFIL_HISTORICO
   register: C170
   fields:
@@ -697,6 +1173,12 @@ pendentes:
   condition: Item tem historico de CST tributado e agora esta zerado
   implemented: true
   module: pendentes_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: informativo
 - id: PEND_ALIQ_INTERESTADUAL
   register: C170
   fields:
@@ -710,6 +1192,12 @@ pendentes:
   implemented: true
   module: aliquota_validator.py
   legislation: Resolucao Senado 13/2012
+  vigencia_de: '2013-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: PEND_NCM_VS_TIPI_ALIQ
   register: C170
   fields:
@@ -722,6 +1210,12 @@ pendentes:
   implemented: true
   module: pendentes_validator.py
   legislation: Decreto 11.158/2022 (TIPI)
+  vigencia_de: '2022-07-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 auditoria_beneficios:
 - id: AUD_COMPETE_DEBITO_INTEGRAL
   register: E110, E111, C190
@@ -739,6 +1233,12 @@ auditoria_beneficios:
   tipo_achado: risco_fiscal
   depende_validacao_externa: true
   validar_externamente: ato concessivo, memoria de calculo do beneficio
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: AUD_BENEFICIO_REDUZIDO_NA_NOTA
   register: C170, C190
   fields:
@@ -752,6 +1252,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: indicio_forte
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: critico
 - id: AUD_E111_SEM_RASTREABILIDADE
   register: E111, E112, E113
   fields:
@@ -760,7 +1266,7 @@ auditoria_beneficios:
   - NUM_PROC
   - CHV_DOC
   error_type: AJUSTE_SEM_LASTRO_DOCUMENTAL
-  severity: critical
+  severity: warning
   description: Ajuste de beneficio no E111 sem detalhamento em E112/E113 quando exigivel
   condition: E111.VL_AJ_APUR > 0 AND nao existe E112 ou E113 vinculado
   implemented: true
@@ -768,6 +1274,12 @@ auditoria_beneficios:
   tipo_achado: risco_fiscal
   depende_validacao_externa: true
   validar_externamente: processos, documentos fiscais, memoria do ajuste
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 - id: AUD_E111_SOMA_VS_E110
   register: E110, E111
   fields:
@@ -780,6 +1292,13 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: erro_objetivo
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
+  tolerance_type: absolute
 - id: AUD_DEVOLUCAO_SEM_REVERSAO_BENEFICIO
   register: C170, C190, E111
   fields:
@@ -787,7 +1306,7 @@ auditoria_beneficios:
   - VL_ICMS
   - COD_AJ_APUR
   error_type: DEVOLUCAO_BENEFICIO_NAO_REVERTIDO
-  severity: critical
+  severity: warning
   description: Devolucao de venda beneficiada sem reversao proporcional do ajuste de beneficio no E111
   condition: CFOP devolucao AND E111 do periodo nao reflete reducao proporcional ao volume devolvido
   implemented: true
@@ -795,6 +1314,12 @@ auditoria_beneficios:
   tipo_achado: inconsistencia
   depende_validacao_externa: true
   validar_externamente: nota original, memoria de calculo do beneficio
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 - id: AUD_CFOP_INTERESTADUAL_UF_INTERNA
   register: C170, 0150
   fields:
@@ -807,6 +1332,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: indicio_forte
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: critico
 - id: AUD_SALDO_CREDOR_RECORRENTE
   register: E110
   fields:
@@ -820,6 +1351,13 @@ auditoria_beneficios:
   tipo_achado: indicio
   depende_validacao_externa: true
   validar_externamente: razao fiscal, historico de apuracao
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: relevante
+  tolerance_type: none
 - id: AUD_CREDITO_ENTRADA_USO_CONSUMO
   register: C170, 0200
   fields:
@@ -834,6 +1372,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: indicio
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: relevante
 - id: AUD_SOBREPOSICAO_BENEFICIOS
   register: C170, E111
   fields:
@@ -841,7 +1385,7 @@ auditoria_beneficios:
   - VL_BC_ICMS
   - COD_AJ_APUR
   error_type: SOBREPOSICAO_BENEFICIOS
-  severity: critical
+  severity: warning
   description: Mesma operacao com reducao de base no documento (CST 020) e credito presumido no E111
   condition: CST 020 (base reduzida) em C170 AND E111 com ajuste de credito presumido sobre mesma operacao
   implemented: true
@@ -849,18 +1393,30 @@ auditoria_beneficios:
   tipo_achado: risco_fiscal
   depende_validacao_externa: true
   validar_externamente: ato concessivo, parecer normativo
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: AUD_BENEFICIO_DESPROPORCIONAL
   register: E111, C190
   fields:
   - VL_AJ_APUR
   - VL_ICMS
   error_type: BENEFICIO_VALOR_DESPROPORCIONAL
-  severity: critical
+  severity: warning
   description: Valor do ajuste de beneficio no E111 desproporcional ao volume de operacoes elegiveis no C190
   condition: E111.VL_AJ_APUR > soma(C190.VL_ICMS de operacoes interestaduais tributadas)
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: risco_fiscal
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: AUD_CST_VOLUME_ISENTO_ATIPICO
   register: C190
   fields:
@@ -873,6 +1429,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: indicio
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: relevante
 - id: AUD_REMESSA_SEM_RETORNO
   register: C170
   fields:
@@ -887,6 +1449,12 @@ auditoria_beneficios:
   tipo_achado: indicio
   depende_validacao_externa: true
   validar_externamente: prazo legal, documentos de retorno
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: relevante
 - id: AUD_CST051_DEBITO_INDEVIDO
   register: C170, C190
   fields:
@@ -899,6 +1467,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: inconsistencia
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 - id: AUD_ST_NOTA_OK_APURACAO_ERRADA
   register: C170, C190, E200, E210
   fields:
@@ -912,6 +1486,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: inconsistencia
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: AUD_INVENTARIO_ITEM_SEM_MOVIMENTO
   register: H010, C170
   fields:
@@ -925,6 +1505,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: indicio
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: informativo
 - id: AUD_E111_CODIGO_GENERICO
   register: E111
   fields:
@@ -937,6 +1523,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: risco_fiscal
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 - id: AUD_PARAMETRIZACAO_SISTEMICA
   register: C170, 0200
   fields:
@@ -951,6 +1543,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: erro_objetivo
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: AUD_XML_SPED_DIVERGENCIA
   register: C170, C100
   fields:
@@ -967,6 +1565,13 @@ auditoria_beneficios:
   tipo_achado: erro_objetivo
   depende_validacao_externa: true
   validar_externamente: XML da NF-e
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
+  tolerance_type: relative
 - id: AUD_CHECKLIST_AUDITORIA_MINIMA
   register: 0150, 0200, C170, C190, E110, E111, H010, 9900
   fields:
@@ -979,6 +1584,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: metarregra
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: informativo
 - id: AUD_TRILHA_BENEFICIO_INCOMPLETA
   register: C190, E110, E111, E112, E113
   fields:
@@ -995,6 +1606,12 @@ auditoria_beneficios:
   tipo_achado: risco_fiscal
   depende_validacao_externa: true
   validar_externamente: memoria de calculo, planilhas auxiliares, ato concessivo
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: AUD_ICMS_EFETIVO_SEM_TRILHA
   register: C170, C190, E110, E111
   fields:
@@ -1010,6 +1627,12 @@ auditoria_beneficios:
   tipo_achado: inconsistencia
   depende_validacao_externa: true
   validar_externamente: regra do beneficio, memoria de calculo
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: AUD_CFOP_OK_CST_ERRADO
   register: C170, C190
   fields:
@@ -1022,6 +1645,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: erro_objetivo
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: AUD_CFOP_6XXX_DESTINO_MESMO_UF
   register: C170, 0150
   fields:
@@ -1034,6 +1663,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: indicio_forte
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: critico
 - id: AUD_REGISTROS_ESSENCIAIS_AUSENTES
   register: C100, C170, C190, E110, E111, 0150, 0200, H010
   fields:
@@ -1045,6 +1680,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: metarregra
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: informativo
 - id: AUD_CST_ESPECIAIS_VOLUME_ATIPICO
   register: C190
   fields:
@@ -1057,6 +1698,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: indicio
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: relevante
 - id: AUD_BENEFICIO_FORA_ESCOPO
   register: C170, C190, 0150, E111, 0200
   fields:
@@ -1072,6 +1719,12 @@ auditoria_beneficios:
   tipo_achado: risco_fiscal
   depende_validacao_externa: true
   validar_externamente: ato concessivo, exclusoes legais
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: AUD_DIAGNOSTICO_CAUSA_RAIZ
   register: C170, C190, E110, E111
   fields:
@@ -1086,6 +1739,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: metarregra
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: informativo
 - id: AUD_AJUSTE_SEM_LASTRO
   register: E111, E112, E113
   fields:
@@ -1094,12 +1753,18 @@ auditoria_beneficios:
   - NUM_PROC
   - CHV_DOC
   error_type: AJUSTE_SEM_LASTRO_DOCUMENTAL
-  severity: critical
+  severity: warning
   description: Ajuste relevante sem detalhamento complementar ou documento vinculado
   condition: E111.VL_AJ_APUR > tolerancia AND sem E112/E113
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: risco_fiscal
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 - id: AUD_CST051_TRATAMENTO_INCORRETO
   register: C170, C190, E110
   fields:
@@ -1112,6 +1777,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: inconsistencia
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 - id: AUD_ST_APURACAO_DIVERGE
   register: C170, C190, E200, E210
   fields:
@@ -1124,6 +1795,13 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: inconsistencia
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
+  tolerance_type: absolute
 - id: AUD_C190_MISTURA_CST
   register: C170, C190
   fields:
@@ -1138,6 +1816,13 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: erro_objetivo
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
+  tolerance_type: absolute
 - id: AUD_CREDITO_SEM_SAIDA
   register: C170, H010, 0200
   fields:
@@ -1150,6 +1835,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: indicio
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: relevante
 - id: AUD_INVENTARIO_REFLEXO_TRIBUTARIO
   register: H005, H010, H020, 0200
   fields:
@@ -1163,6 +1854,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: indicio
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: relevante
 - id: AUD_OPERACAO_ESPECIAL_CONTAMINACAO
   register: C170, C190
   fields:
@@ -1174,6 +1871,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: indicio
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: relevante
 - id: AUD_BENEFICIO_SEM_GOVERNANCA
   register: E111, E112, E113
   fields:
@@ -1187,6 +1890,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: risco_fiscal
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: AUD_TOTALIZACAO_BENEFICIADA
   register: C190, E110, 0150
   fields:
@@ -1200,6 +1909,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: inconsistencia
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 - id: AUD_MISTURA_INSTITUTOS
   register: C170, C190, E111
   fields:
@@ -1207,12 +1922,18 @@ auditoria_beneficios:
   - VL_BC_ICMS
   - COD_AJ_APUR
   error_type: MISTURA_INSTITUTOS_TRIBUTARIOS
-  severity: critical
+  severity: warning
   description: Mistura de credito presumido, reducao de base e isencao na mesma operacao
   condition: CST 020 + E111 credito presumido sobre mesma base
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: risco_fiscal
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: AUD_PERFIL_OPERACIONAL_BENEFICIO
   register: 0000, 0200, C170, C190, E111
   fields:
@@ -1227,6 +1948,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: indicio
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: relevante
 - id: AUD_BENEFICIO_PARAMETRIZACAO_ERRADA
   register: C170, C190, E111
   fields:
@@ -1240,6 +1967,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: risco_fiscal
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: AUD_DESTINATARIO_SEGREGACAO
   register: C170, 0150, E111
   fields:
@@ -1253,6 +1986,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: indicio
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: relevante
 - id: AUD_BASE_BENEFICIO_INFLADA
   register: C100, C170, C190, E111
   fields:
@@ -1266,6 +2005,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: risco_fiscal
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: AUD_SPED_VS_CONTRIBUICOES
   register: C170, C190
   fields:
@@ -1282,6 +2027,12 @@ auditoria_beneficios:
   tipo_achado: inconsistencia
   depende_validacao_externa: true
   validar_externamente: EFD-Contribuicoes
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 - id: AUD_FORMA_VS_SUBSTANCIA
   register: C170, 0200
   fields:
@@ -1295,6 +2046,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: indicio
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: relevante
 - id: AUD_E111_NUMERICO_JURIDICO
   register: E111, E112, E113
   fields:
@@ -1307,6 +2064,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: risco_fiscal
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: AUD_IPI_REFLEXO_CUSTO_BC
   register: C170
   fields:
@@ -1320,6 +2083,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: inconsistencia
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 - id: AUD_CODIGO_AJUSTE_INCOMPATIVEL
   register: E111, E112
   fields:
@@ -1331,6 +2100,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: risco_fiscal
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: AUD_TRILHA_BENEFICIO_AUSENTE
   register: C190, E110, E111, E112, E113
   fields:
@@ -1344,6 +2119,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: risco_fiscal
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
 - id: AUD_CLASSIFICACAO_ERRO
   register: '*'
   fields:
@@ -1355,6 +2136,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: metarregra
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: informativo
 - id: AUD_ESCOPO_APENAS_SPED
   register: C170, C190, E110, E111, 0150, 0200, H010, 9900
   fields:
@@ -1366,6 +2153,12 @@ auditoria_beneficios:
   implemented: true
   module: beneficio_audit_validator.py
   tipo_achado: metarregra
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: informativo
 - id: AUD_CHECKLIST_MESTRE
   register: 0150, 0200, C170, C190, E110, E111, H010, 9900
   fields:
@@ -1378,6 +2171,12 @@ auditoria_beneficios:
   implemented: true
   module: audit_rules.py
   tipo_achado: metarregra
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: informativo
 aliquotas:
 - id: ALIQ_001
   register: C170
@@ -1391,17 +2190,29 @@ aliquotas:
   implemented: true
   module: aliquota_validator.py
   legislation: Resolucao Senado 22/1989, RS 13/2012
+  vigencia_de: '2013-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 - id: ALIQ_002
   register: C170
   fields:
   - CFOP
   - ALIQ_ICMS
   error_type: ALIQ_INTERNA_EM_INTERESTADUAL
-  severity: critical
-  description: Aliquota interna usada em operacao interestadual (>= 17%)
-  condition: CFOP 6xxx AND ALIQ >= 17
+  severity: error
+  description: Aliquota interna usada em operacao interestadual (>= 17%, heuristica)
+  condition: CFOP 6xxx AND ALIQ >= 17 (proxy — certeza provavel)
   implemented: true
   module: aliquota_validator.py
+  vigencia_de: '1989-05-19'
+  vigencia_ate: null
+  version: '1.1'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: critico
 - id: ALIQ_003
   register: C170
   fields:
@@ -1414,6 +2225,72 @@ aliquotas:
   condition: CFOP 5xxx AND ALIQ in {4,7,12} AND mesma UF
   implemented: true
   module: aliquota_validator.py
+  vigencia_de: '1989-05-19'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
+- id: ALIQ_004
+  register: C170
+  fields:
+  - CFOP
+  - ALIQ_ICMS
+  - UF
+  error_type: ALIQ_UF_INCOMPATIVEL
+  severity: critical
+  description: Aliquota 7/12% incompativel com par UF origem-destino
+  condition: CFOP 6xxx + par UF nao corresponde a aliquota padrao (RS 22/1989)
+  implemented: true
+  module: aliquota_validator.py
+  legislation: Resolucao Senado 22/1989
+  tolerance_type: exact
+  vigencia_de: '1989-05-19'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
+- id: ALIQ_005
+  register: C170
+  fields:
+  - CFOP
+  - ALIQ_ICMS
+  - COD_ITEM
+  - COD_NCM
+  error_type: ALIQ_4_SEM_IMPORTACAO
+  severity: warning
+  description: Aliquota 4% sem suporte de importacao (RS 13/2012)
+  condition: CFOP 6xxx + ALIQ=4 + NCM nao tipicamente importado
+  implemented: true
+  module: aliquota_validator.py
+  legislation: Resolucao Senado 13/2012
+  tolerance_type: none
+  vigencia_de: '2013-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: relevante
+- id: ALIQ_006
+  register: C170
+  fields:
+  - COD_ITEM
+  - ALIQ_ICMS
+  error_type: ALIQ_DIVERGENTE_MESMO_ITEM
+  severity: warning
+  description: Mesmo item com aliquotas ICMS divergentes no periodo
+  condition: COD_ITEM com ALIQ_ICMS diferentes em documentos do mesmo periodo
+  implemented: true
+  module: aliquota_validator.py
+  legislation: Analise de consistencia interna
+  tolerance_type: none
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: indicio
+  impacto: relevante
 - id: ALIQ_007
   register: C190
   fields:
@@ -1426,6 +2303,12 @@ aliquotas:
   condition: C190.ALIQ intermediaria entre min e max dos C170 do documento
   implemented: true
   module: aliquota_validator.py
+  vigencia_de: '2013-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
 c190_consolidacao:
 - id: C190_001
   register: C190
@@ -1439,6 +2322,13 @@ c190_consolidacao:
   condition: sum(C170 por CST+CFOP+ALIQ) != C190
   implemented: true
   module: c190_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: critico
+  tolerance_type: absolute
 - id: C190_002
   register: C190
   fields:
@@ -1451,6 +2341,13 @@ c190_consolidacao:
   condition: CST isento com ALIQ>0, CST tributado com ALIQ=0, CFOP inter com ALIQ interna
   implemented: true
   module: c190_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
+  tolerance_type: none
 cst_expandido:
 - id: CST_003
   register: C170
@@ -1464,6 +2361,12 @@ cst_expandido:
   condition: CST 020 AND VL_BC_ICMS >= 95% de VL_ITEM
   implemented: true
   module: cst_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
 - id: IPI_003
   register: C170
   fields:
@@ -1477,3 +2380,900 @@ cst_expandido:
   condition: CST tributado com tudo zero OU CST isento com valores > 0
   implemented: true
   module: cst_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
+difal:
+- id: DIFAL_001
+  register: C170, 0150
+  fields:
+  - CFOP
+  - ALIQ_ICMS
+  - IND_IE
+  - UF
+  error_type: DIFAL_FALTANTE_CONSUMO_FINAL
+  severity: critical
+  description: DIFAL faltante em operacao interestadual para consumidor final
+  condition: CFOP 6xxx + IND_IE=9 + ALIQ == interestadual (sem DIFAL embutido)
+  implemented: true
+  module: difal_validator.py
+  depende_validacao_externa: true
+  validar_externamente: aliquotas_internas_uf.yaml
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
+- id: DIFAL_002
+  register: C170, 0150
+  fields:
+  - CFOP
+  - ALIQ_ICMS
+  - IND_IE
+  error_type: DIFAL_INDEVIDO_REVENDA
+  severity: warning
+  description: DIFAL aplicado indevidamente em operacao de revenda ou industrializacao
+  condition: IND_IE=1 + CFOP revenda/industria + ALIQ > 12%
+  implemented: true
+  module: difal_validator.py
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
+- id: DIFAL_003
+  register: C170, 0150, 0000
+  fields:
+  - CFOP
+  - UF
+  error_type: DIFAL_UF_DESTINO_INCONSISTENTE
+  severity: warning
+  description: UF destino inconsistente com CFOP interestadual
+  condition: CFOP 6xxx + UF_DEST == UF_DECLARANTE
+  implemented: true
+  module: difal_validator.py
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
+- id: DIFAL_004
+  register: C170, 0150, 0000
+  fields:
+  - CFOP
+  - ALIQ_ICMS
+  - UF
+  error_type: DIFAL_ALIQ_INTERNA_INCORRETA
+  severity: critical
+  description: Aliquota interna do destino incorreta no calculo do DIFAL
+  condition: CFOP 6xxx + consumo final + ALIQ != aliquota interna oficial UF destino
+  implemented: true
+  module: difal_validator.py
+  depende_validacao_externa: true
+  validar_externamente: aliquotas_internas_uf.yaml
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
+- id: DIFAL_005
+  register: C170, 0150, 0000
+  fields:
+  - VL_BC_ICMS
+  - ALIQ_ICMS
+  - VL_ICMS
+  error_type: DIFAL_BASE_INCONSISTENTE
+  severity: warning
+  description: Base de calculo DIFAL inconsistente com operacao
+  condition: BC x ALIQ diverge de VL_ICMS alem da tolerancia
+  implemented: true
+  module: difal_validator.py
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
+- id: DIFAL_006
+  register: C170, 0150
+  fields:
+  - CFOP
+  - UF
+  error_type: DIFAL_FCP_AUSENTE
+  severity: warning
+  description: FCP ausente ou incoerente em operacao com DIFAL
+  condition: UF destino cobra FCP + operacao consumo final interestadual + sem destaque FCP
+  implemented: true
+  module: difal_validator.py
+  depende_validacao_externa: true
+  validar_externamente: fcp_por_uf.yaml
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
+- id: DIFAL_007
+  register: C170, 0150
+  fields:
+  - CFOP
+  - IND_IE
+  error_type: DIFAL_PERFIL_INCOMPATIVEL
+  severity: warning
+  description: Perfil destinatario incompativel com tratamento DIFAL
+  condition: IND_IE=1 + CFOP consumo final OU IND_IE=9 + CFOP revenda
+  implemented: true
+  module: difal_validator.py
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
+- id: DIFAL_008
+  register: C170, 0150
+  fields:
+  - CFOP
+  - IND_IE
+  error_type: DIFAL_CONSUMO_FINAL_SEM_MARCADOR
+  severity: info
+  description: Consumo final sem marcadores consistentes para rastreio do DIFAL
+  condition: IND_IE=9 + CFOP generico interestadual (nao usa CFOP de consumo final)
+  implemented: true
+  module: difal_validator.py
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: informativo
+
+# ──────────────────────────────────────────────
+# MOD-17: Bloco C Servicos (C400/C490/C500/C590)
+# ──────────────────────────────────────────────
+- id: CS_001
+  register: C490
+  fields:
+  - VL_BC_ICMS
+  - ALIQ_ICMS
+  - VL_ICMS
+  error_type: CS_C490_SOMA_DIVERGENTE
+  severity: error
+  description: C490 - VL_BC_ICMS x ALIQ_ICMS diverge de VL_ICMS declarado
+  condition: VL_BC_ICMS * ALIQ_ICMS / 100 difere de VL_ICMS alem da tolerancia
+  implemented: true
+  module: bloco_c_servicos_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+- id: CS_002
+  register: C405
+  fields:
+  - DT_DOC
+  error_type: DATE_OUT_OF_PERIOD
+  severity: warning
+  description: C405 - DT_DOC fora do periodo informado no 0000
+  condition: DT_DOC < DT_INI ou DT_DOC > DT_FIN do registro 0000
+  implemented: true
+  module: bloco_c_servicos_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+- id: CS_003
+  register: C500
+  fields:
+  - COD_PART
+  error_type: REF_INEXISTENTE
+  severity: warning
+  description: C500 - COD_PART referenciado nao existe no cadastro 0150
+  condition: COD_PART informado no C500 nao encontrado entre os registros 0150
+  implemented: true
+  module: bloco_c_servicos_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+- id: CS_004
+  register: C590, C510
+  fields:
+  - VL_ICMS
+  - CST_ICMS
+  - CFOP
+  - ALIQ_ICMS
+  error_type: CS_C590_DIVERGE_C510
+  severity: error
+  description: C590 - VL_ICMS diverge da soma dos C510 para mesma combinacao CST+CFOP+ALIQ
+  condition: Soma VL_ICMS dos C510 por CST+CFOP+ALIQ difere do C590 correspondente
+  implemented: true
+  module: bloco_c_servicos_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+base_calculo:
+- id: BASE_001
+  register: C170
+  fields:
+  - VL_BC_ICMS
+  - ALIQ_ICMS
+  - VL_ICMS
+  error_type: CALCULO_DIVERGENTE
+  severity: error
+  description: Recalculo ICMS divergente - BC x ALIQ difere de VL_ICMS declarado
+  condition: '|VL_BC_ICMS * ALIQ_ICMS / 100 - VL_ICMS| > tolerance[item_icms]'
+  implemented: true
+  module: base_calculo_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
+- id: BASE_002
+  register: C170
+  fields:
+  - VL_BC_ICMS
+  - VL_ITEM
+  - CST_ICMS
+  error_type: BASE_MENOR_SEM_JUSTIFICATIVA
+  severity: error
+  description: Base de calculo ICMS menor que 50% do valor do item sem CST de reducao (020, 070)
+  condition: VL_BC_ICMS < (VL_ITEM * 0.5) AND CST not in (020, 070)
+  implemented: true
+  module: base_calculo_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: relevante
+- id: BASE_003
+  register: C170
+  fields:
+  - VL_BC_ICMS
+  - VL_ITEM
+  error_type: BASE_SUPERIOR_RAZOAVEL
+  severity: warning
+  description: Base de calculo ICMS superior a 150% do valor do item
+  condition: VL_BC_ICMS > VL_ITEM * 1.5
+  implemented: true
+  module: base_calculo_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: indicio
+  impacto: relevante
+- id: BASE_004
+  register: C170, C100
+  fields:
+  - VL_BC_ICMS
+  - VL_FRT
+  - IND_FRT
+  error_type: FRETE_CIF_FORA_BASE
+  severity: error
+  description: Frete CIF (IND_FRT=0) nao incluido na base de calculo do ICMS
+  condition: VL_FRT > 0 AND IND_FRT=0 AND VL_BC_ICMS <= VL_ITEM
+  implemented: true
+  module: base_calculo_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: relevante
+  base_legal: Art. 13, par.1, II, LC 87/1996
+- id: BASE_005
+  register: C170, C100
+  fields:
+  - VL_BC_ICMS
+  - VL_FRT
+  - IND_FRT
+  error_type: FRETE_FOB_NA_BASE
+  severity: warning
+  description: Frete FOB (IND_FRT=1) possivelmente incluido na base de calculo do ICMS
+  condition: VL_FRT > 0 AND IND_FRT=1 AND VL_BC_ICMS > VL_ITEM
+  implemented: true
+  module: base_calculo_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: indicio
+  impacto: relevante
+- id: BASE_006
+  register: C170, C100
+  fields:
+  - VL_BC_ICMS
+  - VL_OUT_DA
+  error_type: DESPESAS_ACESSORIAS_FORA_BASE
+  severity: warning
+  description: Despesas acessorias (VL_OUT_DA) nao incluidas na base de calculo para CST tributado
+  condition: VL_OUT_DA > 0 AND VL_BC_ICMS <= VL_ITEM AND CST tributado
+  implemented: true
+  module: base_calculo_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  base_legal: Art. 13, LC 87/1996
+# ──────────────────────────────────────────────
+# GRUPO IPI
+# ──────────────────────────────────────────────
+- id: IPI_001
+  register: C170
+  fields:
+  - VL_BC_ICMS
+  - VL_IPI
+  error_type: IPI_REFLEXO_BC_ICMS
+  severity: warning
+  description: IPI reflexo incorreto na base ICMS — destinatario nao-contribuinte deve incluir IPI na BC; contribuinte nao
+  condition: nao-contribuinte AND IPI fora da BC ICMS, ou contribuinte AND IPI na BC ICMS
+  implemented: true
+  module: ipi_validator.py
+  legislation: Art. 13, §2º, LC 87/1996
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: critico
+  base_legal: Art. 13, §2º, LC 87/1996
+- id: IPI_002
+  register: C170
+  fields:
+  - VL_BC_IPI
+  - ALIQ_IPI
+  - VL_IPI
+  error_type: CALCULO_DIVERGENTE
+  severity: error
+  description: Recalculo IPI divergente — VL_BC_IPI * ALIQ_IPI / 100 != VL_IPI
+  condition: "|VL_BC_IPI * ALIQ_IPI / 100 - VL_IPI| > tolerancia"
+  implemented: true
+  module: tax_recalc.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
+- id: IPI_003
+  register: C170
+  fields:
+  - CST_IPI
+  - VL_BC_IPI
+  - VL_IPI
+  error_type: IPI_CST_MONETARIO_INCOMPATIVEL
+  severity: error
+  description: CST IPI incompativel com campos monetarios — tributado sem valor, isento com valor, ou NT com valor
+  condition: CST tributado (00/49/50) com VL_IPI=0 e BC>0, ou CST isento (01-05/51-55) com VL_IPI>0, ou CST 99 com valores
+  implemented: true
+  module: ipi_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
+# ──────────────────────────────────────────────
+# GRUPO DESTINATARIO
+# ──────────────────────────────────────────────
+- id: DEST_001
+  register: C170
+  fields:
+  - CST_ICMS
+  - CFOP
+  error_type: DEST_IE_INCONSISTENTE
+  severity: warning
+  description: IE ativa no 0150 mas CST indica isencao em operacao interestadual — tratamento fiscal inconsistente
+  condition: IE ativa AND CST 40/41 AND CFOP 6xxx
+  implemented: true
+  module: destinatario_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: critico
+- id: DEST_002
+  register: '0150'
+  fields:
+  - IE
+  - UF
+  error_type: DEST_UF_IE_INCOMPATIVEL
+  severity: error
+  description: Prefixo da IE nao corresponde a UF do participante no 0150
+  condition: prefixo IE nao bate com padrao da UF
+  implemented: true
+  module: destinatario_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+- id: DEST_003
+  register: 0150, 0005
+  fields:
+  - CEP
+  - COD_MUN
+  - UF
+  error_type: DEST_UF_CEP_INCOMPATIVEL
+  severity: error
+  description: CEP ou COD_MUN pertence a faixa de outra UF — endereco inconsistente
+  condition: faixa CEP ou prefixo COD_MUN IBGE difere da UF informada
+  implemented: true
+  module: destinatario_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: informativo
+# ──────────────────────────────────────────────
+# GRUPO CFOP
+# ──────────────────────────────────────────────
+- id: CFOP_001
+  register: C170
+  fields:
+  - CFOP
+  error_type: CFOP_INTERESTADUAL_MESMA_UF
+  severity: error
+  description: CFOP interestadual (6xxx) com destinatario na mesma UF do contribuinte
+  condition: CFOP 6xxx AND UF_DEST == UF_CONTRIBUINTE (0000)
+  implemented: true
+  module: cfop_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
+  base_legal: RICMS, Convênio s/nº 1970
+- id: CFOP_002
+  register: C170
+  fields:
+  - CFOP
+  error_type: CFOP_INTERNO_OUTRA_UF
+  severity: error
+  description: CFOP interno (5xxx) com destinatario em outra UF
+  condition: CFOP 5xxx AND UF_DEST != UF_CONTRIBUINTE (0000)
+  implemented: true
+  module: cfop_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
+  base_legal: RICMS, Convênio s/nº 1970
+- id: CFOP_003
+  register: C170
+  fields:
+  - CFOP
+  error_type: CFOP_DIFAL_INCOMPATIVEL
+  severity: warning
+  description: CFOP de remessa/retorno incompativel com tratamento DIFAL (E300 preenchido)
+  condition: E300 preenchido AND CFOP 6xxx de remessa/retorno
+  implemented: true
+  module: cfop_validator.py
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: critico
+  base_legal: EC 87/2015
+cst_expandido:
+- id: CST_001
+  register: C170
+  fields:
+  - CST_ICMS
+  - ALIQ_ICMS
+  - VL_ITEM
+  error_type: CST_TRIBUTADO_ALIQ_ZERO
+  severity: error
+  description: CST tributado (00,10,20,70,90) com aliquota ICMS zero e valor de item
+    positivo
+  condition: CST in (00,10,20,70,90) AND ALIQ_ICMS = 0 AND VL_ITEM > 0
+  implemented: true
+  module: cst_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  automatizavel: true
+  base_legal: RICMS, Convênio s/nº 1970
+- id: CST_002
+  register: C170
+  fields:
+  - CST_ICMS
+  - VL_ICMS
+  - VL_BC_ICMS
+  error_type: ISENCAO_INCONSISTENTE
+  severity: error
+  description: CST isento/NT (40,41,50) com valor de ICMS ou base de calculo positiva
+  condition: CST in (40,41,50) AND (VL_ICMS > 0 OR VL_BC_ICMS > 0)
+  implemented: true
+  module: cst_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  automatizavel: true
+  base_legal: RICMS, Convênio s/nº 1970
+- id: CST_004
+  register: C170
+  fields:
+  - CST_ICMS
+  - ALIQ_ICMS
+  error_type: CST_020_ALIQ_REDUZIDA
+  severity: warning
+  description: CST 020 com aliquota reduzida abaixo do piso interno sem decreto estadual
+  condition: CST = 020 AND ALIQ_ICMS < 17% AND CFOP 5xxx (interno)
+  implemented: true
+  module: cst_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: relevante
+  automatizavel: false
+  base_legal: RICMS estadual, decreto de beneficio fiscal
+- id: CST_005
+  register: C170
+  fields:
+  - CST_ICMS
+  - VL_ICMS
+  error_type: CST_051_DIFERIMENTO_DEBITO
+  severity: error
+  description: CST 051 (diferimento) gerando debito de ICMS indevido
+  condition: CST = 051 AND VL_ICMS > 0
+  implemented: true
+  module: cst_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  automatizavel: true
+  base_legal: RICMS, art. diferimento
+beneficio_fiscal:
+- id: BENE_001
+  register: C190, E111
+  fields:
+  - ALIQ_ICMS
+  - COD_AJ_APUR
+  error_type: BENEFICIO_CONTAMINANDO_ALIQUOTA
+  severity: error
+  description: Beneficio fiscal no E111 contaminando aliquota do documento (C190)
+  condition: E111 com ajuste de beneficio AND C190 com ALIQ_ICMS atipica em operacao
+    interna
+  implemented: true
+  module: beneficio_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
+  automatizavel: true
+  base_legal: RICMS, legislacao estadual de beneficios
+- id: BENE_002
+  register: C170, E300, E111
+  fields:
+  - ALIQ_ICMS
+  - CFOP
+  error_type: BENEFICIO_CONTAMINANDO_DIFAL
+  severity: warning
+  description: Beneficio fiscal contaminando calculo do DIFAL interestadual
+  condition: E111 beneficio AND C170 interestadual com ALIQ < 4%
+  implemented: true
+  module: beneficio_validator.py
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: relevante
+  automatizavel: false
+  base_legal: EC 87/2015, legislacao estadual de beneficios
+- id: BENE_003
+  register: E111, C190
+  fields:
+  - VL_AJ_APUR
+  - VL_OPR
+  - CFOP
+  error_type: BENEFICIO_BASE_NAO_ELEGIVEL
+  severity: warning
+  description: Base do beneficio fiscal inclui operacoes nao elegiveis (devolucao,
+    cancelamento, remessa)
+  condition: E111 beneficio AND C190 com CFOPs nao elegiveis > 5% do total
+  implemented: true
+  module: beneficio_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: critico
+  automatizavel: false
+  base_legal: Ato concessivo do beneficio fiscal
+devolucoes:
+- id: DEV_001
+  register: C100, C170
+  fields:
+  - CFOP
+  - COD_PART
+  error_type: DEVOLUCAO_SEM_ESPELHAMENTO
+  severity: warning
+  description: Devolucao sem NF original correspondente (mesmo COD_PART, operacao
+    inversa)
+  condition: CFOP devolucao AND sem C100 com mesmo COD_PART e operacao inversa
+  implemented: true
+  module: devolucao_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: relevante
+  automatizavel: false
+  base_legal: RICMS, art. devolucao
+- id: DEV_002
+  register: C170, E300
+  fields:
+  - CFOP
+  error_type: DEVOLUCAO_SEM_DIFAL
+  severity: warning
+  description: Devolucao interestadual sem tratamento do DIFAL (E300 ausente)
+  condition: CFOP devolucao interestadual AND E300 ausente
+  implemented: true
+  module: devolucao_validator.py
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: relevante
+  automatizavel: false
+  base_legal: EC 87/2015
+- id: DEV_003
+  register: C170
+  fields:
+  - CFOP
+  - ALIQ_ICMS
+  error_type: DEVOLUCAO_ALIQ_DIVERGENTE
+  severity: warning
+  description: Devolucao interestadual com aliquota diferente das faixas interestaduais
+    validas
+  condition: CFOP devolucao interestadual AND ALIQ_ICMS not in (4, 7, 12)
+  implemented: true
+  module: devolucao_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: indicio
+  impacto: informativo
+  automatizavel: false
+  base_legal: Resolucao Senado 13/2012, Convênio ICMS 153/2015
+parametrizacao:
+- id: PARAM_001
+  register: C170
+  fields:
+  - COD_ITEM
+  - CST_ICMS
+  - CFOP
+  error_type: PARAM_ERRO_SISTEMATICO_ITEM
+  severity: warning
+  description: Mesmo COD_ITEM com mesmo tipo de erro em mais de 80% de suas ocorrencias
+  condition: COD_ITEM com erro repetitivo (>80%) indica parametrizacao incorreta no ERP
+  implemented: true
+  module: parametrizacao_validator.py
+  tipo_achado: metarregra
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: informativo
+  automatizavel: true
+- id: PARAM_002
+  register: C170, 0150
+  fields:
+  - CST_ICMS
+  - UF
+  error_type: PARAM_ERRO_SISTEMATICO_UF
+  severity: warning
+  description: Mesmo tipo de erro em mais de 80% das operacoes para mesma UF destino
+  condition: Erro concentrado por UF destino (>80%) indica regra fiscal incorreta para
+    a UF
+  implemented: true
+  module: parametrizacao_validator.py
+  tipo_achado: metarregra
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: informativo
+  automatizavel: true
+- id: PARAM_003
+  register: C170, C100
+  fields:
+  - CST_ICMS
+  - DT_DOC
+  error_type: PARAM_ERRO_INICIADO_EM_DATA
+  severity: warning
+  description: Tipo de erro concentrado apos determinada data (janela deslizante)
+  condition: Taxa de erro >80% na segunda metade do periodo vs <20% na primeira metade
+  implemented: true
+  module: parametrizacao_validator.py
+  tipo_achado: metarregra
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: informativo
+  automatizavel: true
+ncm:
+- id: NCM_001
+  register: C170, 0200
+  fields:
+  - COD_NCM
+  - CST_ICMS
+  error_type: NCM_TRIBUTACAO_INCOMPATIVEL
+  severity: error
+  description: NCM com tratamento tributario incompativel com CST (TIPI vs escrituracao)
+  condition: NCM isento/NT na TIPI + CST tributado, ou NCM monofasico + CST incompativel
+  implemented: true
+  module: ncm_validator.py
+  tipo_achado: risco_fiscal
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: critico
+  automatizavel: false
+  base_legal: TIPI (Decreto 11.158/2022)
+- id: NCM_002
+  register: C170, 0200
+  fields:
+  - COD_NCM
+  - VL_ITEM
+  error_type: NCM_GENERICO_RELEVANTE
+  severity: warning
+  description: NCM generico (terminado em 0000) com valor do item acima de R$ 1.000
+  condition: NCM termina em 0000 AND VL_ITEM > 1000
+  implemented: true
+  module: ncm_validator.py
+  tipo_achado: indicio_forte
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: indicio
+  impacto: relevante
+  automatizavel: false
+governanca:
+- id: GOV_001
+  register: '*'
+  fields:
+  - '*'
+  error_type: CLASSIFICACAO_TIPO_ERRO
+  severity: info
+  description: 'Governanca: classificar achado como erro material, parametrizacao ou
+    tese fiscal'
+  condition: Padrao do erro indica natureza pontual, sistemica ou interpretativa
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: metarregra
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: informativo
+  categoria: governance
+- id: GOV_002
+  register: '*'
+  fields:
+  - '*'
+  error_type: GRAU_CONFIANCA_ACHADOS
+  severity: info
+  description: 'Governanca: explicitar grau de confianca (objetivo/provavel/indicio)
+    dos achados'
+  condition: Distribuicao dos achados por grau de certeza
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: metarregra
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: informativo
+  categoria: governance
+- id: GOV_003
+  register: C170, C190, E110, E111, 0150, 0200, H010, 9900
+  fields:
+  - '*'
+  error_type: ACHADO_LIMITADO_AO_SPED
+  severity: info
+  description: 'Governanca: explicitar que achados dependem exclusivamente do SPED
+    sem documentos externos'
+  condition: Regra sustentavel apenas por dados internos do arquivo
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: metarregra
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: informativo
+  categoria: governance
+- id: GOV_004
+  register: 0150, 0200, C170, C190, E110, E111, H010, 9900
+  fields:
+  - '*'
+  error_type: CHECKLIST_AUDITORIA_INCOMPLETO
+  severity: critical
+  description: 'Governanca: checklist mestre de 10 pontos minimos de auditoria SPED'
+  condition: Ausencia de conferencia nos pilares minimos de auditoria
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: metarregra
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: informativo
+  categoria: governance
+- id: AMOSTRA_001
+  register: C170, C190
+  fields:
+  - '*'
+  error_type: AMOSTRAGEM_MATERIALIDADE
+  severity: info
+  description: 'Governanca: amostragem por materialidade e risco — cobertura da auditoria'
+  condition: Percentual de registros com achados vs universo total
+  implemented: true
+  module: beneficio_audit_validator.py
+  tipo_achado: metarregra
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: informativo
+  categoria: governance

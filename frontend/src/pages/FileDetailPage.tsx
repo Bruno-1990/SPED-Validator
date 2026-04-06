@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
-import type { ErrorSummary, FileInfo, LegalBasis, PipelineEvent, StructuredReport, ValidationError } from '../types/sped'
+import type { ErrorSummary, FileInfo, LegalBasis, PipelineEvent, RecordInfo, StructuredReport, ValidationError } from '../types/sped'
+import RecordDetail from '../components/Records/RecordDetail'
+import FieldEditor from '../components/Records/FieldEditor'
+import SuggestionPanel from '../components/Records/SuggestionPanel'
+import ErrorChart from '../components/Dashboard/ErrorChart'
+import AuditScopePanel from '../components/Dashboard/AuditScopePanel'
+import CorrectionApprovalPanel from '../components/Corrections/CorrectionApprovalPanel'
 
 const STAGE_LABELS: Record<string, string> = {
   estrutural: 'Analise Estrutural',
@@ -19,7 +25,7 @@ const SEVERITY_LABELS: Record<string, string> = {
   info: 'Info',
 }
 
-type TabType = 'summary' | 'errors' | 'alerts' | 'report'
+type TabType = 'summary' | 'errors' | 'alerts' | 'corrections' | 'report'
 
 export default function FileDetailPage() {
   const { fileId } = useParams<{ fileId: string }>()
@@ -141,7 +147,7 @@ export default function FileDetailPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <Link to="/files" className="text-sm text-blue-600 hover:underline">&larr; Voltar</Link>
           <h2 className="text-2xl font-bold">{file.company_name || file.filename}</h2>
@@ -179,7 +185,7 @@ export default function FileDetailPage() {
       </div>
 
       {/* Score cards */}
-      <div className="grid grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
         <div className="bg-white p-4 rounded shadow">
           <p className="text-sm text-gray-500">Registros</p>
           <p className="text-2xl font-bold">{file.total_records}</p>
@@ -198,23 +204,27 @@ export default function FileDetailPage() {
         </div>
       </div>
 
+      {/* Audit Scope — always visible when validated */}
+      {file.status === 'validated' && !validating && <AuditScopePanel fileId={id} />}
+
       {/* Pipeline Progress */}
       {validating && pipelineEvent && <PipelineProgressPanel event={pipelineEvent} />}
 
       {/* Tabs */}
       {(file.status === 'validated' || errorItems.length > 0 || alertItems.length > 0) && !validating && (
         <>
-          <div className="flex gap-1 border-b mb-4">
+          <div className="flex gap-1 border-b mb-4 overflow-x-auto">
             {([
               { key: 'summary' as TabType, label: 'Resumo' },
               { key: 'errors' as TabType, label: `Erros (${openErrors.length})`, color: openErrors.length > 0 ? 'text-red-600' : '' },
               { key: 'alerts' as TabType, label: `Alertas (${openAlerts.length})`, color: openAlerts.length > 0 ? 'text-yellow-600' : '' },
+              { key: 'corrections' as TabType, label: 'Correcoes', color: '' },
               { key: 'report' as TabType, label: 'Relatorio' },
             ]).map((t) => (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`pb-2 px-3 text-sm ${
+                className={`pb-2 px-3 text-sm whitespace-nowrap ${
                   tab === t.key
                     ? 'border-b-2 border-blue-600 font-semibold'
                     : `text-gray-500 hover:text-gray-700 ${t.color || ''}`
@@ -225,7 +235,7 @@ export default function FileDetailPage() {
             ))}
           </div>
 
-          {tab === 'summary' && summary && <SummaryTab summary={summary} />}
+          {tab === 'summary' && summary && <SummaryTab summary={summary} fileId={id} />}
           {tab === 'errors' && (
             <ErrorsAlertsList
               items={errorItems}
@@ -246,6 +256,13 @@ export default function FileDetailPage() {
               fileId={id}
               onReload={loadData}
               onRevalidate={handleValidateStream}
+            />
+          )}
+          {tab === 'corrections' && (
+            <CorrectionApprovalPanel
+              fileId={id}
+              errors={[...errorItems, ...alertItems]}
+              onReload={loadData}
             />
           )}
           {tab === 'report' && <ReportTab fileId={id} />}
@@ -315,34 +332,47 @@ function PipelineProgressPanel({ event }: { event: PipelineEvent }) {
 
 // ── Summary Tab ──
 
-function SummaryTab({ summary }: { summary: ErrorSummary }) {
+function SummaryTab({ summary, fileId }: { summary: ErrorSummary; fileId: number }) {
   return (
-    <div className="grid grid-cols-2 gap-6">
-      <div>
-        <h3 className="font-semibold mb-2">Por Tipo</h3>
-        <table className="w-full text-sm">
-          <tbody>
-            {Object.entries(summary.by_type).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
-              <tr key={type} className="border-t">
-                <td className="p-2 font-mono text-xs">{type}</td>
-                <td className="p-2 text-right font-semibold">{count}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="space-y-6">
+      {/* Charts */}
+      <ErrorChart fileId={fileId} />
+
+      {/* Tables */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="overflow-x-auto">
+          <h3 className="font-semibold mb-2">Por Tipo</h3>
+          <table className="w-full text-sm">
+            <tbody>
+              {Object.entries(summary.by_type).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
+                <tr key={type} className="border-t">
+                  <td className="p-2 font-mono text-xs">{type}</td>
+                  <td className="p-2 text-right font-semibold">{count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="overflow-x-auto">
+          <h3 className="font-semibold mb-2">Por Severidade</h3>
+          <table className="w-full text-sm">
+            <tbody>
+              {Object.entries(summary.by_severity).map(([sev, count]) => (
+                <tr key={sev} className="border-t">
+                  <td className="p-2"><SeverityBadge severity={sev} /></td>
+                  <td className="p-2 text-right font-semibold">{count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-      <div>
-        <h3 className="font-semibold mb-2">Por Severidade</h3>
-        <table className="w-full text-sm">
-          <tbody>
-            {Object.entries(summary.by_severity).map(([sev, count]) => (
-              <tr key={sev} className="border-t">
-                <td className="p-2"><SeverityBadge severity={sev} /></td>
-                <td className="p-2 text-right font-semibold">{count}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      {/* Cross-validation link */}
+      <div className="text-center pt-2">
+        <Link to={`/files/${fileId}/cross`} className="text-sm text-blue-600 hover:underline">
+          Ver cruzamentos entre blocos &rarr;
+        </Link>
       </div>
     </div>
   )
@@ -367,6 +397,51 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
   const displayItems = showCorrected ? items : openItems
   const autoCorrectableCount = openItems.filter(e => e.auto_correctable && e.expected_value).length
   const correctedCount = items.filter(e => e.status === 'corrected').length
+
+  // RecordDetail / FieldEditor state
+  const [selectedRecord, setSelectedRecord] = useState<RecordInfo | null>(null)
+  const [selectedRecordErrors, setSelectedRecordErrors] = useState<ValidationError[]>([])
+  const [editingField, setEditingField] = useState<{ fieldName: string; error: ValidationError } | null>(null)
+  const [loadingRecord, setLoadingRecord] = useState<number | null>(null)
+
+  const handleOpenRecordDetail = async (error: ValidationError) => {
+    if (!error.record_id) return
+    // If clicking the same error that's already expanded, close it
+    if (selectedRecord && selectedRecord.id === error.record_id && !editingField) {
+      setSelectedRecord(null)
+      setSelectedRecordErrors([])
+      return
+    }
+    setEditingField(null)
+    setLoadingRecord(error.record_id)
+    try {
+      const records = await api.getRecords(fileId, { record_id: String(error.record_id) })
+      if (records.length > 0) {
+        setSelectedRecord(records[0])
+        // Gather all errors for this record
+        const recordErrors = items.filter(e => e.record_id === error.record_id)
+        setSelectedRecordErrors(recordErrors)
+      }
+    } catch { /* */ }
+    setLoadingRecord(null)
+  }
+
+  const handleFieldClick = (fieldName: string, error: ValidationError) => {
+    setEditingField({ fieldName, error })
+  }
+
+  const handleFieldSave = async (newValue: string, _justification: string) => {
+    if (!editingField || !selectedRecord) return
+    await api.updateRecord(fileId, selectedRecord.id, {
+      field_no: editingField.error.field_no || 0,
+      field_name: editingField.error.field_name || editingField.fieldName,
+      new_value: newValue,
+      error_id: editingField.error.id,
+    })
+    setEditingField(null)
+    setSelectedRecord(null)
+    onReload()
+  }
 
   const handleCorrect = async (error: ValidationError) => {
     if (!error.expected_value || !error.record_id) return
@@ -461,15 +536,45 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
       {/* Cards */}
       <div className="space-y-2">
         {displayItems.map((e) => (
-          <ErrorCard
-            key={e.id}
-            error={e}
-            variant={variant}
-            expanded={expandedError === e.id}
-            onToggle={() => onToggleExpand(expandedError === e.id ? null : e.id)}
-            onCorrect={() => handleCorrect(e)}
-            onDismiss={() => handleDismiss(e.id)}
-          />
+          <div key={e.id}>
+            <ErrorCard
+              error={e}
+              variant={variant}
+              expanded={expandedError === e.id}
+              onToggle={() => onToggleExpand(expandedError === e.id ? null : e.id)}
+              onCorrect={() => handleCorrect(e)}
+              onDismiss={() => handleDismiss(e.id)}
+              onOpenRecord={() => handleOpenRecordDetail(e)}
+              loadingRecord={loadingRecord === e.record_id}
+            />
+            {/* RecordDetail inline below the card */}
+            {selectedRecord && selectedRecord.id === e.record_id && !editingField && (
+              <RecordDetail
+                record={selectedRecord}
+                errors={selectedRecordErrors}
+                onClose={() => { setSelectedRecord(null); setSelectedRecordErrors([]) }}
+                onFieldClick={handleFieldClick}
+              />
+            )}
+            {/* FieldEditor + SuggestionPanel inline below the card */}
+            {editingField && selectedRecord && selectedRecord.id === e.record_id && (
+              <div className="flex flex-col md:flex-row gap-4 items-start">
+                <div className="flex-1 min-w-0 w-full">
+                  <FieldEditor
+                    record={selectedRecord}
+                    fieldName={editingField.fieldName}
+                    error={editingField.error}
+                    onSave={handleFieldSave}
+                    onCancel={() => setEditingField(null)}
+                  />
+                </div>
+                <SuggestionPanel
+                  error={editingField.error}
+                  onSearch={(query) => api.searchDocs(query, editingField.error.field_name || undefined, editingField.error.register)}
+                />
+              </div>
+            )}
+          </div>
         ))}
       </div>
 
@@ -518,7 +623,7 @@ function ConfidenceBadge({ message }: { message: string }) {
 // ── Error Card ──
 
 function ErrorCard({
-  error, variant, expanded, onToggle, onCorrect, onDismiss,
+  error, variant, expanded, onToggle, onCorrect, onDismiss, onOpenRecord, loadingRecord,
 }: {
   error: ValidationError
   variant: 'error' | 'alert'
@@ -526,6 +631,8 @@ function ErrorCard({
   onToggle: () => void
   onCorrect: () => void
   onDismiss: () => void
+  onOpenRecord?: () => void
+  loadingRecord?: boolean
 }) {
   const displayMessage = error.friendly_message || error.message
   const legalBasis = parseLegalBasis(error.legal_basis)
@@ -572,6 +679,16 @@ function ErrorCard({
         </div>
 
         <div className="flex gap-1 flex-shrink-0">
+          {error.record_id && onOpenRecord && (
+            <button
+              onClick={(ev) => { ev.stopPropagation(); onOpenRecord() }}
+              disabled={loadingRecord}
+              className="text-xs text-blue-600 px-2 py-1 rounded hover:bg-blue-50 disabled:opacity-50"
+              title="Ver registro completo"
+            >
+              {loadingRecord ? '...' : 'Ver Registro'}
+            </button>
+          )}
           {error.auto_correctable && !isCorrected && error.expected_value && (
             <button
               onClick={(ev) => { ev.stopPropagation(); onCorrect() }}
@@ -625,7 +742,7 @@ function ErrorCard({
             ) : null}
 
             {/* Dados do erro */}
-            <div className="grid grid-cols-3 gap-4 text-xs pt-2 border-t border-blue-200">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 text-xs pt-2 border-t border-blue-200">
               <div>
                 <span className="text-gray-500">Tipo:</span>{' '}
                 <span className="font-mono">{error.error_type}</span>
@@ -713,7 +830,7 @@ function ReportTab({ fileId }: { fileId: number }) {
       {/* 1. Dados do Arquivo */}
       <div className="bg-white rounded shadow p-6">
         <h3 className="font-semibold text-lg mb-4">Dados do Arquivo</h3>
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div><span className="text-gray-500">Empresa:</span> <span className="font-medium">{metadata.company_name || '-'}</span></div>
           <div><span className="text-gray-500">CNPJ:</span> <span className="font-mono">{metadata.cnpj ? formatCnpj(metadata.cnpj) : '-'}</span></div>
           <div><span className="text-gray-500">UF:</span> {metadata.uf || '-'}</div>
@@ -730,7 +847,7 @@ function ReportTab({ fileId }: { fileId: number }) {
       {/* 2. Resumo da Auditoria */}
       <div className="bg-white rounded shadow p-6">
         <h3 className="font-semibold text-lg mb-4">Resumo da Auditoria</h3>
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
           <div className="text-center p-3 bg-gray-50 rounded">
             <p className="text-2xl font-bold">{summary.total_records.toLocaleString()}</p>
             <p className="text-xs text-gray-500">Registros</p>
@@ -760,7 +877,7 @@ function ReportTab({ fileId }: { fileId: number }) {
       {top_findings.length > 0 && (
         <div className="bg-white rounded shadow p-6">
           <h3 className="font-semibold text-lg mb-4">Principais Achados</h3>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b">
                 <th className="pb-2">Tipo</th>
@@ -779,7 +896,7 @@ function ReportTab({ fileId }: { fileId: number }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
 
@@ -789,7 +906,7 @@ function ReportTab({ fileId }: { fileId: number }) {
         {corrections.length === 0 ? (
           <p className="text-gray-500 text-sm">Nenhuma correcao aplicada ainda. As sugestoes do motor de inteligencia aguardam aprovacao na aba Erros.</p>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b">
                 <th className="pb-2">Registro</th>
@@ -810,7 +927,7 @@ function ReportTab({ fileId }: { fileId: number }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 

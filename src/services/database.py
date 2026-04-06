@@ -104,6 +104,14 @@ CREATE TABLE IF NOT EXISTS audit_log (
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (file_id) REFERENCES sped_files(id)
 );
+
+CREATE TABLE IF NOT EXISTS embedding_metadata (
+    id INTEGER PRIMARY KEY,
+    model_name TEXT NOT NULL,
+    model_version TEXT,
+    indexed_at TEXT DEFAULT (datetime('now')),
+    chunks_count INTEGER
+);
 """
 
 
@@ -118,6 +126,35 @@ _MIGRATIONS: dict[int, list[str]] = {
     ],
     2: [
         "ALTER TABLE validation_errors ADD COLUMN record_id INTEGER REFERENCES sped_records(id)",
+    ],
+    3: [
+        "ALTER TABLE sped_files ADD COLUMN regime_tributario TEXT",
+    ],
+    4: [
+        "ALTER TABLE corrections ADD COLUMN justificativa TEXT",
+        "ALTER TABLE corrections ADD COLUMN correction_type TEXT",
+        "ALTER TABLE corrections ADD COLUMN rule_id TEXT",
+    ],
+    5: [
+        "ALTER TABLE validation_errors ADD COLUMN categoria TEXT DEFAULT 'fiscal'",
+    ],
+    6: [
+        "ALTER TABLE validation_errors ADD COLUMN certeza TEXT DEFAULT 'objetivo'",
+        "ALTER TABLE validation_errors ADD COLUMN impacto TEXT DEFAULT 'relevante'",
+    ],
+    7: [
+        "ALTER TABLE sped_files ADD COLUMN cod_ver INTEGER DEFAULT 0",
+        "ALTER TABLE sped_files ADD COLUMN original_file_id INTEGER REFERENCES sped_files(id)",
+        "ALTER TABLE sped_files ADD COLUMN is_retificador INTEGER DEFAULT 0",
+        """CREATE TABLE IF NOT EXISTS sped_file_versions (
+            id INTEGER PRIMARY KEY,
+            original_file_id INTEGER NOT NULL,
+            retificador_file_id INTEGER NOT NULL,
+            cod_ver INTEGER NOT NULL,
+            linked_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (original_file_id) REFERENCES sped_files(id),
+            FOREIGN KEY (retificador_file_id) REFERENCES sped_files(id)
+        )""",
     ],
 }
 

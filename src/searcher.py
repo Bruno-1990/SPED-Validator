@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from pathlib import Path
 
@@ -9,6 +10,39 @@ import numpy as np
 
 from .embeddings import blob_to_embedding, embed_single
 from .models import Chunk, SearchResult
+
+logger = logging.getLogger(__name__)
+
+_model_drift_warned = False
+
+
+def check_embedding_model_drift(db_path: str | Path) -> None:
+    """Compara modelo configurado com o que foi usado na indexação.
+
+    Loga aviso se houver divergência.
+    """
+    global _model_drift_warned
+    if _model_drift_warned:
+        return
+
+    from config import EMBEDDING_MODEL
+
+    try:
+        conn = sqlite3.connect(str(db_path))
+        row = conn.execute(
+            "SELECT model_name FROM embedding_metadata WHERE id = 1"
+        ).fetchone()
+        conn.close()
+    except sqlite3.OperationalError:
+        return
+
+    if row and row[0] != EMBEDDING_MODEL:
+        logger.warning(
+            "Modelo de embeddings mudou desde a indexação: "
+            "indexado=%s, configurado=%s. Considere reindexar.",
+            row[0], EMBEDDING_MODEL,
+        )
+    _model_drift_warned = True
 
 
 def search(
@@ -23,6 +57,7 @@ def search(
     Combina resultados de FTS5 (busca exata) e similaridade vetorial
     usando Reciprocal Rank Fusion.
     """
+    check_embedding_model_drift(db_path)
     conn = sqlite3.connect(str(db_path))
 
     fts_results = _search_fts(conn, query, register, field_name, top_k * 2)

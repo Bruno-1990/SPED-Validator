@@ -11,8 +11,13 @@ class SpedRecord:
     """Um registro (linha) de um arquivo SPED EFD."""
     line_number: int
     register: str          # ex: "C100"
-    fields: list[str]      # valores posicionais (inclui o código do registro)
+    fields: dict[str, str] # campos nomeados: {"REG": "C100", "IND_OPER": "0", ...}
     raw_line: str
+
+
+def get_field(record: SpedRecord, field_name: str, default: str = "") -> str:
+    """Retorna valor de um campo pelo nome, com default seguro."""
+    return record.fields.get(field_name, default)
 
 
 @dataclass
@@ -53,6 +58,9 @@ class ValidationError:
     error_type: str        # INVALID_VALUE, WRONG_TYPE, WRONG_SIZE, MISSING_REQUIRED
     message: str
     expected_value: str | None = None  # Valor correto quando calculável (para auto-correção)
+    categoria: str = "fiscal"          # 'fiscal' ou 'governance'
+    certeza: str = "objetivo"          # 'objetivo' | 'provavel' | 'indicio'
+    impacto: str = "relevante"         # 'critico' | 'relevante' | 'informativo'
 
 
 @dataclass

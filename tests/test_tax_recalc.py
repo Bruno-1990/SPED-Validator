@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
-
 from src.models import SpedRecord
 from src.parser import group_by_register
+from src.validators.helpers import fields_to_dict
 from src.validators.tax_recalc import (
     E110Totals,
     recalc_e110_totals,
@@ -19,7 +18,7 @@ from src.validators.tax_recalc import (
 
 def rec(register: str, fields: list[str], line: int = 1) -> SpedRecord:
     raw = "|" + "|".join(fields) + "|"
-    return SpedRecord(line_number=line, register=register, fields=fields, raw_line=raw)
+    return SpedRecord(line_number=line, register=register, fields=fields_to_dict(register, fields), raw_line=raw)
 
 
 def c170(

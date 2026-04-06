@@ -6,6 +6,7 @@ import sqlite3
 from collections.abc import Generator
 from pathlib import Path
 
+from api.auth import verify_api_key  # noqa: F401 — re-export para uso nos routers
 from src.services.database import get_connection, init_audit_db
 
 # Caminhos configuráveis

@@ -5,6 +5,18 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
+from ..services.reference_loader import ReferenceLoader
+
+_reference_loader: ReferenceLoader | None = None
+
+
+def _get_reference_loader() -> ReferenceLoader:
+    """Retorna instância singleton do ReferenceLoader."""
+    global _reference_loader  # noqa: PLW0603
+    if _reference_loader is None:
+        _reference_loader = ReferenceLoader()
+    return _reference_loader
+
 # ──────────────────────────────────────────────
 # CNPJ (14 dígitos + módulo 11)
 # ──────────────────────────────────────────────
@@ -197,8 +209,17 @@ def validate_chave_nfe(chave: str) -> bool:
 _UF_FIRST_DIGITS = {"1", "2", "3", "4", "5"}
 
 def validate_cod_municipio(cod: str) -> bool:
-    """Valida código de município IBGE: 7 dígitos, primeiro dígito 1-5."""
+    """Valida código de município IBGE: 7 dígitos, validado contra tabela IBGE.
+
+    Se a tabela ibge_municipios.yaml estiver disponível, valida contra a lista
+    completa de municípios. Caso contrário, usa fallback de primeiro dígito 1-5.
+    """
     cod = cod.strip()
     if not re.fullmatch(r"\d{7}", cod):
         return False
-    return cod[0] in _UF_FIRST_DIGITS
+    if cod[0] not in _UF_FIRST_DIGITS:
+        return False
+    loader = _get_reference_loader()
+    if loader.has_municipios_table():
+        return loader.is_municipio_valido(cod)
+    return True

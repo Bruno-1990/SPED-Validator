@@ -12,13 +12,15 @@ warnings.filterwarnings(
     message='Field name "register".*shadows an attribute',
     category=UserWarning,
 )
-from pathlib import Path
+from datetime import date  # noqa: E402
+from pathlib import Path  # noqa: E402
 
-import pytest
+import pytest  # noqa: E402
 
-from src.models import RegisterField, SpedRecord
-from src.parser import parse_sped_file
-from src.indexer import init_db
+from src.indexer import init_db  # noqa: E402
+from src.models import RegisterField, SpedRecord  # noqa: E402
+from src.parser import parse_sped_file  # noqa: E402
+from src.services.context_builder import TaxRegime, ValidationContext  # noqa: E402
 
 # Diretório das fixtures
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -92,45 +94,123 @@ def sample_field_defs() -> dict[str, list[RegisterField]]:
     """Definições de campos mínimas para testes de validação."""
     return {
         "0000": [
-            RegisterField(register="0000", field_no=1, field_name="REG", field_type="C", field_size=4, required="O"),
-            RegisterField(register="0000", field_no=2, field_name="COD_VER", field_type="N", field_size=3, required="O"),
-            RegisterField(register="0000", field_no=3, field_name="COD_FIN", field_type="N", field_size=1, required="O",
-                          valid_values=["0", "1", "2", "3"]),
-            RegisterField(register="0000", field_no=4, field_name="DT_INI", field_type="N", field_size=8, required="O"),
-            RegisterField(register="0000", field_no=5, field_name="DT_FIN", field_type="N", field_size=8, required="O"),
-            RegisterField(register="0000", field_no=6, field_name="NOME", field_type="C", field_size=100, required="O"),
-            RegisterField(register="0000", field_no=7, field_name="CNPJ", field_type="N", field_size=14, required="O"),
+            RegisterField(
+                register="0000", field_no=1, field_name="REG",
+                field_type="C", field_size=4, required="O",
+            ),
+            RegisterField(
+                register="0000", field_no=2, field_name="COD_VER",
+                field_type="N", field_size=3, required="O",
+            ),
+            RegisterField(
+                register="0000", field_no=3, field_name="COD_FIN",
+                field_type="N", field_size=1, required="O",
+                valid_values=["0", "1", "2", "3"],
+            ),
+            RegisterField(
+                register="0000", field_no=4, field_name="DT_INI",
+                field_type="N", field_size=8, required="O",
+            ),
+            RegisterField(
+                register="0000", field_no=5, field_name="DT_FIN",
+                field_type="N", field_size=8, required="O",
+            ),
+            RegisterField(
+                register="0000", field_no=6, field_name="NOME",
+                field_type="C", field_size=100, required="O",
+            ),
+            RegisterField(
+                register="0000", field_no=7, field_name="CNPJ",
+                field_type="N", field_size=14, required="O",
+            ),
         ],
         "C100": [
-            RegisterField(register="C100", field_no=1, field_name="REG", field_type="C", field_size=4, required="O"),
-            RegisterField(register="C100", field_no=2, field_name="IND_OPER", field_type="C", field_size=1, required="O",
-                          valid_values=["0", "1"]),
-            RegisterField(register="C100", field_no=3, field_name="IND_EMIT", field_type="C", field_size=1, required="O",
-                          valid_values=["0", "1"]),
-            RegisterField(register="C100", field_no=4, field_name="COD_PART", field_type="C", field_size=60, required="O"),
-            RegisterField(register="C100", field_no=5, field_name="COD_MOD", field_type="C", field_size=2, required="O"),
-            RegisterField(register="C100", field_no=6, field_name="COD_SIT", field_type="N", field_size=2, required="O",
-                          valid_values=["00", "01", "02", "03", "04", "05", "06", "07", "08"]),
-            RegisterField(register="C100", field_no=7, field_name="SER", field_type="C", field_size=3, required="OC"),
-            RegisterField(register="C100", field_no=8, field_name="NUM_DOC", field_type="N", field_size=9, required="O"),
-            RegisterField(register="C100", field_no=9, field_name="DT_DOC", field_type="N", field_size=8, required="O"),
-            RegisterField(register="C100", field_no=10, field_name="DT_E_S", field_type="N", field_size=8, required="OC"),
-            RegisterField(register="C100", field_no=11, field_name="VL_DOC", field_type="N", field_size=255, required="O", decimals=2),
+            RegisterField(
+                register="C100", field_no=1, field_name="REG",
+                field_type="C", field_size=4, required="O",
+            ),
+            RegisterField(
+                register="C100", field_no=2, field_name="IND_OPER",
+                field_type="C", field_size=1, required="O",
+                valid_values=["0", "1"],
+            ),
+            RegisterField(
+                register="C100", field_no=3, field_name="IND_EMIT",
+                field_type="C", field_size=1, required="O",
+                valid_values=["0", "1"],
+            ),
+            RegisterField(
+                register="C100", field_no=4, field_name="COD_PART",
+                field_type="C", field_size=60, required="O",
+            ),
+            RegisterField(
+                register="C100", field_no=5, field_name="COD_MOD",
+                field_type="C", field_size=2, required="O",
+            ),
+            RegisterField(
+                register="C100", field_no=6, field_name="COD_SIT",
+                field_type="N", field_size=2, required="O",
+                valid_values=["00", "01", "02", "03", "04", "05", "06", "07", "08"],
+            ),
+            RegisterField(
+                register="C100", field_no=7, field_name="SER",
+                field_type="C", field_size=3, required="OC",
+            ),
+            RegisterField(
+                register="C100", field_no=8, field_name="NUM_DOC",
+                field_type="N", field_size=9, required="O",
+            ),
+            RegisterField(
+                register="C100", field_no=9, field_name="DT_DOC",
+                field_type="N", field_size=8, required="O",
+            ),
+            RegisterField(
+                register="C100", field_no=10, field_name="DT_E_S",
+                field_type="N", field_size=8, required="OC",
+            ),
+            RegisterField(
+                register="C100", field_no=11, field_name="VL_DOC",
+                field_type="N", field_size=255, required="O", decimals=2,
+            ),
         ],
         "C170": [
-            RegisterField(register="C170", field_no=1, field_name="REG", field_type="C", field_size=4, required="O"),
-            RegisterField(register="C170", field_no=2, field_name="NUM_ITEM", field_type="N", field_size=3, required="O"),
-            RegisterField(register="C170", field_no=3, field_name="COD_ITEM", field_type="C", field_size=60, required="O"),
-            RegisterField(register="C170", field_no=4, field_name="DESCR_COMPL", field_type="C", field_size=255, required="OC"),
-            RegisterField(register="C170", field_no=5, field_name="QTD", field_type="N", field_size=255, required="O", decimals=5),
-            RegisterField(register="C170", field_no=6, field_name="UNID", field_type="C", field_size=6, required="O"),
-            RegisterField(register="C170", field_no=7, field_name="VL_ITEM", field_type="N", field_size=255, required="O", decimals=2),
+            RegisterField(
+                register="C170", field_no=1, field_name="REG",
+                field_type="C", field_size=4, required="O",
+            ),
+            RegisterField(
+                register="C170", field_no=2, field_name="NUM_ITEM",
+                field_type="N", field_size=3, required="O",
+            ),
+            RegisterField(
+                register="C170", field_no=3, field_name="COD_ITEM",
+                field_type="C", field_size=60, required="O",
+            ),
+            RegisterField(
+                register="C170", field_no=4, field_name="DESCR_COMPL",
+                field_type="C", field_size=255, required="OC",
+            ),
+            RegisterField(
+                register="C170", field_no=5, field_name="QTD",
+                field_type="N", field_size=255, required="O", decimals=5,
+            ),
+            RegisterField(
+                register="C170", field_no=6, field_name="UNID",
+                field_type="C", field_size=6, required="O",
+            ),
+            RegisterField(
+                register="C170", field_no=7, field_name="VL_ITEM",
+                field_type="N", field_size=255, required="O", decimals=2,
+            ),
         ],
     }
 
 
 @pytest.fixture
-def db_with_field_defs(db_conn: sqlite3.Connection, sample_field_defs: dict[str, list[RegisterField]]) -> sqlite3.Connection:
+def db_with_field_defs(
+    db_conn: sqlite3.Connection,
+    sample_field_defs: dict[str, list[RegisterField]],
+) -> sqlite3.Connection:
     """Banco em memória com definições de campos já inseridas."""
     for fields in sample_field_defs.values():
         for f in fields:
@@ -145,3 +225,46 @@ def db_with_field_defs(db_conn: sqlite3.Connection, sample_field_defs: dict[str,
             )
     db_conn.commit()
     return db_conn
+
+
+# ──────────────────────────────────────────────
+# ValidationContext mockado para testes de validators
+# ──────────────────────────────────────────────
+
+@pytest.fixture
+def make_context():
+    """Factory fixture que retorna um ValidationContext mockado.
+
+    Uso:
+        ctx = make_context()                          # defaults
+        ctx = make_context(regime=TaxRegime.SIMPLES_NACIONAL, uf="SP")
+    """
+    def _factory(
+        file_id: int = 1,
+        regime: TaxRegime = TaxRegime.NORMAL,
+        uf: str = "SP",
+        periodo_ini: date | None = None,
+        periodo_fim: date | None = None,
+        ind_perfil: str = "A",
+        cnpj: str = "12345678000195",
+        company_name: str = "Empresa Teste Ltda",
+        participantes: dict | None = None,
+        produtos: dict | None = None,
+        naturezas: dict | None = None,
+        active_rules: list | None = None,
+    ) -> ValidationContext:
+        return ValidationContext(
+            file_id=file_id,
+            regime=regime,
+            uf_contribuinte=uf,
+            periodo_ini=periodo_ini or date(2024, 1, 1),
+            periodo_fim=periodo_fim or date(2024, 1, 31),
+            ind_perfil=ind_perfil,
+            cnpj=cnpj,
+            company_name=company_name,
+            participantes=participantes or {},
+            produtos=produtos or {},
+            naturezas=naturezas or {},
+            active_rules=active_rules or [],
+        )
+    return _factory

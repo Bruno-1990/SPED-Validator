@@ -18,7 +18,6 @@ from src.validators.format_validator import (
     validate_ncm,
 )
 
-
 # ──────────────────────────────────────────────
 # CNPJ
 # ──────────────────────────────────────────────
@@ -311,7 +310,7 @@ class TestValidateChaveNfe:
 
     def test_invalid_dv(self) -> None:
         # Mesma chave mas com DV errado
-        chave = "35240111222333000181550010000001231" + "12345678" + "0"
+        _chave = "35240111222333000181550010000001231" + "12345678" + "0"
         # Verificar se realmente é inválido (pode ser coincidência)
         # Melhor: usar uma chave sabidamente errada
         chave_errada = "35240111222333000181550010000001231123456785"

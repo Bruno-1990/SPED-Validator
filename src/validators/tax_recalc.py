@@ -6,13 +6,13 @@ from dataclasses import dataclass
 
 from ..models import SpedRecord, ValidationError
 from ..parser import group_by_register
+from ..services.context_builder import ValidationContext
 from .helpers import (
-    TOLERANCE,
     get_field,
     make_error,
     to_float,
 )
-
+from .tolerance import get_tolerance
 
 # ──────────────────────────────────────────────
 # Helpers locais
@@ -36,6 +36,7 @@ def _check_calc(
     aliq: float,
     vl_declarado: float,
     tributo_label: str,
+    tolerance_type: str = "item_icms",
 ) -> list[ValidationError]:
     """Verifica calculo imposto = BC * ALIQ / 100 com deteccao de arredondamento.
 
@@ -46,7 +47,8 @@ def _check_calc(
     calc = vl_bc * aliq / 100
     diff = abs(calc - vl_declarado)
 
-    if diff <= TOLERANCE:
+    tol = get_tolerance(tolerance_type)
+    if diff <= tol:
         return []
 
     # Verificar arredondamento: taxa efetiva arredondada bate com aliquota?
@@ -86,7 +88,10 @@ def _check_calc(
 # API publica
 # ──────────────────────────────────────────────
 
-def recalculate_taxes(records: list[SpedRecord]) -> list[ValidationError]:
+def recalculate_taxes(
+    records: list[SpedRecord],
+    context: ValidationContext | None = None,
+) -> list[ValidationError]:
     """Executa todos os recalculos tributarios.
 
     Retorna lista de erros onde valor declarado diverge do recalculado.
@@ -122,11 +127,11 @@ def recalc_icms_item(record: SpedRecord) -> list[ValidationError]:
     """
     errors: list[ValidationError] = []
 
-    vl_item = to_float(get_field(record, 6))
-    vl_desc = to_float(get_field(record, 7))
-    vl_bc_icms = _float_opt(get_field(record, 12))
-    aliq_icms = _float_opt(get_field(record, 13))
-    vl_icms = _float_opt(get_field(record, 14))
+    _vl_item = to_float(get_field(record, "VL_ITEM"))
+    _vl_desc = to_float(get_field(record, "VL_DESC"))
+    vl_bc_icms = _float_opt(get_field(record, "VL_BC_ICMS"))
+    aliq_icms = _float_opt(get_field(record, "ALIQ_ICMS"))
+    vl_icms = _float_opt(get_field(record, "VL_ICMS"))
 
     if vl_bc_icms is None or aliq_icms is None or vl_icms is None:
         return errors
@@ -139,7 +144,10 @@ def recalc_icms_item(record: SpedRecord) -> list[ValidationError]:
     if aliq_icms == 0 and vl_icms > 0 and vl_bc_icms > 0:
         return errors
 
-    errors.extend(_check_calc(record, "VL_ICMS", 15, vl_bc_icms, aliq_icms, vl_icms, "ICMS"))
+    errors.extend(_check_calc(
+        record, "VL_ICMS", 15, vl_bc_icms, aliq_icms, vl_icms, "ICMS",
+        tolerance_type="item_icms",
+    ))
     return errors
 
 
@@ -162,7 +170,7 @@ def recalc_icms_st_item(record: SpedRecord) -> list[ValidationError]:
     errors: list[ValidationError] = []
 
     # CST_ICMS na posicao 9 (campo 10 do C170)
-    cst_icms = get_field(record, 9)
+    cst_icms = get_field(record, "CST_ICMS")
 
     # So valida se CST indica ST
     if cst_icms not in _CST_ST:
@@ -170,12 +178,24 @@ def recalc_icms_st_item(record: SpedRecord) -> list[ValidationError]:
 
     # Posicoes para ICMS-ST no C170 (podem variar por versao)
     # Tentamos posicoes comuns: 15, 16, 17
-    vl_bc_st = _float_opt(get_field(record, 15))
-    aliq_st = _float_opt(get_field(record, 16))
-    vl_icms_st = _float_opt(get_field(record, 17))
+    vl_bc_st = _float_opt(get_field(record, "VL_BC_ICMS_ST"))
+    aliq_st = _float_opt(get_field(record, "ALIQ_ST"))
+    vl_icms_st = _float_opt(get_field(record, "VL_ICMS_ST"))
 
     if vl_bc_st is None or vl_icms_st is None:
         return errors
+
+    # CST 10/30: verificar se BC_ICMS_ST existe quando VL_ICMS_ST > 0
+    cst_trib = cst_icms[-2:] if len(cst_icms) >= 2 else cst_icms
+    if cst_trib in ("10", "30") and vl_icms_st > 0 and vl_bc_st == 0:
+        errors.append(make_error(
+            record, "VL_BC_ICMS_ST", "CALCULO_DIVERGENTE",
+            f"CST {cst_icms} indica ST com debito, VL_ICMS_ST={vl_icms_st:.2f} "
+            f"mas BC_ICMS_ST esta zerada. A base de calculo da ST e obrigatoria.",
+            field_no=16,
+            expected_value=None,
+            value="0.00",
+        ))
 
     # Se tem BC_ST mas ICMS_ST e zero (ou vice-versa), pode ser inconsistencia
     if vl_bc_st > 0 and vl_icms_st == 0:
@@ -190,7 +210,10 @@ def recalc_icms_st_item(record: SpedRecord) -> list[ValidationError]:
 
     # Se tem aliquota, recalcular
     if aliq_st is not None and aliq_st > 0 and vl_bc_st > 0:
-        errors.extend(_check_calc(record, "VL_ICMS_ST", 18, vl_bc_st, aliq_st, vl_icms_st, "ICMS-ST"))
+        errors.extend(_check_calc(
+            record, "VL_ICMS_ST", 18, vl_bc_st, aliq_st, vl_icms_st, "ICMS-ST",
+            tolerance_type="item_icms",
+        ))
 
     return errors
 
@@ -210,9 +233,9 @@ def recalc_ipi_item(record: SpedRecord) -> list[ValidationError]:
     errors: list[ValidationError] = []
 
     # Posicoes do IPI no C170: campo 22=VL_BC_IPI, 23=ALIQ_IPI, 24=VL_IPI
-    vl_bc_ipi = _float_opt(get_field(record, 21))
-    aliq_ipi = _float_opt(get_field(record, 22))
-    vl_ipi = _float_opt(get_field(record, 23))
+    vl_bc_ipi = _float_opt(get_field(record, "VL_BC_IPI"))
+    aliq_ipi = _float_opt(get_field(record, "ALIQ_IPI"))
+    vl_ipi = _float_opt(get_field(record, "VL_IPI"))
 
     if vl_bc_ipi is None or aliq_ipi is None or vl_ipi is None:
         return errors
@@ -220,7 +243,7 @@ def recalc_ipi_item(record: SpedRecord) -> list[ValidationError]:
     if vl_bc_ipi == 0 and aliq_ipi == 0:
         return errors
 
-    errors.extend(_check_calc(record, "VL_IPI", 22, vl_bc_ipi, aliq_ipi, vl_ipi, "IPI"))
+    errors.extend(_check_calc(record, "VL_IPI", 22, vl_bc_ipi, aliq_ipi, vl_ipi, "IPI", tolerance_type="item_ipi"))
     return errors
 
 
@@ -238,22 +261,25 @@ def recalc_pis_cofins_item(record: SpedRecord) -> list[ValidationError]:
     errors: list[ValidationError] = []
 
     # PIS: campo 26=VL_BC_PIS, 27=ALIQ_PIS(%), 30=VL_PIS
-    vl_bc_pis = _float_opt(get_field(record, 25))
-    aliq_pis = _float_opt(get_field(record, 26))
-    vl_pis = _float_opt(get_field(record, 29))
+    vl_bc_pis = _float_opt(get_field(record, "VL_BC_PIS"))
+    aliq_pis = _float_opt(get_field(record, "ALIQ_PIS"))
+    vl_pis = _float_opt(get_field(record, "VL_PIS"))
 
     if (vl_bc_pis is not None and aliq_pis is not None and vl_pis is not None
             and vl_bc_pis > 0 and aliq_pis > 0):
-        errors.extend(_check_calc(record, "VL_PIS", 25, vl_bc_pis, aliq_pis, vl_pis, "PIS"))
+        errors.extend(_check_calc(record, "VL_PIS", 25, vl_bc_pis, aliq_pis, vl_pis, "PIS", tolerance_type="item_pis"))
 
     # COFINS: campo 32=VL_BC_COFINS, 33=ALIQ_COFINS(%), 36=VL_COFINS
-    vl_bc_cofins = _float_opt(get_field(record, 31))
-    aliq_cofins = _float_opt(get_field(record, 32))
-    vl_cofins = _float_opt(get_field(record, 35))
+    vl_bc_cofins = _float_opt(get_field(record, "VL_BC_COFINS"))
+    aliq_cofins = _float_opt(get_field(record, "ALIQ_COFINS"))
+    vl_cofins = _float_opt(get_field(record, "VL_COFINS"))
 
     if (vl_bc_cofins is not None and aliq_cofins is not None and vl_cofins is not None
             and vl_bc_cofins > 0 and aliq_cofins > 0):
-        errors.extend(_check_calc(record, "VL_COFINS", 28, vl_bc_cofins, aliq_cofins, vl_cofins, "COFINS"))
+        errors.extend(_check_calc(
+            record, "VL_COFINS", 28, vl_bc_cofins, aliq_cofins, vl_cofins,
+            "COFINS", tolerance_type="item_cofins",
+        ))
 
     return errors
 
@@ -269,25 +295,27 @@ class E110Totals:
     creditos_c190: float = 0.0
     debitos_d: float = 0.0
     creditos_d: float = 0.0
+    debitos_c590: float = 0.0
+    creditos_c590: float = 0.0
 
     @property
     def total_debitos(self) -> float:
-        return self.debitos_c190 + self.debitos_d
+        return self.debitos_c190 + self.debitos_d + self.debitos_c590
 
     @property
     def total_creditos(self) -> float:
-        return self.creditos_c190 + self.creditos_d
+        return self.creditos_c190 + self.creditos_d + self.creditos_c590
 
 
 def recalc_e110_totals(groups: dict[str, list[SpedRecord]]) -> list[ValidationError]:
-    """Recalcula totalizacao do E110 a partir dos C190 e D690.
+    """Recalcula totalizacao do E110 a partir dos C190, D690 e C590.
 
-    Soma ICMS dos C190 com CFOP de saida -> debitos
-    Soma ICMS dos C190 com CFOP de entrada -> creditos
+    Soma ICMS dos C190/D690/C590 com CFOP de saida -> debitos
+    Soma ICMS dos C190/D690/C590 com CFOP de entrada -> creditos
     Compara com VL_TOT_DEBITOS e VL_TOT_CREDITOS do E110.
 
     IMPORTANTE: O E110 pode ter componentes nao cobertos pelo recalculo
-    (D190, C390, C590, ajustes E111, DIFAL E300+). O sistema informa
+    (D190, C390, ajustes E111, DIFAL E300+). O sistema informa
     o que foi considerado e o que pode justificar a diferenca.
     """
     errors: list[ValidationError] = []
@@ -300,27 +328,35 @@ def recalc_e110_totals(groups: dict[str, list[SpedRecord]]) -> list[ValidationEr
 
     # C190: CFOP na posicao 2, VL_ICMS na posicao 6
     for rec in groups.get("C190", []):
-        cfop = get_field(rec, 2)
-        vl_icms = to_float(get_field(rec, 6))
+        cfop = get_field(rec, "CFOP")
+        vl_icms = to_float(get_field(rec, "VL_ICMS"))
         if cfop and cfop[0] in ("5", "6", "7"):
             totals.debitos_c190 += vl_icms
         elif cfop and cfop[0] in ("1", "2", "3"):
             totals.creditos_c190 += vl_icms
 
-    # D690 (se existir): VL_ICMS na posicao 4
+    # D690 (se existir): VL_OPR na posicao CFOP/VL_OPR
     for rec in groups.get("D690", []):
-        cfop = get_field(rec, 2)
-        vl_icms = to_float(get_field(rec, 4))
+        cfop = get_field(rec, "CFOP")
+        vl_icms = to_float(get_field(rec, "VL_OPR"))
         if cfop and cfop[0] in ("5", "6", "7"):
             totals.debitos_d += vl_icms
         elif cfop and cfop[0] in ("1", "2", "3"):
             totals.creditos_d += vl_icms
 
+    # MOD-17: C590 (energia/gas) — VL_ICMS por CFOP
+    for rec in groups.get("C590", []):
+        cfop = get_field(rec, "CFOP")
+        vl_icms = to_float(get_field(rec, "VL_ICMS"))
+        if cfop and cfop[0] in ("5", "6", "7"):
+            totals.debitos_c590 += vl_icms
+        elif cfop and cfop[0] in ("1", "2", "3"):
+            totals.creditos_c590 += vl_icms
+
     # Detectar presenca de componentes nao cobertos pelo recalculo
     has_e111 = len(groups.get("E111", [])) > 0
     has_d190 = len(groups.get("D190", [])) > 0
     has_c390 = len(groups.get("C390", [])) > 0
-    has_c590 = len(groups.get("C590", [])) > 0
     has_e300 = len(groups.get("E300", [])) > 0
 
     nao_cobertos: list[str] = []
@@ -330,8 +366,6 @@ def recalc_e110_totals(groups: dict[str, list[SpedRecord]]) -> list[ValidationEr
         nao_cobertos.append("D190 (servicos)")
     if has_c390:
         nao_cobertos.append("C390 (cupons fiscais)")
-    if has_c590:
-        nao_cobertos.append("C590 (energia/comunicacao)")
     if has_e300:
         nao_cobertos.append("E300+ (DIFAL)")
 
@@ -340,16 +374,17 @@ def recalc_e110_totals(groups: dict[str, list[SpedRecord]]) -> list[ValidationEr
     tem_lacunas = len(nao_cobertos) > 0
 
     for e110 in e110_records:
-        vl_tot_debitos = to_float(get_field(e110, 1))
-        vl_tot_creditos = to_float(get_field(e110, 5))
+        vl_tot_debitos = to_float(get_field(e110, "VL_TOT_DEBITOS"))
+        vl_tot_creditos = to_float(get_field(e110, "VL_TOT_CREDITOS"))
 
         # Debitos
+        tol_e110 = get_tolerance("apuracao_e110")
         diff_deb = abs(totals.total_debitos - vl_tot_debitos)
-        if diff_deb > TOLERANCE:
+        if diff_deb > tol_e110:
             if tem_lacunas:
                 score = 60
                 aviso = (
-                    f" ATENCAO: o recalculo considerou apenas C190+D690. "
+                    f" ATENCAO: o recalculo considerou apenas C190+D690+C590. "
                     f"O arquivo tambem contem {', '.join(nao_cobertos)} que "
                     f"podem justificar a diferenca. Avalie antes de corrigir."
                 )
@@ -360,7 +395,7 @@ def recalc_e110_totals(groups: dict[str, list[SpedRecord]]) -> list[ValidationEr
             errors.append(make_error(
                 e110, "VL_TOT_DEBITOS", "CALCULO_DIVERGENTE",
                 f"Totalizacao E110: debitos recalculados={totals.total_debitos:.2f} "
-                f"(C190={totals.debitos_c190:.2f} + D={totals.debitos_d:.2f}) "
+                f"(C190={totals.debitos_c190:.2f} + D={totals.debitos_d:.2f} + C590={totals.debitos_c590:.2f}) "
                 f"vs declarado={vl_tot_debitos:.2f} (dif={diff_deb:.2f}).{aviso} "
                 f"Confianca: {'provavel' if tem_lacunas else 'alta'} ({score} pontos).",
                 field_no=2,
@@ -370,11 +405,11 @@ def recalc_e110_totals(groups: dict[str, list[SpedRecord]]) -> list[ValidationEr
 
         # Creditos
         diff_cred = abs(totals.total_creditos - vl_tot_creditos)
-        if diff_cred > TOLERANCE:
+        if diff_cred > tol_e110:
             if tem_lacunas:
                 score = 60
                 aviso = (
-                    f" ATENCAO: o recalculo considerou apenas C190+D690. "
+                    f" ATENCAO: o recalculo considerou apenas C190+D690+C590. "
                     f"O arquivo tambem contem {', '.join(nao_cobertos)} que "
                     f"podem justificar a diferenca. Avalie antes de corrigir."
                 )
@@ -385,7 +420,7 @@ def recalc_e110_totals(groups: dict[str, list[SpedRecord]]) -> list[ValidationEr
             errors.append(make_error(
                 e110, "VL_TOT_CREDITOS", "CALCULO_DIVERGENTE",
                 f"Totalizacao E110: creditos recalculados={totals.total_creditos:.2f} "
-                f"(C190={totals.creditos_c190:.2f} + D={totals.creditos_d:.2f}) "
+                f"(C190={totals.creditos_c190:.2f} + D={totals.creditos_d:.2f} + C590={totals.creditos_c590:.2f}) "
                 f"vs declarado={vl_tot_creditos:.2f} (dif={diff_cred:.2f}).{aviso} "
                 f"Confianca: {'provavel' if tem_lacunas else 'alta'} ({score} pontos).",
                 field_no=6,

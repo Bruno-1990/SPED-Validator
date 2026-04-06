@@ -5,18 +5,27 @@ from __future__ import annotations
 import json
 
 from src.models import Chunk, RegisterField, SearchResult, SpedRecord, ValidationError
+from src.validators.helpers import fields_to_dict
 
 
 class TestSpedRecord:
     def test_creation(self) -> None:
-        rec = SpedRecord(line_number=1, register="C100", fields=["C100", "0"], raw_line="|C100|0|")
+        rec = SpedRecord(
+            line_number=1, register="C100",
+            fields=fields_to_dict("C100", ["C100", "0"]),
+            raw_line="|C100|0|",
+        )
         assert rec.register == "C100"
         assert rec.line_number == 1
-        assert rec.fields == ["C100", "0"]
+        assert rec.fields == {"REG": "C100", "IND_OPER": "0"}
 
     def test_raw_line_preserved(self) -> None:
         raw = "|0000|017|0|01012024|"
-        rec = SpedRecord(line_number=1, register="0000", fields=["0000", "017", "0", "01012024"], raw_line=raw)
+        rec = SpedRecord(
+            line_number=1, register="0000",
+            fields=fields_to_dict("0000", ["0000", "017", "0", "01012024"]),
+            raw_line=raw,
+        )
         assert rec.raw_line == raw
 
 

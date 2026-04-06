@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 
 from ..models import SpedRecord, ValidationError
 from ..parser import group_by_register
+from ..services.context_builder import ValidationContext
 from .helpers import (
     CST_TRIBUTADO,
     F_C170_ALIQ_ICMS,
@@ -34,13 +35,12 @@ from .helpers import (
     F_C190_ALIQ,
     F_C190_CFOP,
     F_C190_CST,
-    F_C190_VL_ICMS,
-    TOLERANCE,
     get_field,
     make_error,
     to_float,
     trib,
 )
+from .tolerance import get_tolerance
 
 # ──────────────────────────────────────────────
 # Aliquotas plausíveis (nacional + interestaduais)
@@ -86,7 +86,10 @@ class CorrectionHypothesis:
 # API publica
 # ──────────────────────────────────────────────
 
-def validate_with_hypotheses(records: list[SpedRecord]) -> list[ValidationError]:
+def validate_with_hypotheses(
+    records: list[SpedRecord],
+    context: ValidationContext | None = None,
+) -> list[ValidationError]:
     """Executa validacao com hipoteses de correcao inteligentes.
 
     Foco em casos onde ALIQ_ICMS=0 mas VL_ICMS>0 (aliquota faltante).
@@ -167,7 +170,7 @@ def _build_hypothesis(
 
     # Score: aliquota implicita bate com percentual conhecido
     icms_check = round(vl_bc * aliq_plausivel / 100, 2)
-    if abs(icms_check - vl_icms) <= TOLERANCE:
+    if abs(icms_check - vl_icms) <= get_tolerance("item_icms"):
         hypothesis.score += 40
         hypothesis.reasons.append(
             f"Aliquota implicita {aliq_plausivel:.2f}% reproduz exatamente "
@@ -197,7 +200,7 @@ def _build_hypothesis(
         sib_cfop = get_field(sib, F_C170_CFOP)
         sib_bc = to_float(get_field(sib, F_C170_VL_BC_ICMS))
         sib_icms = to_float(get_field(sib, F_C170_VL_ICMS))
-        sib_aliq = to_float(get_field(sib, F_C170_ALIQ_ICMS))
+        _sib_aliq = to_float(get_field(sib, F_C170_ALIQ_ICMS))
 
         # Mesmo perfil fiscal
         if sib_cst != cst_item or sib_cfop != cfop_item:

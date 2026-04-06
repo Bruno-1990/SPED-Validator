@@ -9,7 +9,6 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from api.deps import AUDIT_DB_PATH
 from api.main import app
 from src.services.database import init_audit_db
 
@@ -124,7 +123,9 @@ class TestValidationAPI:
         client.post(f"/api/files/{file_id}/validate")
         r = client.get(f"/api/files/{file_id}/errors")
         assert r.status_code == 200
-        assert len(r.json()) > 0
+        data = r.json()
+        assert data["total"] > 0
+        assert len(data["data"]) > 0
 
     def test_list_errors_with_filter(self, client: TestClient, error_sped: bytes) -> None:
         file_id = self._upload(client, error_sped)
@@ -155,19 +156,21 @@ class TestRecordsAPI:
         file_id = self._upload(client, valid_sped)
         r = client.get(f"/api/files/{file_id}/records")
         assert r.status_code == 200
-        assert len(r.json()) > 0
+        data = r.json()
+        assert data["total"] > 0
+        assert len(data["data"]) > 0
 
     def test_list_records_filter_block(self, client: TestClient, valid_sped: bytes) -> None:
         file_id = self._upload(client, valid_sped)
         r = client.get(f"/api/files/{file_id}/records?block=C")
         assert r.status_code == 200
-        for rec in r.json():
+        for rec in r.json()["data"]:
             assert rec["block"] == "C"
 
     def test_get_record(self, client: TestClient, valid_sped: bytes) -> None:
         file_id = self._upload(client, valid_sped)
-        records = client.get(f"/api/files/{file_id}/records?limit=1").json()
-        rec_id = records[0]["id"]
+        records = client.get(f"/api/files/{file_id}/records?page_size=1").json()
+        rec_id = records["data"][0]["id"]
         r = client.get(f"/api/files/{file_id}/records/{rec_id}")
         assert r.status_code == 200
 
@@ -178,11 +181,18 @@ class TestRecordsAPI:
 
     def test_update_record(self, client: TestClient, valid_sped: bytes) -> None:
         file_id = self._upload(client, valid_sped)
-        records = client.get(f"/api/files/{file_id}/records?limit=1").json()
-        rec_id = records[0]["id"]
+        records = client.get(f"/api/files/{file_id}/records?page_size=1").json()
+        rec_id = records["data"][0]["id"]
         r = client.put(
             f"/api/files/{file_id}/records/{rec_id}",
-            json={"field_no": 2, "field_name": "COD_VER", "new_value": "018"},
+            json={
+                "field_no": 2,
+                "field_name": "COD_VER",
+                "new_value": "018",
+                "justificativa": "Correcao do codigo de versao para 018 conforme layout",
+                "correction_type": "manual",
+                "rule_id": "CAMPO_INVALIDO",
+            },
         )
         assert r.status_code == 200
         assert r.json()["corrected"] is True

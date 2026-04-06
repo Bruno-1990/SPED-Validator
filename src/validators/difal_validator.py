@@ -1,0 +1,636 @@
+"""Validador de DIFAL (Diferencial de Aliquota Interestadual).
+
+Regras implementadas:
+- DIFAL_001: DIFAL faltante em operacao de consumo final interestadual
+- DIFAL_002: DIFAL indevido em revenda/industrializacao
+- DIFAL_003: UF destino inconsistente no DIFAL
+- DIFAL_004: Aliquota interna destino incorreta no DIFAL
+- DIFAL_005: Base DIFAL inconsistente com operacao
+- DIFAL_006: FCP ausente ou incoerente
+- DIFAL_007: Perfil destinatario incompativel com DIFAL
+- DIFAL_008: Consumo final sem marcadores consistentes
+
+Tabelas de referencia:
+- data/tabelas/aliquotas_internas_uf.yaml
+- data/tabelas/fcp_por_uf.yaml
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import yaml
+
+from ..models import SpedRecord, ValidationError
+from ..parser import group_by_register
+from ..services.context_builder import ValidationContext
+from .helpers import (
+    ALIQ_INTERESTADUAIS,
+    CFOP_REMESSA_RETORNO,
+    get_field,
+    make_error,
+    make_generic_error,
+    to_float,
+    trib,
+)
+from .tolerance import get_tolerance
+
+# ──────────────────────────────────────────────
+# Tabelas de referencia
+# ──────────────────────────────────────────────
+
+_DATA_DIR = Path(__file__).parent.parent.parent / "data" / "tabelas"
+
+_aliquotas_uf: dict[str, float] = {}
+_fcp_uf: dict[str, dict] = {}
+_sul_sudeste: set[str] = set()
+
+
+def _load_tables() -> None:
+    """Carrega tabelas YAML de aliquotas e FCP (lazy, uma unica vez)."""
+    global _aliquotas_uf, _fcp_uf, _sul_sudeste
+
+    if _aliquotas_uf:
+        return
+
+    aliq_path = _DATA_DIR / "aliquotas_internas_uf.yaml"
+    if aliq_path.exists():
+        with open(aliq_path, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        for uf, info in data.get("aliquotas", {}).items():
+            _aliquotas_uf[uf] = float(info["aliquota_padrao"])
+        _sul_sudeste = set(data.get("interestaduais", {}).get("sul_sudeste", []))
+
+    fcp_path = _DATA_DIR / "fcp_por_uf.yaml"
+    if fcp_path.exists():
+        with open(fcp_path, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        for uf, info in data.get("fcp", {}).items():
+            _fcp_uf[uf] = info
+
+
+# ──────────────────────────────────────────────
+# Constantes locais
+# ──────────────────────────────────────────────
+
+# CFOPs de venda/transferencia interestadual para consumidor final
+# (tipicamente CFOP 6.1xx e 6.4xx)
+_CFOP_INTERESTADUAL_CONSUMO_FINAL = {
+    "6107", "6108",  # venda a nao contribuinte
+    "6401", "6402", "6403", "6404",  # venda por ST a consumidor final
+    "6501", "6502",  # remessa p/ industrializacao por encomenda (uso/consumo)
+}
+
+# CFOPs de venda interestadual para revenda/industrializacao
+_CFOP_INTERESTADUAL_REVENDA_INDUSTRIA = {
+    "6101", "6102", "6103", "6104", "6105", "6106",  # venda
+    "6109", "6110", "6111", "6112", "6113", "6116",  # venda
+    "6117", "6118", "6119", "6120", "6122", "6123",  # venda
+    "6151", "6152", "6153",  # transferencia
+    "6201", "6202",  # devolucao
+}
+
+# CSTs que indicam operacao com DIFAL (tributado com diferencial)
+_CST_COM_DIFAL = {"00", "10", "20", "70", "90"}
+
+
+# ──────────────────────────────────────────────
+# API publica
+# ──────────────────────────────────────────────
+
+def validate_difal(
+    records: list[SpedRecord],
+    context: ValidationContext | None = None,
+) -> list[ValidationError]:
+    """Executa validacoes de DIFAL nos registros SPED."""
+    from datetime import date as _date
+
+    # Vigencia: DIFAL so se aplica a partir de 01/01/2016 (EC 87/2015)
+    if context and context.periodo_ini and context.periodo_ini < _date(2016, 1, 1):
+        return []
+
+    _load_tables()
+
+    groups = group_by_register(records)
+    errors: list[ValidationError] = []
+
+    # Verificar disponibilidade de tabelas externas
+    tables_available = bool(_aliquotas_uf)
+    if not tables_available:
+        errors.append(make_generic_error(
+            "DIFAL_VERIFICACAO_INCOMPLETA",
+            "Tabela de aliquotas internas por UF nao disponivel. "
+            "Verificacoes DIFAL_001 e DIFAL_004 serao parciais. "
+            "Disponibilize data/reference/aliquotas_internas_uf.yaml.",
+            register="E300",
+            value="aliquotas_internas_uf.yaml",
+        ))
+
+    # UF do declarante (0000, campo 8)
+    uf_declarante = ""
+    for r in groups.get("0000", []):
+        uf_declarante = get_field(r, "UF").upper()
+        break
+
+    if not uf_declarante:
+        return errors
+
+    # Mapa COD_PART -> (UF, IND_IE)
+    part_info: dict[str, dict[str, str]] = {}
+    for r in groups.get("0150", []):
+        cod = get_field(r, "COD_PART")
+        uf = get_field(r, "UF").upper()
+        # Campo 5 = IND_IE (1=contribuinte, 2=isento, 9=nao contribuinte)
+        ind_ie = get_field(r, "CPF")
+        if cod:
+            part_info[cod] = {"uf": uf, "ind_ie": ind_ie}
+
+    # Mapa C170.line -> C100 pai
+    c170_parent = _build_parent_map(groups)
+
+    # Per-item (C170) — operacoes interestaduais
+    for rec in groups.get("C170", []):
+        parent = c170_parent.get(rec.line_number)
+        if not parent:
+            continue
+
+        cod_part = get_field(parent, "COD_PART")
+        info = part_info.get(cod_part, {})
+        uf_dest = info.get("uf", "")
+        ind_ie = info.get("ind_ie", "")
+
+        # So valida interestaduais (CFOP 6xxx)
+        cfop = get_field(rec, "CFOP")
+        if not cfop or cfop[0] != "6":
+            continue
+        if cfop in CFOP_REMESSA_RETORNO:
+            continue
+
+        errors.extend(_check_difal_001(rec, cfop, uf_declarante, uf_dest, ind_ie))
+        errors.extend(_check_difal_002(rec, cfop, ind_ie))
+        errors.extend(_check_difal_003(rec, cfop, uf_declarante, uf_dest))
+        errors.extend(_check_difal_004(rec, cfop, uf_dest, uf_declarante))
+        errors.extend(_check_difal_005(rec, cfop, uf_dest, uf_declarante))
+        errors.extend(_check_difal_006(rec, cfop, uf_dest))
+        errors.extend(_check_difal_007(rec, cfop, ind_ie, uf_dest))
+        errors.extend(_check_difal_008(rec, cfop, ind_ie))
+
+    return errors
+
+
+# ──────────────────────────────────────────────
+# Contexto
+# ──────────────────────────────────────────────
+
+def _build_parent_map(
+    groups: dict[str, list[SpedRecord]],
+) -> dict[int, SpedRecord]:
+    """Mapa C170.line_number -> C100 pai."""
+    all_recs = []
+    for reg_type in ("C100", "C170"):
+        for r in groups.get(reg_type, []):
+            all_recs.append(r)
+    all_recs.sort(key=lambda r: r.line_number)
+
+    parent_map: dict[int, SpedRecord] = {}
+    current_c100: SpedRecord | None = None
+    for r in all_recs:
+        if r.register == "C100":
+            current_c100 = r
+        elif r.register == "C170" and current_c100 is not None:
+            parent_map[r.line_number] = current_c100
+    return parent_map
+
+
+def _aliq_interestadual_esperada(uf_origem: str, uf_dest: str) -> float:
+    """Retorna aliquota interestadual esperada com base nas UFs."""
+    if uf_origem in _sul_sudeste and uf_dest not in _sul_sudeste:
+        return 7.0
+    if uf_origem not in _sul_sudeste and uf_dest in _sul_sudeste:
+        return 12.0
+    if uf_origem in _sul_sudeste and uf_dest in _sul_sudeste:
+        return 12.0
+    # Demais: N/NE/CO entre si
+    return 12.0
+
+
+def _aliq_interna_destino(uf_dest: str) -> float:
+    """Retorna aliquota interna padrao da UF de destino."""
+    return _aliquotas_uf.get(uf_dest, 0.0)
+
+
+def _fcp_destino(uf_dest: str) -> dict:
+    """Retorna informacoes de FCP da UF de destino."""
+    return _fcp_uf.get(uf_dest, {"percentual_geral": 0.0, "tipo": "nenhum"})
+
+
+# ──────────────────────────────────────────────
+# DIFAL_001: DIFAL faltante em consumo final
+# ──────────────────────────────────────────────
+
+def _check_difal_001(
+    record: SpedRecord,
+    cfop: str,
+    uf_declarante: str,
+    uf_dest: str,
+    ind_ie: str,
+) -> list[ValidationError]:
+    """Operacao interestadual para consumidor final sem DIFAL.
+
+    Quando: CFOP 6xxx + destinatario nao-contribuinte (IND_IE=9)
+    ou CFOP de consumo final + UF diferente.
+    Esperado: deve haver DIFAL (diferenca aliq interna destino - interestadual).
+    """
+    if not uf_dest or uf_dest == uf_declarante:
+        return []
+
+    # Consumidor final: IND_IE = 9 (nao contribuinte) ou CFOP de consumo final
+    eh_consumo_final = (
+        ind_ie == "9"
+        or cfop in _CFOP_INTERESTADUAL_CONSUMO_FINAL
+    )
+    if not eh_consumo_final:
+        return []
+
+    cst = get_field(record, "CST_ICMS")
+    if not cst:
+        return []
+    t = trib(cst)
+    if t not in _CST_COM_DIFAL:
+        return []
+
+    aliq = to_float(get_field(record, "ALIQ_ICMS"))
+    aliq_interna = _aliq_interna_destino(uf_dest)
+    aliq_inter = _aliq_interestadual_esperada(uf_declarante, uf_dest)
+
+    if aliq_interna <= 0:
+        return []
+
+    difal_esperado = aliq_interna - aliq_inter
+    if difal_esperado <= 0:
+        return []
+
+    # Verificar se a aliquota usada ja contempla o DIFAL
+    # Se aliq == aliq_inter, o DIFAL nao foi aplicado
+    if abs(aliq - aliq_inter) < get_tolerance("item_icms"):
+        return [make_error(
+            record, "DIFAL", "DIFAL_FALTANTE_CONSUMO_FINAL",
+            (
+                f"Operacao interestadual (CFOP {cfop}) para consumidor final "
+                f"em {uf_dest} com aliquota {aliq:.2f}% (interestadual). "
+                f"Esperado DIFAL de {difal_esperado:.2f}pp "
+                f"(aliq interna {uf_dest}={aliq_interna:.2f}% - "
+                f"interestadual={aliq_inter:.2f}%). "
+                f"Verifique se o DIFAL esta sendo recolhido por GNRE ou ajuste E300."
+            ),
+            field_no=14,
+            value=f"CFOP={cfop} ALIQ={aliq:.2f}% UF_DEST={uf_dest}",
+            expected_value=f"DIFAL={difal_esperado:.2f}pp",
+        )]
+
+    return []
+
+
+# ──────────────────────────────────────────────
+# DIFAL_002: DIFAL indevido em revenda/industrializacao
+# ──────────────────────────────────────────────
+
+def _check_difal_002(
+    record: SpedRecord,
+    cfop: str,
+    ind_ie: str,
+) -> list[ValidationError]:
+    """DIFAL aplicado indevidamente em operacao de revenda ou industrializacao.
+
+    DIFAL so se aplica a consumidor final. Se o destinatario e contribuinte
+    (IND_IE=1) e o CFOP indica revenda/industrializacao, nao cabe DIFAL.
+    """
+    if ind_ie != "1":
+        return []
+
+    if cfop not in _CFOP_INTERESTADUAL_REVENDA_INDUSTRIA:
+        return []
+
+    cst = get_field(record, "CST_ICMS")
+    if not cst:
+        return []
+    t = trib(cst)
+    if t not in _CST_COM_DIFAL:
+        return []
+
+    aliq = to_float(get_field(record, "ALIQ_ICMS"))
+    # Se a aliquota usada e maior que qualquer interestadual valida,
+    # pode indicar que DIFAL foi embutido indevidamente
+    if aliq <= 12.0:
+        return []
+
+    if aliq not in ALIQ_INTERESTADUAIS:
+        return [make_error(
+            record, "DIFAL", "DIFAL_INDEVIDO_REVENDA",
+            (
+                f"Operacao interestadual (CFOP {cfop}) para contribuinte "
+                f"(IND_IE=1, revenda/industrializacao) com aliquota {aliq:.2f}%. "
+                f"Nao cabe DIFAL em operacao para revenda ou industrializacao. "
+                f"Aliquota esperada: 4%, 7% ou 12% conforme UF de origem/destino."
+            ),
+            field_no=14,
+            value=f"CFOP={cfop} ALIQ={aliq:.2f}% IND_IE={ind_ie}",
+        )]
+
+    return []
+
+
+# ──────────────────────────────────────────────
+# DIFAL_003: UF destino inconsistente no DIFAL
+# ──────────────────────────────────────────────
+
+def _check_difal_003(
+    record: SpedRecord,
+    cfop: str,
+    uf_declarante: str,
+    uf_dest: str,
+) -> list[ValidationError]:
+    """UF do destinatario inconsistente com a operacao interestadual.
+
+    Operacao com CFOP 6xxx mas destinatario cadastrado na mesma UF,
+    ou CFOP 5xxx com destinatario de outra UF.
+    """
+    if not uf_dest:
+        return []
+
+    # CFOP 6xxx mas mesma UF
+    if cfop[0] == "6" and uf_dest == uf_declarante:
+        return [make_error(
+            record, "UF_DESTINO", "DIFAL_UF_DESTINO_INCONSISTENTE",
+            (
+                f"CFOP {cfop} (interestadual) mas destinatario cadastrado "
+                f"na mesma UF do declarante ({uf_declarante}). "
+                f"Se a operacao e interna, o CFOP deveria iniciar com 5. "
+                f"Isso impacta diretamente o calculo do DIFAL."
+            ),
+            field_no=11,
+            value=f"CFOP={cfop} UF_DECL={uf_declarante} UF_DEST={uf_dest}",
+        )]
+
+    return []
+
+
+# ──────────────────────────────────────────────
+# DIFAL_004: Aliquota interna destino incorreta
+# ──────────────────────────────────────────────
+
+def _check_difal_004(
+    record: SpedRecord,
+    cfop: str,
+    uf_dest: str,
+    uf_declarante: str,
+) -> list[ValidationError]:
+    """Aliquota interna do destino incorreta no calculo do DIFAL.
+
+    Quando o item indica consumo final interestadual e a aliquota usada
+    nao corresponde a aliquota interna oficial da UF de destino.
+    """
+    if not uf_dest or uf_dest == uf_declarante:
+        return []
+
+    cst = get_field(record, "CST_ICMS")
+    if not cst:
+        return []
+    t = trib(cst)
+    if t not in _CST_COM_DIFAL:
+        return []
+
+    aliq = to_float(get_field(record, "ALIQ_ICMS"))
+    aliq_interna = _aliq_interna_destino(uf_dest)
+
+    if aliq_interna <= 0:
+        return []
+
+    # Se a aliquota usada e a interna do destino (indicando DIFAL completo),
+    # mas nao bate com a tabela oficial
+    aliq_inter = _aliq_interestadual_esperada(uf_declarante, uf_dest)
+
+    # So verifica quando parece que tentaram aplicar a aliquota interna
+    # (aliquota > interestadual, indicando possivel DIFAL embutido)
+    if aliq <= aliq_inter + get_tolerance("item_icms"):
+        return []
+
+    # Se usou aliquota interna mas errada
+    if abs(aliq - aliq_interna) > get_tolerance("item_icms") and aliq > aliq_inter:
+        return [make_error(
+            record, "ALIQ_ICMS", "DIFAL_ALIQ_INTERNA_INCORRETA",
+            (
+                f"Operacao interestadual (CFOP {cfop}) para {uf_dest} com "
+                f"aliquota {aliq:.2f}%, que difere da aliquota interna "
+                f"oficial de {uf_dest} ({aliq_interna:.2f}%). "
+                f"Para DIFAL, a aliquota interna de referencia deve ser "
+                f"{aliq_interna:.2f}% conforme legislacao vigente."
+            ),
+            field_no=14,
+            value=f"CFOP={cfop} ALIQ={aliq:.2f}% UF_DEST={uf_dest}",
+            expected_value=f"{aliq_interna:.2f}%",
+        )]
+
+    return []
+
+
+# ──────────────────────────────────────────────
+# DIFAL_005: Base DIFAL inconsistente
+# ──────────────────────────────────────────────
+
+def _check_difal_005(
+    record: SpedRecord,
+    cfop: str,
+    uf_dest: str,
+    uf_declarante: str,
+) -> list[ValidationError]:
+    """Base de calculo do DIFAL inconsistente com a operacao.
+
+    Verifica se VL_BC_ICMS e coerente quando ha indicacao de DIFAL.
+    """
+    if not uf_dest or uf_dest == uf_declarante:
+        return []
+
+    cst = get_field(record, "CST_ICMS")
+    if not cst:
+        return []
+    t = trib(cst)
+    if t not in _CST_COM_DIFAL:
+        return []
+
+    vl_item = to_float(get_field(record, "VL_ITEM"))
+    vl_bc = to_float(get_field(record, "VL_BC_ICMS"))
+    aliq = to_float(get_field(record, "ALIQ_ICMS"))
+    vl_icms = to_float(get_field(record, "VL_ICMS"))
+
+    if vl_item <= 0 or vl_bc <= 0:
+        return []
+
+    _aliq_inter = _aliq_interestadual_esperada(uf_declarante, uf_dest)
+    aliq_interna = _aliq_interna_destino(uf_dest)
+
+    if aliq_interna <= 0:
+        return []
+
+    # Recalcular ICMS esperado sobre a base
+    icms_esperado = vl_bc * aliq / 100.0
+    if vl_icms > 0 and abs(vl_icms - icms_esperado) > max(get_tolerance("item_icms"), vl_bc * 0.005):
+        return [make_error(
+            record, "VL_BC_ICMS", "DIFAL_BASE_INCONSISTENTE",
+            (
+                f"Base ICMS (R$ {vl_bc:.2f}) x aliquota ({aliq:.2f}%) = "
+                f"R$ {icms_esperado:.2f}, mas VL_ICMS informado e "
+                f"R$ {vl_icms:.2f} (diferenca de R$ {abs(vl_icms - icms_esperado):.2f}). "
+                f"A base de calculo do DIFAL deve refletir corretamente "
+                f"a operacao interestadual para {uf_dest}."
+            ),
+            field_no=13,
+            value=f"BC={vl_bc:.2f} ALIQ={aliq:.2f}% ICMS={vl_icms:.2f}",
+            expected_value=f"ICMS={icms_esperado:.2f}",
+        )]
+
+    return []
+
+
+# ──────────────────────────────────────────────
+# DIFAL_006: FCP ausente ou incoerente
+# ──────────────────────────────────────────────
+
+def _check_difal_006(
+    record: SpedRecord,
+    cfop: str,
+    uf_dest: str,
+) -> list[ValidationError]:
+    """FCP ausente ou incoerente em operacao com DIFAL.
+
+    Quando UF de destino cobra FCP e a operacao e interestadual
+    para consumidor final, deve haver destaque de FCP.
+    """
+    if not uf_dest:
+        return []
+
+    fcp_info = _fcp_destino(uf_dest)
+    fcp_percentual = float(fcp_info.get("percentual_geral", 0.0))
+    fcp_tipo = fcp_info.get("tipo", "nenhum")
+
+    # Se UF nao tem FCP, nada a validar
+    if fcp_tipo == "nenhum" or fcp_percentual <= 0:
+        return []
+
+    # Verificar se CFOP indica consumo final interestadual
+    if cfop not in _CFOP_INTERESTADUAL_CONSUMO_FINAL:
+        return []
+
+    cst = get_field(record, "CST_ICMS")
+    if not cst:
+        return []
+    t = trib(cst)
+    if t not in _CST_COM_DIFAL:
+        return []
+
+    # C170 nao tem campo especifico de FCP no layout padrao,
+    # mas a ausencia de qualquer ajuste/registro E300 indica risco
+    return [make_error(
+        record, "FCP", "DIFAL_FCP_AUSENTE",
+        (
+            f"Operacao interestadual (CFOP {cfop}) para consumidor final "
+            f"em {uf_dest}, que cobra FCP de {fcp_percentual:.1f}% "
+            f"({fcp_tipo}). Verifique se o FCP esta sendo destacado "
+            f"e recolhido. {uf_dest} exige FCP conforme "
+            f"{fcp_info.get('observacao', 'legislacao estadual')}."
+        ),
+        field_no=14,
+        value=f"CFOP={cfop} UF_DEST={uf_dest} FCP_ESPERADO={fcp_percentual:.1f}%",
+    )]
+
+
+# ──────────────────────────────────────────────
+# DIFAL_007: Perfil destinatario incompativel
+# ──────────────────────────────────────────────
+
+def _check_difal_007(
+    record: SpedRecord,
+    cfop: str,
+    ind_ie: str,
+    uf_dest: str,
+) -> list[ValidationError]:
+    """Perfil do destinatario incompativel com tratamento DIFAL.
+
+    IND_IE indica contribuinte (1) mas CFOP indica consumo final,
+    ou IND_IE indica nao-contribuinte (9) mas CFOP indica revenda.
+    """
+    if not ind_ie or not uf_dest:
+        return []
+
+    # Contribuinte com CFOP de consumo final
+    if ind_ie == "1" and cfop in _CFOP_INTERESTADUAL_CONSUMO_FINAL:
+        return [make_error(
+            record, "IND_IE", "DIFAL_PERFIL_INCOMPATIVEL",
+            (
+                f"Destinatario e contribuinte (IND_IE=1) mas CFOP {cfop} "
+                f"indica operacao para consumidor final. Revise o cadastro "
+                f"do participante ou o CFOP. Isso afeta diretamente "
+                f"a responsabilidade pelo recolhimento do DIFAL."
+            ),
+            field_no=11,
+            value=f"IND_IE={ind_ie} CFOP={cfop}",
+        )]
+
+    # Nao-contribuinte com CFOP de revenda
+    if ind_ie == "9" and cfop in _CFOP_INTERESTADUAL_REVENDA_INDUSTRIA:
+        return [make_error(
+            record, "IND_IE", "DIFAL_PERFIL_INCOMPATIVEL",
+            (
+                f"Destinatario nao-contribuinte (IND_IE=9) mas CFOP {cfop} "
+                f"indica revenda/industrializacao. Nao-contribuinte nao "
+                f"revende nem industrializa. Revise cadastro do participante "
+                f"ou reclassifique a operacao."
+            ),
+            field_no=11,
+            value=f"IND_IE={ind_ie} CFOP={cfop}",
+        )]
+
+    return []
+
+
+# ──────────────────────────────────────────────
+# DIFAL_008: Consumo final sem marcadores
+# ──────────────────────────────────────────────
+
+def _check_difal_008(
+    record: SpedRecord,
+    cfop: str,
+    ind_ie: str,
+) -> list[ValidationError]:
+    """Consumo final sem marcadores consistentes.
+
+    Operacao parece ser para consumo final (IND_IE=9) mas nao usa
+    CFOP especifico de consumo final, dificultando rastreio do DIFAL.
+    """
+    if ind_ie != "9":
+        return []
+
+    # Se ja usa CFOP de consumo final, esta ok
+    if cfop in _CFOP_INTERESTADUAL_CONSUMO_FINAL:
+        return []
+
+    # Nao-contribuinte com CFOP generico interestadual
+    cst = get_field(record, "CST_ICMS")
+    if not cst:
+        return []
+    t = trib(cst)
+    if t not in _CST_COM_DIFAL:
+        return []
+
+    return [make_error(
+        record, "CFOP", "DIFAL_CONSUMO_FINAL_SEM_MARCADOR",
+        (
+            f"Destinatario nao-contribuinte (IND_IE=9) com CFOP {cfop} "
+            f"que nao e especifico de consumo final. Operacoes para "
+            f"consumidor final interestadual devem usar CFOPs adequados "
+            f"(6107, 6108, etc.) para correto tratamento do DIFAL. "
+            f"Risco de extravio na apuracao do diferencial."
+        ),
+        field_no=11,
+        value=f"IND_IE={ind_ie} CFOP={cfop}",
+    )]

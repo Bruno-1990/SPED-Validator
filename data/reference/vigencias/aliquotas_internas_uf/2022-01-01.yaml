@@ -1,0 +1,37 @@
+meta:
+  fonte: "CONFAZ + legislacoes estaduais"
+  vigencia_de: "2022-01-01"
+  vigencia_ate: null
+  ultima_revisao: "2026-04-06"
+  avisos:
+    - "RJ tem excecoes para produtos suntuosos (22%)"
+    - "SP tem excecoes para energia eletrica e combustiveis"
+
+aliquotas:
+  AC: 17.0
+  AL: 17.0
+  AM: 18.0
+  AP: 18.0
+  BA: 19.0
+  CE: 18.0
+  DF: 18.0
+  ES: 17.0
+  GO: 17.0
+  MA: 18.0
+  MG: 18.0
+  MS: 17.0
+  MT: 17.0
+  PA: 17.0
+  PB: 18.0
+  PE: 18.0
+  PI: 18.0
+  PR: 19.0
+  RJ: 20.0
+  RN: 18.0
+  RO: 17.0
+  RR: 17.0
+  RS: 17.0
+  SC: 17.0
+  SE: 18.0
+  SP: 18.0
+  TO: 18.0

@@ -10,10 +10,10 @@ python-multipart>=0.0.6
 pydantic>=2.0.0
 starlette>=0.27.0
 
-# YAML (rules.yaml)
+# YAML (rules.yaml + tabelas de referencia)
 pyyaml>=6.0
 
-# Indexação de documentos e busca semântica
+# Indexacao de documentos e busca semantica
 pdfplumber>=0.10.0
 sentence-transformers>=2.2.0
 numpy>=1.24.0
@@ -23,3 +23,4 @@ tqdm>=4.65.0
 # Testes
 pytest>=7.0.0
 pytest-cov>=4.0.0
+httpx>=0.25.0

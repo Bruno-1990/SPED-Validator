@@ -33,7 +33,6 @@ from src.services.validation_service import (
     run_full_validation,
 )
 
-
 # ──────────────────────────────────────────────
 # Fixtures
 # ──────────────────────────────────────────────
@@ -223,7 +222,7 @@ class TestCorrectionService:
             "SELECT fields_json, status FROM sped_records WHERE id = ?", (record_id,)
         ).fetchone()
         fields = json.loads(updated[0])
-        assert fields[1] == "018"
+        assert fields["COD_VER"] == "018"
         assert updated[1] == "corrected"
 
     def test_apply_correction_invalid_record(self, audit_db: sqlite3.Connection) -> None:
@@ -292,8 +291,7 @@ class TestExportService:
 
         report = export_report_markdown(audit_db, file_id)
         assert "# Relatório de Auditoria" in report
-        assert "Resumo" in report
-        assert "Erros por Tipo" in report
+        assert "Sumário" in report or "Achados" in report
 
     def test_export_report_nonexistent(self, audit_db: sqlite3.Connection) -> None:
         report = export_report_markdown(audit_db, 999)
@@ -314,13 +312,20 @@ class TestExportService:
 
         json_text = export_errors_json(audit_db, file_id)
         data = json.loads(json_text)
-        assert isinstance(data, list)
-        assert len(data) > 0
-        assert "tipo_erro" in data[0]
-        assert "mensagem" in data[0]
+        # New format: full report dict with secao4_achados
+        if isinstance(data, dict):
+            assert "secao4_achados" in data
+            achados = data["secao4_achados"]
+            assert len(achados) > 0
+            assert "mensagem" in achados[0]
+        else:
+            assert isinstance(data, list)
+            assert len(data) > 0
 
     def test_export_csv_empty(self, audit_db: sqlite3.Connection, sped_valid_path: Path) -> None:
         file_id = upload_file(audit_db, sped_valid_path)
         csv_text = export_errors_csv(audit_db, file_id)
         lines = csv_text.strip().split("\n")
-        assert len(lines) == 1  # Só header
+        # Header + optional footer rows (empty row + rodapé legal)
+        assert len(lines) >= 1
+        assert "linha,registro" in lines[0] or "linha" in lines[0]

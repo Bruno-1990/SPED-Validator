@@ -12,7 +12,7 @@ Este sistema resolve isso automatizando:
 
 1. **Conversao** de PDFs/DOCX/TXT da documentacao oficial para Markdown estruturado
 2. **Indexacao** com Full-Text Search (FTS5) + embeddings vetoriais para busca semantica
-3. **Validacao** em 7 camadas dos arquivos SPED (estrutural, semantica fiscal, monofasicos) contra as definicoes extraidas da documentacao
+3. **Validacao** em 21 camadas dos arquivos SPED (estrutural, semantica fiscal, monofasicos, auditoria de beneficios, aliquotas, C190, DIFAL/FCP, base de calculo, destinatario, parametrizacao, governanca) com 175 regras implementadas
 4. **Busca automatica** da documentacao relevante para cada erro encontrado
 5. **API REST** (FastAPI) com endpoints para upload, validacao, correcao e exportacao
 6. **Frontend React** com interface para upload, visualizacao de erros e relatorios
@@ -29,21 +29,43 @@ Duplo clique em `start.bat` — inicia API + Frontend automaticamente.
 
 **Terminal 1 (API):**
 ```powershell
-cd "C:\Users\bmb19\OneDrive\Documentos\work\SPED"
+cd <diretorio-do-projeto>
 .\.venv-win\Scripts\Activate.ps1
 $env:PYTHONPATH = (Get-Location).Path
+$env:API_KEY = "sua-chave-aqui-minimo-32-caracteres"
 python -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 **Terminal 2 (Frontend):**
 ```powershell
-cd "C:\Users\bmb19\OneDrive\Documentos\work\SPED\frontend"
+cd <diretorio-do-projeto>\frontend
 npm run dev
 ```
 
 **Acessar:**
 - App: http://localhost:3000
 - API Docs: http://localhost:8000/docs
+
+### Configuracao da API Key
+
+A API exige autenticacao via header `X-API-Key` em todos os endpoints (exceto `/api/health`).
+
+1. Copie `.env.example` para `.env` e defina uma chave com no minimo 32 caracteres:
+   ```
+   API_KEY=sua-chave-secreta-com-pelo-menos-32-caracteres
+   ```
+
+2. Exporte a variavel de ambiente antes de iniciar a API:
+   - **Linux/macOS:** `export API_KEY="sua-chave-aqui"`
+   - **PowerShell:** `$env:API_KEY = "sua-chave-aqui"`
+   - **Docker:** ja configurado via `.env`
+
+3. Envie a chave em todas as requisicoes:
+   ```bash
+   curl -H "X-API-Key: sua-chave-aqui" http://localhost:8000/api/files
+   ```
+
+**Modo desenvolvimento:** Se `API_KEY` nao estiver definida, a API aceita qualquer chave (ou nenhuma). Nao use em producao.
 
 ### Git Push
 
@@ -130,7 +152,7 @@ Execute `git-push.bat` no Windows — pede a mensagem do commit, faz rebase na m
 ```
 SPED/
 |-- README.md                       # Este arquivo
-|-- rules.yaml                      # Catalogo de 63 regras de validacao (YAML)
+|-- rules.yaml                      # Catalogo de 175 regras de validacao (YAML)
 |-- pyproject.toml                  # Dependencias e metadados (v0.1.0)
 |-- config.py                       # Caminhos, modelo embedding, parametros
 |-- start.bat                       # Inicia API + Frontend (Windows)
@@ -157,6 +179,28 @@ SPED/
 |   |   |-- tax_recalc.py               # Recalculo ICMS, ICMS-ST, IPI, PIS/COFINS, E110
 |   |   |-- cst_validator.py            # CSTs ICMS, isencoes, Bloco H estoque
 |   |   |-- fiscal_semantics.py         # Semantica fiscal: CST x CFOP, aliquota zero, monofasicos
+|   |   |-- aliquota_validator.py       # Aliquotas interestaduais, internas, media indevida
+|   |   |-- beneficio_audit_validator.py # 50 regras de auditoria de beneficios fiscais
+|   |   |-- beneficio_validator.py       # Beneficio contaminando aliquota/DIFAL/base
+|   |   |-- c190_validator.py            # C190 vs C170, combinacoes incompativeis
+|   |   |-- difal_validator.py           # DIFAL/FCP: faltante, indevido, base, UF, perfil
+|   |   |-- base_calculo_validator.py    # Recalculo BC, frete CIF/FOB, despesas acessorias
+|   |   |-- ipi_validator.py             # IPI reflexo BC, recalculo, CST vs monetario
+|   |   |-- destinatario_validator.py    # IE inconsistente, UF vs IE, UF vs CEP
+|   |   |-- cfop_validator.py            # CFOP interestadual/interno vs UF
+|   |   |-- st_validator.py              # ST vs DIFAL, ST sem reflexo apuracao
+|   |   |-- devolucao_validator.py       # Devolucao: espelhamento, DIFAL, aliquota historica
+|   |   |-- parametrizacao_validator.py  # Erros sistematicos por item/UF/data
+|   |   |-- ncm_validator.py             # NCM tributacao incompativel, generico
+|   |   |-- bloco_c_servicos_validator.py # Servicos no Bloco C
+|   |   |-- bloco_d_validator.py         # Bloco D: transporte
+|   |   |-- pendentes_validator.py       # Regras pendentes de contexto externo
+|   |   |-- audit_rules.py              # Regras de auditoria gerais
+|   |   |-- retificador_validator.py     # Validacoes de retificacao
+|   |   |-- helpers.py                   # Funcoes auxiliares dos validadores
+|   |   |-- tolerance.py                 # Constantes de tolerancia de calculo
+|   |   |-- correction_hypothesis.py     # Hipoteses de correcao automatica
+|   |   |-- cst_hypothesis.py            # Hipoteses de correcao de CST
 |   |-- services/
 |   |   |-- __init__.py
 |   |   |-- database.py                 # Schema SQLite de auditoria (6 tabelas)
@@ -444,7 +488,7 @@ Valida cada campo de cada registro SPED contra as definicoes extraidas da docume
 
 ```python
 # Fonte dos documentos
-DOCS_ROOT = "C:\Users\bmb19\OneDrive\Documentos\work\SPED"
+DOCS_ROOT = os.getenv("DOCS_ROOT", str(ROOT_DIR / "data" / "source"))
 GUIA_DIR = DOCS_ROOT / "guia pratico"
 LEGISLACAO_DIR = DOCS_ROOT / "legislaacao"
 
@@ -757,7 +801,7 @@ Bloco K: K001, K200, K210, K215, K220, K230, K235, K250-K292
 
 ```powershell
 # Backend
-cd "C:\Users\bmb19\OneDrive\Documentos\work\SPED"
+cd <diretorio-do-projeto>
 python -m venv .venv-win
 .\.venv-win\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -807,7 +851,7 @@ Arquivos SPED gerados pelo PVA (Programa Validador e Assinador) da Receita Feder
 
 ## Testes e Cobertura
 
-**563 testes | 97% de cobertura total | 0 falhas | 4 testes E2E**
+**1473 testes | 97% de cobertura total | 0 falhas | 4 testes E2E**
 
 **Lint: 0 erros ruff | 0 erros mypy | 0 alertas bandit**
 
@@ -911,20 +955,33 @@ Camada 3 do motor — vai alem da consistencia numerica e verifica se o tratamen
 
 Catalogo centralizado de todas as regras de validacao em formato YAML. Permite rastrear, adicionar e auditar regras sem precisar ler o codigo.
 
-**Arquivo `rules.yaml`:** 63 regras em 10 blocos:
+**Arquivo `rules.yaml`:** 175 regras em 21 blocos (todas implementadas):
 
 | Bloco | Regras | Descricao |
 |-------|--------|-----------|
 | `formato` | 9 | CNPJ, CPF, datas, CEP, CFOP, NCM, chave NFe, cod municipio |
 | `campo_a_campo` | 4 | Obrigatoriedade, tipo, tamanho, valores validos |
 | `intra_registro` | 10 | C100 (datas, cancelamento), C170 (CFOP), C190 (somas), E110 (apuracao) |
-| `cruzamento` | 7 | 0150/0200 (referencias), E110 vs C190 (debitos/creditos), bloco 9 (contagem) |
+| `cruzamento` | 13 | 0150/0200 (referencias), E110 vs C190 (debitos/creditos), bloco 9, bloco D |
 | `recalculo` | 8 | ICMS, ICMS-ST, IPI, PIS, COFINS, E110 totais |
 | `cst_isencoes` | 6 | CST invalido, isencao com valor, tributado sem ICMS, H010 estoque |
 | `semantica_aliquota_zero` | 5 | CST tributado com tudo zerado (ICMS, IPI, PIS, COFINS) |
 | `semantica_cst_cfop` | 3 | Venda+isento, interestadual+zero, exportacao+tributado |
 | `monofasicos` | 5 | CST 04 x NCM x aliquota x entrada/saida |
 | `pendentes` | 6 | Beneficio fiscal, desoneracao, devolucao, historico, interestadual, TIPI |
+| `auditoria_beneficios` | 50 | E111/E112/E113 vs E110, lastro documental, sobreposicao, desproporcionalidade, governanca |
+| `aliquotas` | 7 | Interestadual invalida, interna em interestadual, interestadual em interna, aliquota media, UF incompativel, importacao, divergente |
+| `c190_consolidacao` | 2 | C190 vs C170 com rateio de despesas, combinacoes incompativeis CST/CFOP/ALIQ |
+| `cst_expandido` | 4 | CST 020 sem reducao real, IPI CST vs campos monetarios, CST tributado aliq zero, diferimento |
+| `difal` | 12 | DIFAL faltante, indevido, UF inconsistente, aliquota incorreta, base, FCP, perfil, CFOP |
+| `base_calculo` | 15 | Recalculo BC, frete CIF/FOB, despesas acessorias, base inflada |
+| `beneficio_fiscal` | 3 | Beneficio contaminando aliquota/DIFAL/base |
+| `devolucoes` | 3 | Espelhamento, DIFAL, aliquota historica |
+| `parametrizacao` | 3 | Erros sistematicos por item/UF/data |
+| `ncm` | 2 | NCM tributacao incompativel, generico |
+| `governanca` | 5 | Classificacao erro, grau confianca, dependencia externa, checklist, amostragem |
+
+**Severidades:** 50 critical, 39 error, 70 warning, 16 info
 
 **CLI (`python -m src.rules`):**
 
@@ -1099,10 +1156,10 @@ Correcoes de lint aplicadas:
 |--------|-----------|
 | `database.py` | Schema SQLite com 6 tabelas: sped_files (metadados), sped_records (registros parseados), validation_errors (erros com severidade), cross_validations (cruzamentos), corrections (historico de correcoes), audit_log (rastreabilidade) |
 | `file_service.py` | Upload com hash SHA-256 (detecta duplicata), parse, extracao de metadados do 0000 (empresa, CNPJ, periodo), persistencia dos registros, delete cascade, listagem |
-| `validation_service.py` | Orquestrador: executa as 7 camadas de validacao em sequencia, classifica severidade (critical/error/warning/info), persiste erros, permite revalidacao sem duplicar |
+| `validation_service.py` | Orquestrador: executa 21 camadas de validacao (175 regras) em sequencia, classifica severidade (critical/error/warning/info), persiste erros, permite revalidacao sem duplicar |
 | `fiscal_semantics.py` | Validacao semantica: CST x CFOP (3 regras), classificador aliquota zero (7 cenarios), monofasicos PIS/COFINS x NCM (5 regras, 100+ NCMs) |
 | `pipeline.py` | Pipeline estagiado com progresso em tempo real via SSE: 4 estagios (estrutural, cruzamento+semantica, enriquecimento, auto-correcao) com detalhes por sub-passo |
-| `error_messages.py` | 30+ tipos de erro com template amigavel, orientacao de correcao e icone. Cobre monofasicos, CST x CFOP, aliquota zero |
+| `error_messages.py` | 71 tipos de erro com template amigavel, orientacao de correcao e icone. Cobre monofasicos, CST x CFOP, aliquota zero, auditoria de beneficios, DIFAL, C190 |
 | `correction_service.py` | Aplica correcao em campo especifico (atualiza fields_json + raw_line), salva historico (old_value → new_value), marca erro como corrigido, undo que restaura valor original |
 | `export_service.py` | 4 formatos: SPED corrigido (.txt pipe-delimited), relatorio Markdown (resumo + erros + correcoes), CSV, JSON |
 
@@ -1161,7 +1218,7 @@ cd frontend && npm run dev
 # http://localhost:3000 (proxy /api → localhost:8000)
 ```
 
-Build: 0 erros TypeScript (strict mode), 174KB JS + 10KB CSS gzipped, 1.75s
+Build: 0 erros TypeScript (strict mode), 183KB JS + 5KB CSS gzipped
 
 ### Fase 7 — Integracao e Polish
 
@@ -1198,15 +1255,76 @@ docker-compose up --build
 
 | Metrica | Valor |
 |---------|-------|
-| **Testes** | 563 (unitarios + integracao + API + E2E) |
+| **Testes** | 1473 (unitarios + integracao + API + E2E) |
 | **Cobertura** | 97% |
+| **Regras de validacao** | 175 em 21 blocos (todas implementadas) |
 | **Lint** | 0 ruff, 0 mypy, 0 bandit |
-| **Modulos Python** | 18 arquivos em `src/` + `api/` |
-| **Componentes React** | 6 arquivos (types, client, layout, 3 pages) |
-| **Endpoints API** | 14 |
+| **Modulos validadores** | 28 arquivos em `src/validators/` |
+| **Modulos Python** | 40+ arquivos em `src/` + `api/` |
+| **Componentes React** | 7 arquivos (types, client, layout, 4 pages) |
+| **Endpoints API** | 17 |
 | **Tabelas SQLite** | 6 (auditoria) + 3 (documentacao) |
-| **Linhas de codigo** | ~4.500 |
 | **Fases completas** | 7/7 |
+
+---
+
+## Configuracao
+
+### Variaveis de Ambiente
+
+| Variavel | Obrigatoria | Descricao |
+|----------|-------------|-----------|
+| `API_KEY` | Sim (producao) | Chave de autenticacao da API (minimo 32 caracteres). Se nao definida, modo dev aceita qualquer chave |
+| `DOCS_ROOT` | Nao | Caminho para documentos fonte (default: `data/source`) |
+| `PYTHONPATH` | Sim | Raiz do projeto (para imports relativos) |
+
+**Linux/macOS:**
+```bash
+export API_KEY="sua-chave-secreta-com-pelo-menos-32-caracteres"
+export PYTHONPATH=$(pwd)
+```
+
+**PowerShell:**
+```powershell
+$env:API_KEY = "sua-chave-secreta-com-pelo-menos-32-caracteres"
+$env:PYTHONPATH = (Get-Location).Path
+```
+
+**Docker:** Defina no arquivo `.env` (copiado de `.env.example`).
+
+---
+
+## Tabelas de Referencia
+
+O motor de validacao utiliza tabelas YAML em `data/` para regras que dependem de dados externos. Para atualizar:
+
+1. Edite o arquivo YAML correspondente
+2. Reinicie a API (as tabelas sao carregadas em memoria no startup)
+3. Revalide os arquivos SPED para aplicar as novas regras
+
+| Tabela | Arquivo | Uso |
+|--------|---------|-----|
+| Aliquotas internas por UF | `aliquotas_internas_uf.yaml` | DIFAL_004, validacao aliquota interna |
+| FCP por UF | `fcp_por_uf.yaml` | DIFAL_006, percentual FCP |
+| NCMs monofasicos | `monofasicos_ncm.yaml` | Regras monofasicos PIS/COFINS |
+| Regras de validacao | `rules.yaml` | Catalogo central de 175 regras |
+
+**Como adicionar uma regra ao `rules.yaml`:**
+
+```yaml
+- id: NOVA_001
+  register: C170
+  fields: [CAMPO1, CAMPO2]
+  error_type: NOVO_TIPO_ERRO
+  severity: warning
+  description: "Descricao da regra"
+  implemented: false          # Mude para true apos implementar
+  module: modulo_validator.py
+```
+
+Apos adicionar, execute `python -m src.rules --check` para validar a integridade do catalogo.
+
+---
 
 ### Itens pendentes (melhorias futuras)
 

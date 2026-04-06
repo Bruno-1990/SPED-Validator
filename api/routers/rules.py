@@ -450,7 +450,7 @@ def _generate_condition(description: str) -> str:
 
 def _extract_legislation(sources: list[dict]) -> str | None:
     """Extrai referencias legislativas das fontes encontradas."""
-    legislations = set()
+    legislations: set[str] = set()
     for s in sources:
         fonte = s.get("fonte", "")
         heading = s.get("heading", "")

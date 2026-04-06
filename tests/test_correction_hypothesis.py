@@ -12,8 +12,6 @@ Cobre:
 
 from __future__ import annotations
 
-import pytest
-
 from src.models import SpedRecord
 from src.validators.correction_hypothesis import (
     CorrectionHypothesis,
@@ -21,7 +19,7 @@ from src.validators.correction_hypothesis import (
     _find_plausible_rate,
     validate_with_hypotheses,
 )
-
+from src.validators.helpers import fields_to_dict
 
 # ──────────────────────────────────────────────
 # Helpers para construir registros
@@ -33,7 +31,7 @@ def _make_c100(line: int = 1) -> SpedRecord:
     return SpedRecord(
         line_number=line,
         register="C100",
-        fields=fields,
+        fields=fields_to_dict("C100", fields),
         raw_line="|".join(fields),
     )
 
@@ -61,7 +59,7 @@ def _make_c170(
     return SpedRecord(
         line_number=line,
         register="C170",
-        fields=fields,
+        fields=fields_to_dict("C170", fields),
         raw_line="|".join(fields),
     )
 
@@ -84,7 +82,7 @@ def _make_c190(
     return SpedRecord(
         line_number=line,
         register="C190",
-        fields=fields,
+        fields=fields_to_dict("C190", fields),
         raw_line="|".join(fields),
     )
 

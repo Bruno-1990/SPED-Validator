@@ -42,15 +42,13 @@ from collections import defaultdict
 
 from ..models import SpedRecord, ValidationError
 from ..parser import group_by_register
+from ..services.context_builder import ValidationContext
 from .correction_hypothesis import CorrectionHypothesis
 from .helpers import (
-    CST_ISENTO_NT,
-    CST_ST,
-    CST_TRIBUTADO,
     CFOP_EXPORTACAO,
     CFOP_REMESSA_RETORNO,
+    CST_ST,
     F_C170_ALIQ_ICMS,
-    F_C170_ALIQ_ST,
     F_C170_CFOP,
     F_C170_CST_ICMS,
     F_C170_VL_BC_ICMS,
@@ -59,15 +57,14 @@ from .helpers import (
     F_C170_VL_ICMS,
     F_C170_VL_ICMS_ST,
     F_C170_VL_ITEM,
-    F_C190_ALIQ,
     F_C190_CFOP,
     F_C190_CST,
-    TOLERANCE,
     get_field,
     make_error,
     to_float,
     trib,
 )
+from .tolerance import get_tolerance
 
 # ──────────────────────────────────────────────
 # Tipos de incompatibilidade detectavel
@@ -87,7 +84,10 @@ _REDUCAO_MIN = 0.15
 # API publica
 # ──────────────────────────────────────────────
 
-def validate_cst_hypotheses(records: list[SpedRecord]) -> list[ValidationError]:
+def validate_cst_hypotheses(
+    records: list[SpedRecord],
+    context: ValidationContext | None = None,
+) -> list[ValidationError]:
     """Analisa CST de cada C170 e gera hipoteses de correcao quando incompativel.
 
     Nao duplica validacoes existentes — foca em SUGERIR o CST correto,
@@ -123,9 +123,9 @@ def validate_cst_hypotheses(records: list[SpedRecord]) -> list[ValidationError]:
             if incompat is None:
                 continue
 
-            incompat_type, context = incompat
+            incompat_type, incompat_ctx = incompat
             hyp = _build_hypothesis(
-                item, incompat_type, context, items, c190_recs,
+                item, incompat_type, incompat_ctx, items, c190_recs,
             )
             if hyp and hyp.score >= 40:
                 errors.append(_hypothesis_to_error(item, hyp, incompat_type))
@@ -172,9 +172,10 @@ def _detect_inconsistency(
         "vl_icms_st": vl_icms_st,
     }
 
-    tem_tributacao = vl_bc > TOLERANCE and aliq > TOLERANCE and vl_icms > TOLERANCE
-    sem_tributacao = vl_bc <= TOLERANCE and vl_icms <= TOLERANCE
-    tem_st = vl_bc_st > TOLERANCE or vl_icms_st > TOLERANCE
+    tol = get_tolerance("item_icms")
+    tem_tributacao = vl_bc > tol and aliq > tol and vl_icms > tol
+    sem_tributacao = vl_bc <= tol and vl_icms <= tol
+    tem_st = vl_bc_st > tol or vl_icms_st > tol
 
     # Caso 1: CST isento/NT/suspensao mas item tem tributacao normal
     # CST 40 (isenta), 41 (nao tributada), 50 (suspensao)
@@ -183,9 +184,7 @@ def _detect_inconsistency(
 
     # Caso 2: CST tributado integral mas sem nenhuma tributacao
     # CST 00 com tudo zerado
-    if cst == "00" and sem_tributacao:
-        # Ignorar se CFOP de remessa/retorno (pode ser legítimo)
-        if cfop not in CFOP_REMESSA_RETORNO:
+    if cst == "00" and sem_tributacao and cfop not in CFOP_REMESSA_RETORNO:
             return (_TRIBUTADO_SEM_TRIBUTO, ctx)
 
     # Caso 3: CST sem ST mas campos de ST preenchidos
@@ -196,7 +195,7 @@ def _detect_inconsistency(
     # Caso 4: CST 00 (integral) mas base indica reducao
     if cst == "00" and tem_tributacao:
         vl_tributavel = vl_item - vl_desc if vl_item > 0 else 0
-        if vl_tributavel > TOLERANCE:
+        if vl_tributavel > get_tolerance("item_icms"):
             reducao = 1 - (vl_bc / vl_tributavel)
             if reducao >= _REDUCAO_MIN:
                 ctx["reducao_pct"] = reducao
@@ -217,7 +216,7 @@ def _build_hypothesis(
     c190_recs: list[SpedRecord],
 ) -> CorrectionHypothesis | None:
     """Constroi hipotese de CST com score de confianca."""
-    cst = ctx["cst"]
+    _cst = ctx["cst"]
 
     if incompat_type == _ISENTO_COM_TRIBUTO:
         return _hyp_isento_com_tributo(item, ctx, siblings, c190_recs)
@@ -251,12 +250,13 @@ def _hyp_isento_com_tributo(
     vl_icms = ctx["vl_icms"]
     vl_item = ctx["vl_item"]
     vl_desc = ctx["vl_desc"]
-    tem_st = ctx["vl_bc_st"] > TOLERANCE or ctx["vl_icms_st"] > TOLERANCE
+    tol = get_tolerance("item_icms")
+    tem_st = ctx["vl_bc_st"] > tol or ctx["vl_icms_st"] > tol
 
     # Determinar CST sugerido
     vl_tributavel = vl_item - vl_desc if vl_item > 0 else 0
     tem_reducao = (
-        vl_tributavel > TOLERANCE
+        vl_tributavel > get_tolerance("item_icms")
         and vl_bc < vl_tributavel * (1 - _REDUCAO_MIN)
     )
 
@@ -278,13 +278,14 @@ def _hyp_isento_com_tributo(
     # Score: coerencia matematica — item tem tributo, CST diz isento
     hyp.score += 30
     hyp.reasons.append(
-        f"CST {cst} indica operacao {'isenta' if cst == '40' else 'nao tributada' if cst == '41' else 'com suspensao'}, "
+        f"CST {cst} indica operacao "
+        f"{'isenta' if cst == '40' else 'nao tributada' if cst == '41' else 'com suspensao'}, "
         f"mas o item possui VL_BC_ICMS={vl_bc:.2f}, ALIQ_ICMS={aliq:.2f}% e VL_ICMS={vl_icms:.2f}"
     )
 
     # Verificar se recalculo bate
     icms_check = round(vl_bc * aliq / 100, 2)
-    if abs(icms_check - vl_icms) <= TOLERANCE:
+    if abs(icms_check - vl_icms) <= get_tolerance("item_icms"):
         hyp.score += 10
         hyp.reasons.append(
             f"Recalculo confirma: {vl_bc:.2f} x {aliq:.2f}% = {icms_check:.2f} (igual ao VL_ICMS)"
@@ -356,7 +357,7 @@ def _hyp_tributado_sem_tributo(
         hyp.reasons.append(motivo_cfop)
 
     # CFOP de venda/devolucao sem ICMS = sinal adicional
-    from .helpers import CFOP_VENDA, CFOP_DEVOLUCAO
+    from .helpers import CFOP_DEVOLUCAO, CFOP_VENDA
     if cfop in CFOP_VENDA | CFOP_DEVOLUCAO and not motivo_cfop:
         hyp.score += 15
         hyp.reasons.append(
@@ -398,16 +399,16 @@ def _hyp_sem_st_com_campos(
     """
     cst = ctx["cst"]
     vl_bc = ctx["vl_bc"]
-    aliq = ctx["aliq"]
+    _aliq = ctx["aliq"]
     vl_icms = ctx["vl_icms"]
     vl_bc_st = ctx["vl_bc_st"]
     vl_icms_st = ctx["vl_icms_st"]
 
-    tem_tributacao_propria = vl_bc > TOLERANCE and vl_icms > TOLERANCE
+    tem_tributacao_propria = vl_bc > get_tolerance("item_icms") and vl_icms > get_tolerance("item_icms")
     vl_tributavel = ctx["vl_item"] - ctx["vl_desc"] if ctx["vl_item"] > 0 else 0
     tem_reducao = (
         tem_tributacao_propria
-        and vl_tributavel > TOLERANCE
+        and vl_tributavel > get_tolerance("item_icms")
         and vl_bc < vl_tributavel * (1 - _REDUCAO_MIN)
     )
 
@@ -416,7 +417,7 @@ def _hyp_sem_st_com_campos(
         suggested = "70"  # Com reducao + ST
     elif tem_tributacao_propria:
         suggested = "10"  # Tributado + ST
-    elif vl_bc <= TOLERANCE and vl_icms <= TOLERANCE:
+    elif vl_bc <= get_tolerance("item_icms") and vl_icms <= get_tolerance("item_icms"):
         suggested = "30"  # Isento/NT + ST
     else:
         suggested = "10"  # Default: tributado + ST
@@ -476,7 +477,7 @@ def _hyp_integral_com_reducao(
     vl_bc = ctx["vl_bc"]
     vl_item = ctx["vl_item"]
     vl_desc = ctx["vl_desc"]
-    aliq = ctx["aliq"]
+    _aliq = ctx["aliq"]
     reducao_pct = ctx.get("reducao_pct", 0)
 
     suggested = "20"
@@ -539,7 +540,7 @@ def _score_cfop(hyp: CorrectionHypothesis, ctx: dict) -> None:
         return
 
     # CFOP de venda/devolucao + CST tributado = coerente
-    from .helpers import CFOP_VENDA, CFOP_DEVOLUCAO
+    from .helpers import CFOP_DEVOLUCAO, CFOP_VENDA
     if cfop in CFOP_VENDA | CFOP_DEVOLUCAO:
         if suggested in ("00", "10", "20", "70"):
             hyp.score += 20
@@ -555,8 +556,7 @@ def _score_cfop(hyp: CorrectionHypothesis, ctx: dict) -> None:
             )
 
     # CFOP de exportacao + CST isento/NT = coerente
-    if cfop in CFOP_EXPORTACAO:
-        if suggested in ("40", "41"):
+    if cfop in CFOP_EXPORTACAO and suggested in ("40", "41"):
             hyp.score += 20
             hyp.reasons.append(
                 f"CFOP {cfop} (exportacao) compativel com CST {suggested} (nao incidencia)"
@@ -686,7 +686,7 @@ def _hypothesis_to_error(
         "CST_ICMS",
         "CST_HIPOTESE",
         " ".join(parts[:4]) + "\n" + "\n".join(parts[4:]),
-        field_no=F_C170_CST_ICMS + 1,  # 1-based para o usuario
+        field_no=10,  # CST_ICMS e campo 10 (1-based) no C170
         value=hyp.current_value,
         expected_value=suggested,
     )

@@ -2,7 +2,23 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from typing import Generic, Literal, TypeVar
+
+from pydantic import BaseModel, ConfigDict, field_validator
+
+T = TypeVar("T")
+
+
+# ──────────────────────────────────────────────
+# Pagination
+# ──────────────────────────────────────────────
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    total: int
+    page: int
+    page_size: int
+    has_next: bool
+    data: list[T]  # type: ignore[valid-type]
 
 # ──────────────────────────────────────────────
 # Files
@@ -22,6 +38,9 @@ class FileInfo(BaseModel):
     total_errors: int = 0
     status: str = "uploaded"
     auto_corrections_applied: int = 0
+    cod_ver: int = 0
+    is_retificador: bool = False
+    original_file_id: int | None = None
 
 
 class FileUploadResponse(BaseModel):
@@ -55,6 +74,23 @@ class RecordUpdate(BaseModel):
     error_id: int | None = None
 
 
+class CorrectionRequest(BaseModel):
+    field_no: int
+    field_name: str
+    new_value: str
+    error_id: int | None = None
+    justificativa: str
+    correction_type: Literal["deterministic", "assisted", "manual"]
+    rule_id: str
+
+    @field_validator("justificativa")
+    @classmethod
+    def justificativa_min_length(cls, v: str) -> str:
+        if len(v.strip()) < 20:
+            raise ValueError("Justificativa deve ter no mínimo 20 caracteres")
+        return v.strip()
+
+
 # ──────────────────────────────────────────────
 # Validation
 # ──────────────────────────────────────────────
@@ -77,6 +113,9 @@ class ValidationErrorInfo(BaseModel):
     expected_value: str | None = None
     auto_correctable: bool = False
     status: str = "open"
+    categoria: str = "fiscal"
+    certeza: str = "objetivo"
+    impacto: str = "relevante"
 
 
 class ErrorSummary(BaseModel):
@@ -89,6 +128,26 @@ class ValidationResponse(BaseModel):
     file_id: int
     total_errors: int
     status: str
+
+
+# ──────────────────────────────────────────────
+# Audit Scope (MOD-11)
+# ──────────────────────────────────────────────
+
+class AuditCheckInfo(BaseModel):
+    id: str
+    status: str  # ok | parcial | nao_executado | nao_aplicavel
+    regras: int = 0
+    motivo_parcial: str | None = None
+
+
+class AuditScope(BaseModel):
+    regime_identificado: str
+    periodo: str
+    checks_executados: list[AuditCheckInfo]
+    tabelas_externas: dict[str, str]
+    cobertura_estimada_pct: int
+    aviso: str | None = None
 
 
 # ──────────────────────────────────────────────

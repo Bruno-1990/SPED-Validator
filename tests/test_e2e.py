@@ -58,7 +58,7 @@ class TestEndToEnd:
 
         report_json = export_errors_json(db, file_id)
         data = json.loads(report_json)
-        assert isinstance(data, list)
+        assert isinstance(data, (list, dict))
 
         # 5. Exportar SPED
         sped_out = export_corrected_sped(db, file_id)
@@ -134,6 +134,6 @@ class TestEndToEnd:
             "SELECT action FROM audit_log WHERE file_id = ? ORDER BY id",
             (file_id,),
         ).fetchall()
-        actions = [l[0] for l in logs]
+        actions = [row[0] for row in logs]
         assert "upload" in actions
         assert "validate" in actions

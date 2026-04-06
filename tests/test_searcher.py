@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
-import pytest
 
 from src.embeddings import embedding_to_blob
-from src.indexer import init_db
 from src.searcher import (
     _build_fts_query,
     _fetch_chunk,
@@ -22,7 +20,6 @@ from src.searcher import (
     search,
     search_for_error,
 )
-
 
 # ──────────────────────────────────────────────
 # Helper

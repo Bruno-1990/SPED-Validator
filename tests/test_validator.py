@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 from pathlib import Path
-
-import pytest
 
 from src.indexer import init_db
 from src.models import RegisterField, SpedRecord, ValidationError
@@ -17,7 +14,7 @@ from src.validator import (
     load_field_definitions,
     validate_records,
 )
-
+from src.validators.helpers import fields_to_dict
 
 # ──────────────────────────────────────────────
 # Helpers
@@ -25,7 +22,7 @@ from src.validator import (
 
 def make_record(register: str, fields: list[str], line: int = 1) -> SpedRecord:
     raw = "|" + "|".join(fields) + "|"
-    return SpedRecord(line_number=line, register=register, fields=fields, raw_line=raw)
+    return SpedRecord(line_number=line, register=register, fields=fields_to_dict(register, fields), raw_line=raw)
 
 
 # ──────────────────────────────────────────────
@@ -61,14 +58,14 @@ class TestIsNumeric:
 
 class TestFieldType:
     def test_numeric_field_with_text_raises_error(self) -> None:
-        defs = [RegisterField(register="C100", field_no=2, field_name="VL_DOC",
+        defs = [RegisterField(register="C100", field_no=2, field_name="IND_OPER",
                               field_type="N", required="O")]
         record = make_record("C100", ["C100", "ABC"])
         errors = _validate_record(record, defs)
         assert any(e.error_type == "WRONG_TYPE" for e in errors)
 
     def test_numeric_field_with_number_ok(self) -> None:
-        defs = [RegisterField(register="C100", field_no=2, field_name="VL_DOC",
+        defs = [RegisterField(register="C100", field_no=2, field_name="IND_OPER",
                               field_type="N", required="O")]
         record = make_record("C100", ["C100", "1000"])
         errors = _validate_record(record, defs)
@@ -76,14 +73,14 @@ class TestFieldType:
 
     def test_numeric_field_with_comma_decimal(self) -> None:
         """Valores com vírgula devem ser aceitos (padrão brasileiro)."""
-        defs = [RegisterField(register="C100", field_no=2, field_name="VL_DOC",
+        defs = [RegisterField(register="C100", field_no=2, field_name="IND_OPER",
                               field_type="N", required="O")]
         record = make_record("C100", ["C100", "1000,50"])
         errors = _validate_record(record, defs)
         assert not any(e.error_type == "WRONG_TYPE" for e in errors)
 
     def test_char_field_accepts_anything(self) -> None:
-        defs = [RegisterField(register="C100", field_no=2, field_name="DESCR",
+        defs = [RegisterField(register="C100", field_no=2, field_name="IND_OPER",
                               field_type="C", required="O")]
         record = make_record("C100", ["C100", "Qualquer texto 123!@#"])
         errors = _validate_record(record, defs)
@@ -96,28 +93,28 @@ class TestFieldType:
 
 class TestFieldSize:
     def test_value_exceeds_max_size(self) -> None:
-        defs = [RegisterField(register="C100", field_no=2, field_name="SER",
+        defs = [RegisterField(register="C100", field_no=2, field_name="IND_OPER",
                               field_type="C", field_size=3, required="O")]
         record = make_record("C100", ["C100", "ABCDE"])
         errors = _validate_record(record, defs)
         assert any(e.error_type == "WRONG_SIZE" for e in errors)
 
     def test_value_within_size(self) -> None:
-        defs = [RegisterField(register="C100", field_no=2, field_name="SER",
+        defs = [RegisterField(register="C100", field_no=2, field_name="IND_OPER",
                               field_type="C", field_size=3, required="O")]
         record = make_record("C100", ["C100", "AB"])
         errors = _validate_record(record, defs)
         assert not any(e.error_type == "WRONG_SIZE" for e in errors)
 
     def test_value_exact_size(self) -> None:
-        defs = [RegisterField(register="C100", field_no=2, field_name="SER",
+        defs = [RegisterField(register="C100", field_no=2, field_name="IND_OPER",
                               field_type="C", field_size=3, required="O")]
         record = make_record("C100", ["C100", "ABC"])
         errors = _validate_record(record, defs)
         assert not any(e.error_type == "WRONG_SIZE" for e in errors)
 
     def test_no_size_defined_skips_check(self) -> None:
-        defs = [RegisterField(register="C100", field_no=2, field_name="DESCR",
+        defs = [RegisterField(register="C100", field_no=2, field_name="IND_OPER",
                               field_type="C", field_size=None, required="O")]
         record = make_record("C100", ["C100", "X" * 1000])
         errors = _validate_record(record, defs)
@@ -155,14 +152,14 @@ class TestRequired:
         assert any(e.error_type == "MISSING_REQUIRED" and e.field_name == "COD_PART" for e in errors)
 
     def test_optional_field_empty_ok(self) -> None:
-        defs = [RegisterField(register="C100", field_no=2, field_name="SER",
+        defs = [RegisterField(register="C100", field_no=2, field_name="IND_OPER",
                               field_type="C", required="N")]
         record = make_record("C100", ["C100", ""])
         errors = _validate_record(record, defs)
         assert len(errors) == 0
 
     def test_conditional_field_empty_ok(self) -> None:
-        defs = [RegisterField(register="C100", field_no=2, field_name="DT_E_S",
+        defs = [RegisterField(register="C100", field_no=2, field_name="IND_OPER",
                               field_type="N", required="OC")]
         record = make_record("C100", ["C100", ""])
         errors = _validate_record(record, defs)
@@ -189,23 +186,23 @@ class TestValidValues:
         assert not any(e.error_type == "INVALID_VALUE" for e in errors)
 
     def test_cod_sit_valid(self) -> None:
-        defs = [RegisterField(register="C100", field_no=2, field_name="COD_SIT",
+        defs = [RegisterField(register="C100", field_no=6, field_name="COD_SIT",
                               field_type="N", required="O",
                               valid_values=["00", "01", "02", "03", "04", "05", "06", "07", "08"])]
-        record = make_record("C100", ["C100", "00"])
+        record = make_record("C100", ["C100", "0", "0", "FORN", "55", "00"])
         errors = _validate_record(record, defs)
         assert not any(e.error_type == "INVALID_VALUE" for e in errors)
 
     def test_cod_sit_invalid(self) -> None:
-        defs = [RegisterField(register="C100", field_no=2, field_name="COD_SIT",
+        defs = [RegisterField(register="C100", field_no=6, field_name="COD_SIT",
                               field_type="N", required="O",
                               valid_values=["00", "01", "02", "03", "04", "05", "06", "07", "08"])]
-        record = make_record("C100", ["C100", "09"])
+        record = make_record("C100", ["C100", "0", "0", "FORN", "55", "09"])
         errors = _validate_record(record, defs)
         assert any(e.error_type == "INVALID_VALUE" for e in errors)
 
     def test_no_valid_values_skips_check(self) -> None:
-        defs = [RegisterField(register="C100", field_no=2, field_name="NOME",
+        defs = [RegisterField(register="C100", field_no=2, field_name="IND_OPER",
                               field_type="C", required="O", valid_values=None)]
         record = make_record("C100", ["C100", "qualquer coisa"])
         errors = _validate_record(record, defs)

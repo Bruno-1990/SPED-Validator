@@ -11,12 +11,17 @@ from collections import defaultdict
 
 from ..models import SpedRecord, ValidationError
 from ..parser import group_by_register
+from ..services.context_builder import ValidationContext
 from .helpers import (
     ALIQ_INTERESTADUAIS,
     CFOP_REMESSA_SAIDA,
     CST_ISENTO_NT,
     CST_TRIBUTADO,
+    F_C100_VL_DOC,
     F_C100_VL_FRT,
+    F_C100_VL_ICMS_ST,
+    F_C100_VL_IPI,
+    F_C100_VL_MERC,
     F_C100_VL_OUT_DA,
     F_C100_VL_SEG,
     F_C170_ALIQ_ICMS,
@@ -32,19 +37,21 @@ from .helpers import (
     F_C190_VL_BC,
     F_C190_VL_ICMS,
     F_C190_VL_OPR,
-    TOLERANCE,
     get_field,
     make_error,
     to_float,
     trib,
 )
-
+from .tolerance import get_tolerance
 
 # ──────────────────────────────────────────────
 # API publica
 # ──────────────────────────────────────────────
 
-def validate_c190(records: list[SpedRecord]) -> list[ValidationError]:
+def validate_c190(
+    records: list[SpedRecord],
+    context: ValidationContext | None = None,
+) -> list[ValidationError]:
     """Executa validacoes de consolidacao C190."""
     groups = group_by_register(records)
     errors: list[ValidationError] = []
@@ -103,11 +110,22 @@ def _check_c190_001(
         if not c100 or not items:
             continue
 
-        # Despesas comuns do C100
+        # Despesas e parcelas adicionais do C100 que integram VL_OPR
+        # Pelo Guia Pratico, VL_OPR pode incluir frete, seguro, outras despesas,
+        # IPI (quando nao recuperavel) e ICMS-ST (retido anteriormente).
         vl_frt = to_float(get_field(c100, F_C100_VL_FRT))
         vl_seg = to_float(get_field(c100, F_C100_VL_SEG))
         vl_out_da = to_float(get_field(c100, F_C100_VL_OUT_DA))
-        despesas_comuns = vl_frt + vl_seg + vl_out_da
+        vl_ipi = to_float(get_field(c100, F_C100_VL_IPI))
+        vl_icms_st = to_float(get_field(c100, F_C100_VL_ICMS_ST))
+        despesas_explicitas = vl_frt + vl_seg + vl_out_da + vl_ipi + vl_icms_st
+
+        # Residual: parcelas que compõem VL_DOC mas nao estao discriminadas
+        # (ex: ICMS-ST embutido no preco em CST 060, diferenças de arredondamento)
+        vl_doc = to_float(get_field(c100, F_C100_VL_DOC))
+        vl_merc = to_float(get_field(c100, F_C100_VL_MERC))
+        residual_doc = max(0.0, vl_doc - vl_merc - despesas_explicitas) if vl_doc > 0 else 0.0
+        despesas_comuns = despesas_explicitas + residual_doc
 
         # Base total liquida do documento para rateio
         base_rateio_doc = 0.0
@@ -141,7 +159,7 @@ def _check_c190_001(
             cfop_c190 = get_field(c190, F_C190_CFOP)
             aliq_c190 = round(to_float(get_field(c190, F_C190_ALIQ)), 2)
             vl_opr_c190 = to_float(get_field(c190, F_C190_VL_OPR))
-            vl_bc_c190 = to_float(get_field(c190, F_C190_VL_BC))
+            _vl_bc_c190 = to_float(get_field(c190, F_C190_VL_BC))
             vl_icms_c190 = to_float(get_field(c190, F_C190_VL_ICMS))
 
             # -- Validacao 1: VL_OPR por reconstrucao com rateio --
@@ -156,33 +174,26 @@ def _check_c190_001(
             if despesas_comuns > 0 and base_rateio_doc > 0:
                 if qtd_combinacoes == 1:
                     # Unica combinacao: 100% das despesas
-                    frete_rateado = vl_frt
-                    seguro_rateado = vl_seg
-                    outras_rateado = vl_out_da
+                    despesa_rateada = despesas_comuns
                 else:
                     # Multiplas combinacoes: rateio proporcional
                     peso = soma_itens / base_rateio_doc
-                    frete_rateado = round(vl_frt * peso, 2)
-                    seguro_rateado = round(vl_seg * peso, 2)
-                    outras_rateado = round(vl_out_da * peso, 2)
+                    despesa_rateada = round(despesas_comuns * peso, 2)
             else:
-                frete_rateado = 0.0
-                seguro_rateado = 0.0
-                outras_rateado = 0.0
+                despesa_rateada = 0.0
 
-            vl_opr_esperado = round(
-                soma_itens + frete_rateado + seguro_rateado + outras_rateado, 2,
-            )
+            vl_opr_esperado = round(soma_itens + despesa_rateada, 2)
 
+            n_itens_combo = sum(1 for it in items
+                                if (get_field(it, F_C170_CST_ICMS),
+                                    get_field(it, F_C170_CFOP),
+                                    round(to_float(get_field(it, F_C170_ALIQ_ICMS)), 2)) == key)
+            tol_consol = get_tolerance("consolidacao", n_items=n_itens_combo)
             diff_opr = abs(vl_opr_c190 - vl_opr_esperado)
-            if diff_opr > TOLERANCE:
+            if diff_opr > tol_consol:
                 composicao = f"Sum(VL_ITEM-VL_DESC)={soma_itens:.2f}"
-                if frete_rateado > 0:
-                    composicao += f" + frete={frete_rateado:.2f}"
-                if seguro_rateado > 0:
-                    composicao += f" + seguro={seguro_rateado:.2f}"
-                if outras_rateado > 0:
-                    composicao += f" + outras={outras_rateado:.2f}"
+                if despesa_rateada > 0:
+                    composicao += f" + despesas_rateadas={despesa_rateada:.2f}"
 
                 errors.append(make_error(
                     c190, "VL_OPR", "C190_DIVERGE_C170",
@@ -205,7 +216,7 @@ def _check_c190_001(
             soma_icms_c170 = c170_vl_icms.get(key, 0.0)
             if soma_icms_c170 > 0 or vl_icms_c190 > 0:
                 diff_icms = abs(soma_icms_c170 - vl_icms_c190)
-                if diff_icms > TOLERANCE:
+                if diff_icms > tol_consol:
                     errors.append(make_error(
                         c190, "VL_ICMS", "C190_DIVERGE_C170",
                         (
@@ -234,10 +245,10 @@ def _check_c190_002(
     errors: list[ValidationError] = []
 
     for rec in groups.get("C190", []):
-        cst = trib(get_field(rec, 1))
-        cfop = get_field(rec, 2)
-        aliq = to_float(get_field(rec, 3))
-        vl_opr = to_float(get_field(rec, 4))
+        cst = trib(get_field(rec, "CST_ICMS"))
+        cfop = get_field(rec, "CFOP")
+        aliq = to_float(get_field(rec, "ALIQ_ICMS"))
+        vl_opr = to_float(get_field(rec, "VL_OPR"))
 
         if not cst or not cfop or vl_opr == 0:
             continue
@@ -247,7 +258,7 @@ def _check_c190_002(
             errors.append(make_error(
                 rec, "CST_ICMS", "C190_COMBINACAO_INCOMPATIVEL",
                 (
-                    f"C190 com CST {get_field(rec, 1)} (isento/NT) e ALIQ={aliq:.2f}%. "
+                    f"C190 com CST {cst} (isento/NT) e ALIQ={aliq:.2f}%. "
                     f"CST de isencao ou nao-tributacao nao deveria ter aliquota "
                     f"positiva. Revise a classificacao fiscal dos itens."
                 ),
@@ -263,7 +274,7 @@ def _check_c190_002(
             errors.append(make_error(
                 rec, "ALIQ_ICMS", "C190_COMBINACAO_INCOMPATIVEL",
                 (
-                    f"C190 com CST {get_field(rec, 1)} (tributado) e ALIQ=0% em "
+                    f"C190 com CST {cst} (tributado) e ALIQ=0% em "
                     f"CFOP {cfop}. CST tributado deveria ter aliquota positiva. "
                     f"Revise se o CST deveria ser 40/41/50 ou se a aliquota "
                     f"esta faltando."

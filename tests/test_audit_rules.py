@@ -17,11 +17,12 @@ from src.validators.audit_rules import (
     _check_volume_isento,
     validate_audit_rules,
 )
+from src.validators.helpers import fields_to_dict
 
 
 def rec(register: str, fields: list[str], line: int = 1) -> SpedRecord:
     raw = "|" + "|".join(fields) + "|"
-    return SpedRecord(line_number=line, register=register, fields=fields, raw_line=raw)
+    return SpedRecord(line_number=line, register=register, fields=fields_to_dict(register, fields), raw_line=raw)
 
 
 def make_0000(uf: str = "ES") -> SpedRecord:

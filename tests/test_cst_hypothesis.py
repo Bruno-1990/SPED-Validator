@@ -4,24 +4,23 @@ Cobre os 4 tipos de incompatibilidade detectaveis, casos negativos,
 scoring helpers e formato de saida.
 """
 
-import pytest
 
 from src.models import SpedRecord
+from src.validators.correction_hypothesis import CorrectionHypothesis
 from src.validators.cst_hypothesis import (
-    _detect_inconsistency,
-    _build_hypothesis,
-    _hypothesis_to_error,
-    _score_cfop,
-    _score_c190,
-    _score_siblings,
-    _ISENTO_COM_TRIBUTO,
-    _TRIBUTADO_SEM_TRIBUTO,
-    _SEM_ST_COM_CAMPOS_ST,
     _INTEGRAL_COM_REDUCAO,
+    _ISENTO_COM_TRIBUTO,
+    _SEM_ST_COM_CAMPOS_ST,
+    _TRIBUTADO_SEM_TRIBUTO,
+    _build_hypothesis,
+    _detect_inconsistency,
+    _hypothesis_to_error,
+    _score_c190,
+    _score_cfop,
+    _score_siblings,
     validate_cst_hypotheses,
 )
-from src.validators.correction_hypothesis import CorrectionHypothesis
-
+from src.validators.helpers import fields_to_dict
 
 # ──────────────────────────────────────────────
 # Helpers para construir registros de teste
@@ -70,12 +69,12 @@ def _make_c170(
         vl_icms_st,     # 17 VL_ICMS_ST
     ]
     raw = "|" + "|".join(fields) + "|"
-    return SpedRecord(line_number=line, register="C170", fields=fields, raw_line=raw)
+    return SpedRecord(line_number=line, register="C170", fields=fields_to_dict("C170", fields), raw_line=raw)
 
 
 def _make_c100(line: int = 10) -> SpedRecord:
     fields = ["C100"] + [""] * 25
-    return SpedRecord(line_number=line, register="C100", fields=fields, raw_line="|C100|")
+    return SpedRecord(line_number=line, register="C100", fields=fields_to_dict("C100", fields), raw_line="|C100|")
 
 
 def _make_c190(
@@ -86,7 +85,7 @@ def _make_c190(
 ) -> SpedRecord:
     # Layout: 0:REG, 1:CST, 2:CFOP, 3:ALIQ, 4:VL_OPR, 5:VL_BC, 6:VL_ICMS
     fields = ["C190", cst, cfop, aliq, "1000.00", "1000.00", "180.00"]
-    return SpedRecord(line_number=line, register="C190", fields=fields, raw_line="|C190|")
+    return SpedRecord(line_number=line, register="C190", fields=fields_to_dict("C190", fields), raw_line="|C190|")
 
 
 # ──────────────────────────────────────────────

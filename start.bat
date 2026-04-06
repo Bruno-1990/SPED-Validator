@@ -1,10 +1,11 @@
 @echo off
 chcp 65001 >nul 2>&1
-title SPED EFD Audit
+title SPED EFD Audit v3.0
 cd /d "%~dp0"
 
 echo ============================================
-echo   SPED EFD Audit System
+echo   SPED EFD Audit System v3.0
+echo   175 regras | 21 blocos | 1473 testes
 echo ============================================
 echo.
 
@@ -70,14 +71,25 @@ if not exist "frontend\node_modules" (
     echo   [OK] Dependencias Frontend instaladas.
 )
 
-REM --- Criar banco de dados se nao existir ---
+REM --- Criar diretorios necessarios ---
 if not exist "db" mkdir db
-if not exist "db\audit.db" (
-    echo   [SETUP] Criando banco de dados...
-    python -c "from src.services.database import init_audit_db; init_audit_db('db/audit.db')" 2>nul
+if not exist "data\reference" mkdir data\reference
+if not exist "data\tabelas" mkdir data\tabelas
+
+REM --- Criar/migrar banco de dados ---
+echo   [DB] Verificando banco de dados e migracoes...
+python -c "from src.services.database import init_audit_db; init_audit_db('db/audit.db')" 2>nul
+
+REM --- Verificar tabelas de referencia ---
+if not exist "data\reference\aliquotas_internas_uf.yaml" (
+    echo   [AVISO] Tabelas de referencia ausentes em data/reference/
+    echo           DIFAL e FCP podem nao funcionar corretamente.
 )
 
-REM --- Criar scripts temporarios ---
+echo.
+echo   Iniciando API (porta 8000)...
+
+REM --- Criar script temporario API ---
 echo @echo off > "%~dp0_run_api.bat"
 echo title SPED-API (porta 8000) >> "%~dp0_run_api.bat"
 echo cd /d "%~dp0" >> "%~dp0_run_api.bat"
@@ -86,14 +98,13 @@ echo set PYTHONPATH=%~dp0 >> "%~dp0_run_api.bat"
 echo python -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8000 >> "%~dp0_run_api.bat"
 echo pause >> "%~dp0_run_api.bat"
 
+REM --- Criar script temporario Frontend ---
 echo @echo off > "%~dp0_run_frontend.bat"
 echo title SPED-Frontend (porta 3000) >> "%~dp0_run_frontend.bat"
 echo cd /d "%~dp0frontend" >> "%~dp0_run_frontend.bat"
 echo call npm run dev >> "%~dp0_run_frontend.bat"
 echo pause >> "%~dp0_run_frontend.bat"
 
-echo.
-echo   Iniciando API (porta 8000)...
 start "" /min "%~dp0_run_api.bat"
 
 echo   Aguardando API (8s)...

@@ -77,12 +77,8 @@ def _validate_record(
     errors: list[ValidationError] = []
 
     for fdef in field_defs:
-        idx = fdef.field_no - 1  # campos são 1-based, lista é 0-based
-        if idx < 0:
-            continue
-
         # Campo ausente
-        if idx >= len(record.fields):
+        if fdef.field_name not in record.fields:
             if fdef.required == "O":
                 errors.append(ValidationError(
                     line_number=record.line_number,
@@ -95,7 +91,7 @@ def _validate_record(
                 ))
             continue
 
-        value = record.fields[idx].strip()
+        value = record.fields[fdef.field_name].strip()
 
         # Campo obrigatório vazio
         if fdef.required == "O" and not value:

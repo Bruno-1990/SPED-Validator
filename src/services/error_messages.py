@@ -516,11 +516,13 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
     # ── Auditoria de beneficios e ajustes ──
     "AJUSTE_SEM_LASTRO_DOCUMENTAL": {
         "friendly": (
-            "Ajuste de apuracao (E111) sem lastro documental "
+            "Ajuste de apuracao (E111) sem detalhamento E112/E113 "
             "no registro {register} (linha {line}). {value}"
         ),
         "guidance": (
-            "Ajuste sem E112/E113 vinculados. Comprove com documentos. "
+            "Verifique se o codigo de ajuste exige detalhamento via "
+            "E112/E113. Nem todo ajuste requer esses registros — depende "
+            "da legislacao e da tabela 5.1.1 aplicavel. "
             f"{_DETALHE}"
         ),
         "icon": "shield-alert",

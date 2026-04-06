@@ -12,11 +12,12 @@ from src.validators.fiscal_semantics import (
     _validate_monofasico,
     validate_fiscal_semantics,
 )
+from src.validators.helpers import fields_to_dict
 
 
 def rec(register: str, fields: list[str], line: int = 1) -> SpedRecord:
     raw = "|" + "|".join(fields) + "|"
-    return SpedRecord(line_number=line, register=register, fields=fields, raw_line=raw)
+    return SpedRecord(line_number=line, register=register, fields=fields_to_dict(register, fields), raw_line=raw)
 
 
 def c170(
@@ -172,12 +173,15 @@ class TestClassifyZeroRateIpi:
         r = c170(cst_ipi="", vl_bc_ipi="0", aliq_ipi="0", vl_ipi="0")
         assert _classify_zero_rate_ipi(r) == []
 
-    def test_ipi_cst_49_tributado_zero_alerta(self) -> None:
-        """CST_IPI 49 (outras saídas tributadas) com tudo zero → alerta."""
+    def test_ipi_cst_49_residual_zero_ok(self) -> None:
+        """CST_IPI 49 (outras entradas, residual) com tudo zero → sem alerta."""
         r = c170(cst_ipi="49", vl_bc_ipi="0", aliq_ipi="0", vl_ipi="0")
-        errors = _classify_zero_rate_ipi(r)
-        assert len(errors) == 1
-        assert errors[0].error_type == "IPI_CST_ALIQ_ZERO"
+        assert _classify_zero_rate_ipi(r) == []
+
+    def test_ipi_tributado_aliq_zero_com_bc_ok(self) -> None:
+        """CST_IPI 00 com BC preenchida e aliquota 0% (TIPI) → sem alerta."""
+        r = c170(cst_ipi="00", vl_bc_ipi="360", aliq_ipi="0", vl_ipi="0")
+        assert _classify_zero_rate_ipi(r) == []
 
 
 # ──────────────────────────────────────────────

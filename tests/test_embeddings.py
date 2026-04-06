@@ -5,7 +5,6 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import numpy as np
-import pytest
 
 from src.embeddings import (
     blob_to_embedding,
@@ -95,8 +94,10 @@ class TestGetModel:
             mock_cls = MagicMock()
             mock_instance = MagicMock()
             mock_cls.return_value = mock_instance
-            with patch("src.embeddings.SentenceTransformer", mock_cls, create=True):
-                with patch.dict("sys.modules", {"sentence_transformers": MagicMock(SentenceTransformer=mock_cls)}):
+            with (
+                patch("src.embeddings.SentenceTransformer", mock_cls, create=True),
+                patch.dict("sys.modules", {"sentence_transformers": MagicMock(SentenceTransformer=mock_cls)}),
+            ):
                     # Force reimport
                     model = get_model()
                     assert model is not None

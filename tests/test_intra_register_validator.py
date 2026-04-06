@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
-
 from src.models import SpedRecord
+from src.validators.helpers import fields_to_dict
 from src.validators.helpers import get_field as _get_field
 from src.validators.intra_register_validator import (
     SpedContext,
     _build_context,
     _build_parent_map,
-    _get_c170_siblings,
     _to_float,
     _validate_c100,
     _validate_c170,
@@ -22,7 +20,7 @@ from src.validators.intra_register_validator import (
 
 def rec(register: str, fields: list[str], line: int = 1) -> SpedRecord:
     raw = "|" + "|".join(fields) + "|"
-    return SpedRecord(line_number=line, register=register, fields=fields, raw_line=raw)
+    return SpedRecord(line_number=line, register=register, fields=fields_to_dict(register, fields), raw_line=raw)
 
 
 CTX = SpedContext(dt_ini="01012024", dt_fin="31012024")
@@ -35,11 +33,11 @@ CTX = SpedContext(dt_ini="01012024", dt_fin="31012024")
 class TestHelpers:
     def test_get_field_valid(self) -> None:
         r = rec("C100", ["C100", "0", "1"])
-        assert _get_field(r, 1) == "0"
+        assert _get_field(r, "IND_OPER") == "0"
 
     def test_get_field_out_of_range(self) -> None:
         r = rec("C100", ["C100"])
-        assert _get_field(r, 5) == ""
+        assert _get_field(r, "VL_DOC") == ""
 
     def test_to_float_dot(self) -> None:
         assert _to_float("1000.50") == 1000.50
@@ -292,6 +290,49 @@ class TestValidateC190:
         errors = _validate_c190(c190, c170s)
         # CFOP 5102 != 1019, não deve comparar
         assert len(errors) == 0
+
+    def test_two_csts_same_cfop_validated_separately(self) -> None:
+        """Documento com CST 00 + CST 40 no mesmo CFOP → dois C190 validados separadamente."""
+        # C170: 2 itens mesmo CFOP 5102, mas CST 00 (aliq 18%) e CST 40 (isento, aliq 0%)
+        c170s = [
+            rec("C170", ["C170", "1", "P1", "D", "10", "UN", "1000,00",
+                         "0", "0", "00", "5102", "001", "1000,00", "18", "180,00"], line=2),
+            rec("C170", ["C170", "2", "P2", "D", "5", "UN", "500,00",
+                         "0", "0", "40", "5102", "001", "0", "0", "0"], line=3),
+        ]
+        # C190 para CST 00, CFOP 5102, ALIQ 18%
+        c190_cst00 = rec("C190", ["C190", "00", "5102", "18,00", "1000,00", "1000,00", "180,00"], line=4)
+        errors_cst00 = _validate_c190(c190_cst00, c170s)
+        assert len(errors_cst00) == 0, f"CST 00 deveria passar sem erro: {errors_cst00}"
+
+        # C190 para CST 40, CFOP 5102, ALIQ 0%
+        c190_cst40 = rec("C190", ["C190", "40", "5102", "0", "500,00", "0", "0"], line=5)
+        errors_cst40 = _validate_c190(c190_cst40, c170s)
+        assert len(errors_cst40) == 0, f"CST 40 deveria passar sem erro: {errors_cst40}"
+
+    def test_cst40_aliq0_accepted(self) -> None:
+        """C190 com CST 40 (isento) e ALIQ 0 → aceito sem erro."""
+        c170s = [
+            rec("C170", ["C170", "1", "P1", "D", "10", "UN", "800,00",
+                         "0", "0", "40", "5102", "001", "0", "0", "0"], line=2),
+        ]
+        c190 = rec("C190", ["C190", "40", "5102", "0", "800,00", "0", "0"], line=3)
+        errors = _validate_c190(c190, c170s)
+        assert len(errors) == 0, f"CST 40 com ALIQ 0 deveria ser aceito: {errors}"
+
+    def test_wrong_sum_by_cst_cfop_aliq_detected(self) -> None:
+        """C190 com soma errada por CFOP+CST+ALIQ → erro detectado."""
+        c170s = [
+            rec("C170", ["C170", "1", "P1", "D", "10", "UN", "1000,00",
+                         "0", "0", "00", "5102", "001", "1000,00", "18", "180,00"], line=2),
+            rec("C170", ["C170", "2", "P2", "D", "5", "UN", "500,00",
+                         "0", "0", "00", "5102", "001", "500,00", "18", "90,00"], line=3),
+        ]
+        # C190 declara VL_BC_ICMS=1000 mas soma dos C170 CST=00 CFOP=5102 ALIQ=18 é 1500
+        c190 = rec("C190", ["C190", "00", "5102", "18,00", "1500,00", "1000,00", "180,00"], line=4)
+        errors = _validate_c190(c190, c170s)
+        assert any(e.field_name == "VL_BC_ICMS" for e in errors), \
+            f"Deveria detectar divergência em VL_BC_ICMS: {errors}"
 
 
 # ──────────────────────────────────────────────

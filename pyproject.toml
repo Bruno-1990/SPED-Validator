@@ -1,16 +1,19 @@
 [project]
 name = "sped-validator"
-version = "0.1.0"
-description = "Sistema SPED EFD - Conversor de PDFs, Validador e Busca na Documentação"
+version = "3.0.0"
+description = "Sistema SPED EFD - Auditoria, Validacao e Correcao de Escrituracao Fiscal Digital"
 requires-python = ">=3.10"
 dependencies = [
-    "pdfplumber>=0.10.0",
-    "sentence-transformers>=2.2.0",
-    "numpy>=1.24.0",
-    "tqdm>=4.65.0",
     "fastapi>=0.100.0",
     "uvicorn>=0.23.0",
     "python-multipart>=0.0.6",
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+    "pdfplumber>=0.10.0",
+    "sentence-transformers>=2.2.0",
+    "numpy>=1.24.0",
+    "torch>=2.0.0",
+    "tqdm>=4.65.0",
 ]
 
 [project.optional-dependencies]

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from src.models import SpedRecord
 from src.parser import group_by_register
 from src.validators.cross_block_validator import (
@@ -12,11 +10,12 @@ from src.validators.cross_block_validator import (
     validate_cadastro_refs,
     validate_cross_blocks,
 )
+from src.validators.helpers import fields_to_dict
 
 
 def rec(register: str, fields: list[str], line: int = 1) -> SpedRecord:
     raw = "|" + "|".join(fields) + "|"
-    return SpedRecord(line_number=line, register=register, fields=fields, raw_line=raw)
+    return SpedRecord(line_number=line, register=register, fields=fields_to_dict(register, fields), raw_line=raw)
 
 
 # ──────────────────────────────────────────────

@@ -77,6 +77,11 @@ _KNOWN_ERROR_TYPES: set[str] = {
     "IPI_ALIQ_NCM_DIVERGENTE",
     # correction_hypothesis.py
     "ALIQ_ICMS_AUSENTE",
+    # difal_validator.py
+    "DIFAL_FALTANTE_CONSUMO_FINAL", "DIFAL_INDEVIDO_REVENDA",
+    "DIFAL_UF_DESTINO_INCONSISTENTE", "DIFAL_ALIQ_INTERNA_INCORRETA",
+    "DIFAL_BASE_INCONSISTENTE", "DIFAL_FCP_AUSENTE",
+    "DIFAL_PERFIL_INCOMPATIVEL", "DIFAL_CONSUMO_FINAL_SEM_MARCADOR",
 }
 
 
@@ -94,6 +99,10 @@ class Rule:
     implemented: bool
     module: str
     legislation: str | None = None
+    vigencia_de: str | None = None
+    vigencia_ate: str | None = None
+    version: str | None = None
+    last_updated: str | None = None
 
 
 def load_rules(path: Path | None = None) -> list[Rule]:
@@ -123,6 +132,10 @@ def load_rules(path: Path | None = None) -> list[Rule]:
                 implemented=entry.get("implemented", False),
                 module=entry.get("module", ""),
                 legislation=entry.get("legislation"),
+                vigencia_de=entry.get("vigencia_de"),
+                vigencia_ate=entry.get("vigencia_ate"),
+                version=entry.get("version"),
+                last_updated=entry.get("last_updated"),
             ))
 
     return rules
@@ -247,18 +260,62 @@ def print_block(rules: list[Rule], block: str) -> None:
     print(f"\n{'='*70}\n")
 
 
+def print_vigentes(rules: list[Rule], periodo: str) -> None:
+    """Imprime regras vigentes para um período YYYY-MM."""
+    from datetime import date as _date
+
+    from .services.rule_loader import RuleLoader
+
+    parts = periodo.split("-")
+    year, month = int(parts[0]), int(parts[1])
+    period_start = _date(year, month, 1)
+    # Último dia do mês
+    if month == 12:
+        period_end = _date(year, 12, 31)
+    else:
+        period_end = _date(year, month + 1, 1).replace(day=1)
+        from datetime import timedelta
+        period_end = period_end - timedelta(days=1)
+
+    loader = RuleLoader()
+    active_raw = loader.load_rules_for_period(period_start, period_end)
+    active_ids = {r["id"] for r in active_raw}
+
+    vigentes = [r for r in rules if r.id in active_ids]
+    excluidas = [r for r in rules if r.id not in active_ids]
+
+    print(f"\n{'='*70}")
+    print(f"  REGRAS VIGENTES PARA {periodo}")
+    print(f"{'='*70}")
+    print(f"  Vigentes: {len(vigentes)} / {len(rules)}")
+    print(f"  Excluidas por vigencia: {len(excluidas)}")
+
+    if excluidas:
+        print(f"\n  Regras NAO vigentes para {periodo}:")
+        for r in excluidas:
+            print(f"    - {r.id}: vigencia_de={r.vigencia_de} vigencia_ate={r.vigencia_ate}")
+
+    print("\n  Regras vigentes:")
+    for r in vigentes:
+        print(f"    [{r.id}] {r.description[:60]}  (desde {r.vigencia_de})")
+    print(f"{'='*70}\n")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Gerenciador de regras SPED")
     parser.add_argument("--check", action="store_true", help="Verifica implementacao")
     parser.add_argument("--pending", action="store_true", help="Lista regras pendentes")
     parser.add_argument("--block", type=str, help="Filtra por bloco")
     parser.add_argument("--rules-file", type=str, help="Caminho do rules.yaml")
+    parser.add_argument("--vigentes-para", type=str, help="Mostra regras vigentes para YYYY-MM")
     args = parser.parse_args()
 
     path = Path(args.rules_file) if args.rules_file else None
     rules = load_rules(path)
 
-    if args.block:
+    if args.vigentes_para:
+        print_vigentes(rules, args.vigentes_para)
+    elif args.block:
         print_block(rules, args.block)
     elif args.pending:
         print_pending(rules)

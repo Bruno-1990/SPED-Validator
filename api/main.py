@@ -12,10 +12,11 @@ warnings.filterwarnings(
     category=UserWarning,
 )
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Depends, FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
-from api.routers import files, records, report, rules, search, validation
+from api.auth import verify_api_key  # noqa: E402
+from api.routers import files, records, report, rules, search, validation  # noqa: E402
 
 app = FastAPI(
     title="SPED EFD Audit API",
@@ -32,13 +33,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routers
-app.include_router(files.router)
-app.include_router(records.router)
-app.include_router(validation.router)
-app.include_router(report.router)
-app.include_router(search.router)
-app.include_router(rules.router)
+# Routers — todos protegidos por API Key
+_auth = [Depends(verify_api_key)]
+app.include_router(files.router, dependencies=_auth)
+app.include_router(records.router, dependencies=_auth)
+app.include_router(validation.router, dependencies=_auth)
+app.include_router(report.router, dependencies=_auth)
+app.include_router(search.router, dependencies=_auth)
+app.include_router(rules.router, dependencies=_auth)
 
 
 @app.on_event("startup")
@@ -46,11 +48,11 @@ def preload_model() -> None:
     """Pre-carrega o modelo de embeddings no startup para evitar delay na primeira validacao."""
     import threading
 
-    def _load():
+    def _load() -> None:
         try:
-            from src.embeddings import get_model
+            from src.embeddings import get_model  # noqa: E402
             get_model()
-        except Exception:
+        except Exception:  # noqa: S110
             pass  # Se falhar, carrega lazy depois
 
     threading.Thread(target=_load, daemon=True).start()

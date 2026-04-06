@@ -14,13 +14,29 @@ from src.services.file_service import clear_all_audit, clear_audit, delete_file,
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
+
 
 @router.post("/upload", response_model=FileUploadResponse)
 def upload(file: UploadFile, db: sqlite3.Connection = Depends(get_db)) -> FileUploadResponse:
-    """Upload de arquivo SPED EFD."""
+    """Upload de arquivo SPED EFD com limite de 100 MB e leitura streaming."""
+    # Leitura streaming em chunks de 1 MB
+    chunk_size = 1024 * 1024
+    total_read = 0
     with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as tmp:
-        content = file.file.read()
-        tmp.write(content)
+        while True:
+            chunk = file.file.read(chunk_size)
+            if not chunk:
+                break
+            total_read += len(chunk)
+            if total_read > MAX_FILE_SIZE:
+                tmp_path = Path(tmp.name)
+                tmp_path.unlink(missing_ok=True)
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Arquivo excede o limite de 100 MB ({total_read / (1024*1024):.0f} MB recebidos)",
+                )
+            tmp.write(chunk)
         tmp_path = Path(tmp.name)
 
     try:

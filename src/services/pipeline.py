@@ -6,23 +6,34 @@ import json
 import sqlite3
 from dataclasses import dataclass, field
 
-from ..models import SpedRecord, ValidationError
+from ..models import ValidationError
 from ..validator import load_field_definitions, validate_records
 from ..validators.aliquota_validator import validate_aliquotas
-from ..validators.correction_hypothesis import validate_with_hypotheses
-from ..validators.cst_hypothesis import validate_cst_hypotheses
 from ..validators.audit_rules import validate_audit_rules
+from ..validators.base_calculo_validator import validate_base_calculo
 from ..validators.beneficio_audit_validator import validate_beneficio_audit
+from ..validators.beneficio_validator import validate_beneficio
+from ..validators.bloco_d_validator import validate_bloco_d
 from ..validators.c190_validator import validate_c190
+from ..validators.cfop_validator import validate_cfop
+from ..validators.correction_hypothesis import validate_with_hypotheses
 from ..validators.cross_block_validator import validate_cross_blocks
+from ..validators.cst_hypothesis import validate_cst_hypotheses
 from ..validators.cst_validator import validate_cst_and_exemptions
+from ..validators.destinatario_validator import validate_destinatario
+from ..validators.devolucao_validator import validate_devolucao
+from ..validators.difal_validator import validate_difal
 from ..validators.fiscal_semantics import validate_fiscal_semantics
 from ..validators.intra_register_validator import validate_intra_register
+from ..validators.ipi_validator import validate_ipi
+from ..validators.ncm_validator import validate_ncm
+from ..validators.parametrizacao_validator import validate_parametrizacao
 from ..validators.pendentes_validator import validate_pendentes
 from ..validators.tax_recalc import recalculate_taxes
+from .context_builder import build_context
 from .error_messages import format_friendly_message, get_guidance
+from .rule_loader import RuleLoader
 from .validation_service import _load_records, _severity_for
-
 
 # ──────────────────────────────────────────────
 # Progress tracking
@@ -93,6 +104,17 @@ def run_pipeline(
         db.execute("DELETE FROM validation_errors WHERE file_id = ?", (file_id,))
         db.commit()
 
+        # Construir contexto de validação (regime, caches)
+        context = build_context(file_id, db)
+
+        # Carregar apenas regras vigentes para o período do arquivo
+        if context.periodo_ini and context.periodo_fim:
+            loader = RuleLoader()
+            active_rules = loader.load_rules_for_period(
+                context.periodo_ini, context.periodo_fim
+            )
+            context.active_rules = [r["id"] for r in active_rules]
+
         records = _load_records(db, file_id)
 
         # ── Estágio 1: Estrutural ──
@@ -107,7 +129,7 @@ def run_pipeline(
         progress.stage_progress = 50
 
         progress.detail = "Validando formatos: CNPJ, datas, CFOP, C100, C170"
-        structural_errors.extend(validate_intra_register(records))
+        structural_errors.extend(validate_intra_register(records, context=context))
         progress.stage_progress = 100
 
         _persist_stage_errors(db, file_id, structural_errors)
@@ -126,38 +148,71 @@ def run_pipeline(
 
         cross_errors: list[ValidationError] = []
         progress.detail = "Cruzando C100 x C170 x C190, referencias 0150/0200, E110"
-        cross_errors.extend(validate_cross_blocks(records))
+        cross_errors.extend(validate_cross_blocks(records, context=context))
         progress.stage_progress = 20
 
         progress.detail = "Recalculando ICMS, ICMS-ST, IPI, PIS/COFINS nos C170"
-        cross_errors.extend(recalculate_taxes(records))
+        cross_errors.extend(recalculate_taxes(records, context=context))
         progress.stage_progress = 45
 
         progress.detail = "Validando CST ICMS, isencoes e Bloco H"
-        cross_errors.extend(validate_cst_and_exemptions(records))
+        cross_errors.extend(validate_cst_and_exemptions(records, context=context))
         progress.stage_progress = 65
 
         progress.detail = "Analise semantica: CST x CFOP, aliquota zero, monofasicos"
-        cross_errors.extend(validate_fiscal_semantics(records))
+        cross_errors.extend(validate_fiscal_semantics(records, context=context))
         progress.stage_progress = 85
 
         progress.detail = "Auditoria fiscal: CFOP x UF, parametrizacao, remessas, inventario"
-        cross_errors.extend(validate_audit_rules(records))
+        cross_errors.extend(validate_audit_rules(records, context=context))
+        progress.stage_progress = 88
+
+        progress.detail = "Parametrizacao sistematica: erros por item, UF e data"
+        cross_errors.extend(validate_parametrizacao(records, context=context))
+        progress.stage_progress = 89
+
+        progress.detail = "NCM: tratamento tributario e NCM generico"
+        cross_errors.extend(validate_ncm(records, context=context))
         progress.stage_progress = 90
 
         progress.detail = "Validando aliquotas e consolidacao C190"
-        cross_errors.extend(validate_aliquotas(records))
-        cross_errors.extend(validate_c190(records))
+        cross_errors.extend(validate_aliquotas(records, context=context))
+        cross_errors.extend(validate_c190(records, context=context))
+        cross_errors.extend(validate_bloco_d(records, context=context))
         progress.stage_progress = 93
 
         progress.detail = "Auditoria de beneficios fiscais e regras pendentes"
-        cross_errors.extend(validate_beneficio_audit(records))
-        cross_errors.extend(validate_pendentes(records))
+        cross_errors.extend(validate_beneficio_audit(records, context=context))
+        cross_errors.extend(validate_pendentes(records, context=context))
         progress.stage_progress = 97
 
+        progress.detail = "Base de calculo ICMS (BASE_001 a BASE_006)"
+        cross_errors.extend(validate_base_calculo(records, context=context))
+        progress.stage_progress = 97
+
+        progress.detail = "DIFAL (Diferencial de Aliquota Interestadual)"
+        cross_errors.extend(validate_difal(records, context=context))
+        progress.stage_progress = 97
+
+        progress.detail = "Beneficios fiscais (BENE_001 a BENE_003)"
+        cross_errors.extend(validate_beneficio(records, context=context))
+
+        progress.detail = "Devolucoes (DEV_001 a DEV_003)"
+        cross_errors.extend(validate_devolucao(records, context=context))
+
+        progress.detail = "IPI: reflexo BC, CST monetario"
+        cross_errors.extend(validate_ipi(records, context=context))
+
+        progress.detail = "Destinatario: IE, UF, CEP"
+        cross_errors.extend(validate_destinatario(records, context=context))
+
+        progress.detail = "CFOP: interestadual x interno, DIFAL"
+        cross_errors.extend(validate_cfop(records, context=context))
+        progress.stage_progress = 98
+
         progress.detail = "Hipoteses de correcao inteligente (aliquota e CST)"
-        cross_errors.extend(validate_with_hypotheses(records))
-        cross_errors.extend(validate_cst_hypotheses(records))
+        cross_errors.extend(validate_with_hypotheses(records, context=context))
+        cross_errors.extend(validate_cst_hypotheses(records, context=context))
         progress.stage_progress = 100
 
         # Deduplicar: hipoteses inteligentes supersede erros genericos
@@ -329,13 +384,13 @@ def _persist_stage_errors(
         db.execute(
             """INSERT INTO validation_errors
                (file_id, record_id, line_number, register, field_no, field_name, value,
-                error_type, severity, message, expected_value)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                error_type, severity, message, expected_value, categoria)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 file_id, record_id, err.line_number, err.register, err.field_no,
                 err.field_name, err.value, err.error_type,
                 _severity_for(err.error_type), err.message,
-                err.expected_value,
+                err.expected_value, err.categoria,
             ),
         )
     db.commit()
@@ -381,9 +436,8 @@ def _enrich_errors(
         groups.setdefault(key, []).append(entry)
 
     total_groups = len(groups)
-    processed = 0
 
-    for (error_type, register, field_name), entries in groups.items():
+    for processed, ((error_type, register, field_name), entries) in enumerate(groups.items(), 1):
         # Gerar mensagem amigável (mesmo template para todos do grupo)
         sample = entries[0]
         friendly = format_friendly_message(
@@ -406,10 +460,11 @@ def _enrich_errors(
 
         # Determinar se auto-corrigível (botao "Corrigir" no frontend)
         auto_correctable = 0
-        if error_type in ("CALCULO_DIVERGENTE", "SOMA_DIVERGENTE", "CRUZAMENTO_DIVERGENTE",
-                         "C190_DIVERGE_C170") and sample["expected_value"]:
-            auto_correctable = 1
-        elif error_type == "CONTAGEM_DIVERGENTE" and sample["expected_value"]:
+        if (
+            error_type in ("CALCULO_DIVERGENTE", "SOMA_DIVERGENTE", "CRUZAMENTO_DIVERGENTE",
+                           "C190_DIVERGE_C170") and sample["expected_value"]
+            or error_type == "CONTAGEM_DIVERGENTE" and sample["expected_value"]
+        ):
             auto_correctable = 1
         elif error_type == "ALIQ_ICMS_AUSENTE" and sample["expected_value"]:
             # Botao aparece, mas auto_correction_service pula (requer clique do usuario)
@@ -449,7 +504,6 @@ def _enrich_errors(
                 (entry_friendly, legal_basis_json, doc_suggestion, entry_auto, entry["id"]),
             )
 
-        processed += 1
         progress.stage_progress = int(processed / total_groups * 100)
 
     db.commit()

@@ -6,6 +6,8 @@ tributario informado faz sentido fiscalmente, alem da consistencia numerica.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ..models import SpedRecord, ValidationError
 from ..parser import group_by_register
 from .helpers import (
@@ -13,21 +15,25 @@ from .helpers import (
     CFOP_EXPORTACAO,
     CFOP_REMESSA_RETORNO,
     CFOP_VENDA,
-    CST_TRIBUTADO,
     CST_DIFERIMENTO,
     CST_ISENTO_NT,
+    CST_TRIBUTADO,
     get_field,
     make_error,
     to_float,
     trib,
 )
 
+if TYPE_CHECKING:
+    from ..services.context_builder import ValidationContext
+
 # ──────────────────────────────────────────────
 # Constantes locais — CST (nao compartilhadas)
 # ──────────────────────────────────────────────
 
-# IPI — CSTs que indicam tributacao (saida tributada / entrada com credito)
-_CST_IPI_TRIBUTADO = {"00", "01", "49", "50", "99"}
+# IPI — CSTs que indicam tributacao efetiva (saida tributada / entrada com credito)
+# 49 (Outras Entradas) e 99 (Outras Saidas) sao residuais e nao exigem valores
+_CST_IPI_TRIBUTADO = {"00", "01", "50"}
 
 # PIS/COFINS — CSTs que indicam operacao tributavel (aliquota normal)
 _CST_PIS_COFINS_TRIBUTAVEL = {"01", "02", "03", "49"}
@@ -208,31 +214,43 @@ def _ncm_is_monofasico(ncm: str) -> str | None:
 # API publica
 # ──────────────────────────────────────────────
 
-def validate_fiscal_semantics(records: list[SpedRecord]) -> list[ValidationError]:
+def validate_fiscal_semantics(
+    records: list[SpedRecord],
+    context: ValidationContext | None = None,
+) -> list[ValidationError]:
     """Executa validacoes semanticas fiscais nos registros C170.
 
     Regras implementadas:
     - Classificacao de cenario aliquota zero (ICMS, IPI, PIS/COFINS)
     - Cruzamento CST x CFOP
     - Validacao monofasica PIS/COFINS (CST 04 x NCM x aliquota)
+
+    Se context.regime == SIMPLES_NACIONAL, pula regras de CST Tabela A.
     """
     groups = group_by_register(records)
     errors: list[ValidationError] = []
+
+    is_simples = False
+    if context is not None:
+        from ..services.context_builder import TaxRegime
+        is_simples = context.regime == TaxRegime.SIMPLES_NACIONAL
 
     # Construir mapa COD_ITEM -> NCM a partir do cadastro 0200
     # 0200: pos 1=COD_ITEM, pos 7=COD_NCM (pode variar; campo NCM e posicao 7)
     item_ncm: dict[str, str] = {}
     for r in groups.get("0200", []):
-        cod_item = get_field(r, 1)
-        ncm = get_field(r, 7)
+        cod_item = get_field(r, "COD_ITEM")
+        ncm = get_field(r, "COD_NCM")
         if cod_item and ncm:
             item_ncm[cod_item] = ncm
 
     for rec in groups.get("C170", []):
-        errors.extend(_classify_zero_rate_icms(rec))
+        if not is_simples:
+            # Regras de CST Tabela A ICMS — só para Regime Normal
+            errors.extend(_classify_zero_rate_icms(rec))
+            errors.extend(_validate_cst_cfop(rec))
         errors.extend(_classify_zero_rate_ipi(rec))
         errors.extend(_classify_zero_rate_pis_cofins(rec))
-        errors.extend(_validate_cst_cfop(rec))
         errors.extend(_validate_monofasico(rec, item_ncm))
 
     return errors
@@ -251,14 +269,14 @@ def _classify_zero_rate_icms(record: SpedRecord) -> list[ValidationError]:
     - CST isento/NT + tudo zero -> OK (sem alerta)
     - CST diferimento + tudo zero -> OK (sem alerta)
     """
-    cst_icms = get_field(record, 9)
+    cst_icms = get_field(record, "CST_ICMS")
     if not cst_icms:
         return []
 
     t = trib(cst_icms)
-    vl_bc = to_float(get_field(record, 12))
-    aliq = to_float(get_field(record, 13))
-    vl_icms = to_float(get_field(record, 14))
+    vl_bc = to_float(get_field(record, "VL_BC_ICMS"))
+    aliq = to_float(get_field(record, "ALIQ_ICMS"))
+    vl_icms = to_float(get_field(record, "VL_ICMS"))
 
     # So analisa cenarios zerados
     if aliq > 0:
@@ -274,7 +292,7 @@ def _classify_zero_rate_icms(record: SpedRecord) -> list[ValidationError]:
 
     # CST tributado com aliquota zero
     if t in CST_TRIBUTADO:
-        cfop = get_field(record, 10)
+        cfop = get_field(record, "CFOP")
 
         # Exportacao com aliquota zero e esperado
         if cfop in CFOP_EXPORTACAO:
@@ -318,25 +336,26 @@ def _classify_zero_rate_icms(record: SpedRecord) -> list[ValidationError]:
 
 def _classify_zero_rate_ipi(record: SpedRecord) -> list[ValidationError]:
     """Classifica cenarios de IPI com CST tributado e valores zerados."""
-    cst_ipi = get_field(record, 19)
+    cst_ipi = get_field(record, "CST_IPI")
     if not cst_ipi:
         return []
 
-    vl_bc_ipi = to_float(get_field(record, 21))
-    aliq_ipi = to_float(get_field(record, 22))
-    vl_ipi = to_float(get_field(record, 23))
+    vl_bc_ipi = to_float(get_field(record, "VL_BC_IPI"))
+    _aliq_ipi = to_float(get_field(record, "ALIQ_IPI"))
+    _vl_ipi = to_float(get_field(record, "VL_IPI"))
 
     if cst_ipi not in _CST_IPI_TRIBUTADO:
         return []
 
-    if vl_bc_ipi == 0 and aliq_ipi == 0 and vl_ipi == 0:
+    # Aliquota 0% na TIPI e valida para CST tributado — so exige BC preenchida
+    if vl_bc_ipi == 0:
         return [make_error(
             record, "CST_IPI", "IPI_CST_ALIQ_ZERO",
             (
-                f"CST_IPI {cst_ipi} indica tributacao, mas base, aliquota "
-                f"e valor de IPI estao zerados. Verifique se o CST deveria "
-                f"ser 02 (isento), 03 (nao tributado), 04 (imune) ou "
-                f"05 (suspenso)."
+                f"CST_IPI {cst_ipi} indica tributacao, mas VL_BC_IPI esta "
+                f"zerado. Verifique se o CST deveria ser 02 (isento), "
+                f"03 (nao tributado), 04 (imune) ou 05 (suspenso), ou se "
+                f"a base de calculo do IPI esta faltando."
             ),
             field_no=20,
             value=f"CST_IPI={cst_ipi}",
@@ -350,11 +369,11 @@ def _classify_zero_rate_pis_cofins(record: SpedRecord) -> list[ValidationError]:
     errors: list[ValidationError] = []
 
     # PIS: CST na posicao 24, BC=25, ALIQ=26, VL=29
-    cst_pis = get_field(record, 24)
+    cst_pis = get_field(record, "CST_PIS")
     if cst_pis and cst_pis in _CST_PIS_COFINS_TRIBUTAVEL:
-        vl_bc = to_float(get_field(record, 25))
-        aliq = to_float(get_field(record, 26))
-        vl_pis = to_float(get_field(record, 29))
+        vl_bc = to_float(get_field(record, "VL_BC_PIS"))
+        aliq = to_float(get_field(record, "ALIQ_PIS"))
+        vl_pis = to_float(get_field(record, "VL_PIS"))
         if vl_bc == 0 and aliq == 0 and vl_pis == 0:
             errors.append(make_error(
                 record, "CST_PIS", "PIS_CST_ALIQ_ZERO",
@@ -369,11 +388,11 @@ def _classify_zero_rate_pis_cofins(record: SpedRecord) -> list[ValidationError]:
             ))
 
     # COFINS: CST na posicao 30, BC=31, ALIQ=32, VL=35
-    cst_cofins = get_field(record, 30)
+    cst_cofins = get_field(record, "CST_COFINS")
     if cst_cofins and cst_cofins in _CST_PIS_COFINS_TRIBUTAVEL:
-        vl_bc = to_float(get_field(record, 31))
-        aliq = to_float(get_field(record, 32))
-        vl_cofins = to_float(get_field(record, 35))
+        vl_bc = to_float(get_field(record, "VL_BC_COFINS"))
+        aliq = to_float(get_field(record, "ALIQ_COFINS"))
+        vl_cofins = to_float(get_field(record, "VL_COFINS"))
         if vl_bc == 0 and aliq == 0 and vl_cofins == 0:
             errors.append(make_error(
                 record, "CST_COFINS", "COFINS_CST_ALIQ_ZERO",
@@ -402,14 +421,14 @@ def _validate_cst_cfop(record: SpedRecord) -> list[ValidationError]:
     - CFOP interestadual + aliquota zero (CST tributado) -> alerta
     - CFOP de exportacao + CST tributado com aliquota > 0 -> alerta
     """
-    cst_icms = get_field(record, 9)
-    cfop = get_field(record, 10)
+    cst_icms = get_field(record, "CST_ICMS")
+    cfop = get_field(record, "CFOP")
 
     if not cst_icms or not cfop:
         return []
 
     t = trib(cst_icms)
-    aliq = to_float(get_field(record, 13))
+    aliq = to_float(get_field(record, "ALIQ_ICMS"))
     errors: list[ValidationError] = []
 
     # REGRA 1: CFOP de venda + CST isento/NT (sem remessa/exportacao)
@@ -482,12 +501,12 @@ def _validate_monofasico(
     """
     errors: list[ValidationError] = []
 
-    cst_pis = get_field(record, 24)
-    cst_cofins = get_field(record, 30)
-    cfop = get_field(record, 10)
+    cst_pis = get_field(record, "CST_PIS")
+    cst_cofins = get_field(record, "CST_COFINS")
+    cfop = get_field(record, "CFOP")
 
     # Obter NCM via COD_ITEM -> 0200
-    cod_item = get_field(record, 2)
+    cod_item = get_field(record, "COD_ITEM")
     ncm = item_ncm.get(cod_item, "")
     categoria = _ncm_is_monofasico(ncm) if ncm else None
 
@@ -496,13 +515,13 @@ def _validate_monofasico(
 
     # -- PIS --
     errors.extend(_validate_monofasico_tributo(
-        record, cst_pis, "PIS", 25, 26, 29,
+        record, cst_pis, "PIS", "VL_BC_PIS", "ALIQ_PIS", "VL_PIS",
         ncm, categoria, is_entrada,
     ))
 
     # -- COFINS --
     errors.extend(_validate_monofasico_tributo(
-        record, cst_cofins, "COFINS", 31, 32, 35,
+        record, cst_cofins, "COFINS", "VL_BC_COFINS", "ALIQ_COFINS", "VL_COFINS",
         ncm, categoria, is_entrada,
     ))
 
@@ -513,9 +532,9 @@ def _validate_monofasico_tributo(
     record: SpedRecord,
     cst: str,
     tributo: str,
-    pos_bc: int,
-    pos_aliq: int,
-    pos_valor: int,
+    field_bc: str,
+    field_aliq: str,
+    field_valor: str,
     ncm: str,
     categoria: str | None,
     is_entrada: bool,
@@ -525,10 +544,18 @@ def _validate_monofasico_tributo(
     if not cst:
         return errors
 
-    aliq = to_float(get_field(record, pos_aliq))
-    valor = to_float(get_field(record, pos_valor))
+    aliq = to_float(get_field(record, field_aliq))
+    valor = to_float(get_field(record, field_valor))
     field_name = f"CST_{tributo}"
-    cod_item = get_field(record, 2)
+    cod_item = get_field(record, "COD_ITEM")
+
+    # Mapeamento de field name -> field_no para backward compat de make_error
+    _FIELD_NO = {
+        "ALIQ_PIS": 27, "VL_PIS": 30,
+        "ALIQ_COFINS": 33, "VL_COFINS": 36,
+    }
+    fn_aliq = _FIELD_NO.get(field_aliq, 0)
+    fn_valor = _FIELD_NO.get(field_valor, 0)
 
     # -- REGRA 1: CST 04 com aliquota > 0 -> erro --
     # Monofasico na revenda = aliquota zero obrigatoriamente
@@ -541,7 +568,7 @@ def _validate_monofasico_tributo(
                 f"de produto monofasico, a aliquota deve ser zero pois o "
                 f"tributo ja foi recolhido pelo fabricante/importador."
             ),
-            field_no=pos_aliq + 1,
+            field_no=fn_aliq,
             value=f"CST_{tributo}={cst} ALIQ={aliq:.2f}%",
         ))
 
@@ -555,7 +582,7 @@ def _validate_monofasico_tributo(
                 f"pois o {tributo} ja foi recolhido na etapa anterior "
                 f"(fabricante ou importador)."
             ),
-            field_no=pos_valor + 1,
+            field_no=fn_valor,
             value=f"CST_{tributo}={cst} VL={valor:.2f}",
         ))
 
@@ -570,7 +597,7 @@ def _validate_monofasico_tributo(
                 f"o CST deveria ser 01 (tributacao normal), 06 (aliquota "
                 f"zero) ou outro, ou se o NCM do produto esta correto."
             ),
-            field_no=pos_aliq + 1,
+            field_no=fn_aliq,
             value=f"CST_{tributo}={cst} NCM={ncm}",
         ))
 
@@ -587,7 +614,7 @@ def _validate_monofasico_tributo(
                 f"aliquota zero), mas esta informado como {cst} (operacao "
                 f"tributavel). Verifique a classificacao fiscal."
             ),
-            field_no=pos_aliq + 1,
+            field_no=fn_aliq,
             value=f"CST_{tributo}={cst} NCM={ncm}",
         ))
 
@@ -596,18 +623,19 @@ def _validate_monofasico_tributo(
     # industrializador usa credito (CST 50-56), revendedor nao tem credito.
     # CST 04 na entrada pode indicar erro de classificacao.
     if cst in _CST_PIS_COFINS_MONOFASICO and is_entrada:
+        cfop_val = get_field(record, "CFOP")
         errors.append(make_error(
             record, field_name, "MONOFASICO_ENTRADA_CST04",
             (
                 f"CST_{tributo} {cst} (monofasico) informado em operacao de "
-                f"entrada (CFOP {get_field(record, 10)}). Na entrada, o CST "
+                f"entrada (CFOP {cfop_val}). Na entrada, o CST "
                 f"monofasico se aplica a aquisicao para revenda sem direito a "
                 f"credito. Se a empresa for industrializadora com direito a "
                 f"credito, o CST deveria ser 50-56. Verifique a natureza "
                 f"da operacao e o regime da empresa."
             ),
-            field_no=pos_aliq + 1,
-            value=f"CST_{tributo}={cst} CFOP={get_field(record, 10)}",
+            field_no=fn_aliq,
+            value=f"CST_{tributo}={cst} CFOP={cfop_val}",
         ))
 
     return errors

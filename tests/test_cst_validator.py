@@ -12,11 +12,12 @@ from src.validators.cst_validator import (
     _validate_exemptions_c170,
     validate_cst_and_exemptions,
 )
+from src.validators.helpers import fields_to_dict
 
 
 def rec(register: str, fields: list[str], line: int = 1) -> SpedRecord:
     raw = "|" + "|".join(fields) + "|"
-    return SpedRecord(line_number=line, register=register, fields=fields, raw_line=raw)
+    return SpedRecord(line_number=line, register=register, fields=fields_to_dict(register, fields), raw_line=raw)
 
 
 def c170(cst: str = "000", vl_bc: str = "1000,00", vl_icms: str = "180,00", line: int = 1) -> SpedRecord:

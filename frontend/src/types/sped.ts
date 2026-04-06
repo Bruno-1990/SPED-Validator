@@ -12,6 +12,9 @@ export interface FileInfo {
   total_errors: number
   status: string
   auto_corrections_applied: number
+  cod_ver: string | null
+  is_retificador: boolean | null
+  original_file_id: number | null
 }
 
 export interface RecordInfo {
@@ -77,6 +80,19 @@ export interface ValidationError {
   expected_value: string | null
   auto_correctable: boolean
   status: string
+  certeza: string | null
+  impacto: string | null
+  categoria: string | null
+}
+
+export interface SearchResult {
+  source_file: string
+  register: string | null
+  field_name: string | null
+  heading: string
+  content: string
+  score: number
+  source: string
 }
 
 export interface LegalBasis {
@@ -126,6 +142,51 @@ export interface GeneratedRule {
     register: string | null
     score: number
   }> | null
+}
+
+export interface CrossValidationItem {
+  id: number
+  error_type: string
+  categoria: string
+  register: string
+  line_number: number
+  dest_register: string | null
+  dest_line: number | null
+  value: string | null
+  expected_value: string | null
+  difference: number | null
+  severity: string
+  message: string
+  friendly_message: string | null
+}
+
+export interface AuditScopeCheck {
+  name: string
+  status: 'ok' | 'partial' | 'not_run'
+  detail: string | null
+}
+
+export interface AuditScope {
+  coverage_pct: number
+  checks: AuditScopeCheck[]
+  missing_tables: string[]
+}
+
+export interface CorrectionSuggestion {
+  error_id: number
+  record_id: number
+  register: string
+  field_no: number
+  field_name: string
+  old_value: string
+  expected_value: string
+  error_type: string
+  certeza: string | null
+  impacto: string | null
+  line_number: number
+  message: string
+  friendly_message: string | null
+  decision?: 'approved' | 'rejected' | 'skipped'
 }
 
 export interface PipelineEvent {
