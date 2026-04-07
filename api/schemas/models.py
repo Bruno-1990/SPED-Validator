@@ -116,6 +116,7 @@ class ValidationErrorInfo(BaseModel):
     categoria: str = "fiscal"
     certeza: str = "objetivo"
     impacto: str = "relevante"
+    materialidade: float = 0
 
 
 class ErrorSummary(BaseModel):

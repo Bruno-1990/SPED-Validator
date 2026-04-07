@@ -464,7 +464,7 @@ FastAPI com 5 routers e banco SQLite de auditoria.
 | `corrections` | Historico de correcoes aplicadas (old/new value, audit trail) |
 | `audit_log` | Log de acoes (upload, validacao, correcao) |
 | `finding_resolutions` | Workflow de resolucao (accepted/rejected/deferred/noted + justificativa) |
-| `retificacoes` | Vinculos entre arquivos originais e retificadores |
+| `sped_file_versions` | Vinculos entre arquivos originais e retificadores |
 
 **Configuracao:** SQLite com `check_same_thread=False` para compatibilidade com FastAPI (endpoints rodam em threads diferentes).
 
