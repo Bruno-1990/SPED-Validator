@@ -1,0 +1,120 @@
+meta:
+  fonte: 'Ajuste SINIEF 07/2005 - Tabela B (atualizada)'
+  vigencia_de: '2022-01-01'
+  vigencia_ate: null
+  descricao: >
+    Codigo de Situacao da Operacao no Simples Nacional (CSOSN).
+    Utilizado no lugar do CST ICMS (tabela A) quando o emitente e
+    optante pelo Simples Nacional.
+
+csosn:
+  # --- GRUPO: TRIBUTADO PELO SIMPLES NACIONAL ---
+
+  "101":
+    descricao: "Tributada pelo SN com permissao de credito"
+    permite_credito: true
+    exige_aliquota_credito: true
+    aplica_st: false
+    uso_tipico: >
+      Venda para pessoa juridica que pode se creditar do ICMS.
+      Obrigatorio informar pCredSN e vCredICMSSN na NF-e.
+    campos_obrigatorios: ["pCredSN", "vCredICMSSN"]
+
+  "102":
+    descricao: "Tributada pelo SN sem permissao de credito"
+    permite_credito: false
+    exige_aliquota_credito: false
+    aplica_st: false
+    uso_tipico: >
+      Venda para consumidor final (PF) ou empresa do Lucro Presumido
+      sem direito a credito. Caso mais comum no varejo SN.
+    campos_obrigatorios: []
+
+  "103":
+    descricao: "Isencao do ICMS no SN para faixa de receita bruta"
+    permite_credito: false
+    exige_aliquota_credito: false
+    aplica_st: false
+    uso_tipico: >
+      Empresa SN com receita bruta na faixa de isencao estadual de ICMS.
+      Verificar legislacao estadual especifica.
+    campos_obrigatorios: []
+
+  # --- GRUPO: COM SUBSTITUICAO TRIBUTARIA ---
+
+  "201":
+    descricao: "Tributada pelo SN com permissao de credito e com ST"
+    permite_credito: true
+    exige_aliquota_credito: true
+    aplica_st: true
+    uso_tipico: >
+      Operacao com ST onde o emitente SN e substituto tributario.
+      Deve calcular ICMS ST e informar credito ao destinatario.
+    campos_obrigatorios: ["pCredSN", "vCredICMSSN", "vBCST", "vICMSST"]
+
+  "202":
+    descricao: "Tributada pelo SN sem permissao de credito e com ST"
+    permite_credito: false
+    exige_aliquota_credito: false
+    aplica_st: true
+    uso_tipico: >
+      Operacao com ST onde o emitente SN e substituto tributario,
+      mas o destinatario nao tem direito a credito.
+    campos_obrigatorios: ["vBCST", "pMVAST", "pICMSST", "vICMSST"]
+
+  "203":
+    descricao: "Isencao do ICMS no SN para faixa de receita bruta e com ST"
+    permite_credito: false
+    exige_aliquota_credito: false
+    aplica_st: true
+    uso_tipico: >
+      Empresa na faixa de isencao estadual, mas que ainda retem
+      ICMS ST para o destinatario.
+    campos_obrigatorios: ["vBCST", "pMVAST", "pICMSST", "vICMSST"]
+
+  # --- GRUPO: IMUNE / ISENTO / NAO TRIBUTADO ---
+
+  "300":
+    descricao: "Imune"
+    permite_credito: false
+    exige_aliquota_credito: false
+    aplica_st: false
+    uso_tipico: >
+      Operacao com imunidade constitucional de ICMS (ex: livros,
+      exportacoes, papel para jornal).
+    campos_obrigatorios: []
+
+  "400":
+    descricao: "Nao tributada pelo SN"
+    permite_credito: false
+    exige_aliquota_credito: false
+    aplica_st: false
+    uso_tipico: >
+      Operacao fora do campo de incidencia do ICMS.
+      Ex: prestacao de servico (ISS), transferencia nao onerosa.
+    campos_obrigatorios: []
+
+  # --- GRUPO: ICMS COBRADO ANTERIORMENTE POR ST ---
+
+  "500":
+    descricao: "ICMS cobrado anteriormente por ST (substituido) ou por antecipacao"
+    permite_credito: false
+    exige_aliquota_credito: false
+    aplica_st: false
+    uso_tipico: >
+      Revenda de produto ja com ICMS ST recolhido pelo substituto.
+      Comum em distribuidoras/varejo (combustivel, bebidas, autopecas).
+      O substituido nao destaca ICMS na NF-e.
+    campos_obrigatorios: ["vBCSTRet", "vICMSSTRet"]
+
+  # --- GRUPO: OUTROS ---
+
+  "900":
+    descricao: "Outros"
+    permite_credito: null
+    exige_aliquota_credito: false
+    aplica_st: null
+    uso_tipico: >
+      Operacoes que nao se enquadram nos codigos anteriores.
+      Usar com cautela; preferir codigo especifico sempre que possivel.
+    campos_obrigatorios: []

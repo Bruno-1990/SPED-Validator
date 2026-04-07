@@ -12,7 +12,7 @@ Este sistema resolve isso automatizando:
 
 1. **Conversao** de PDFs/DOCX/TXT da documentacao oficial para Markdown estruturado
 2. **Indexacao** com Full-Text Search (FTS5) + embeddings vetoriais para busca semantica
-3. **Validacao** em 21 camadas dos arquivos SPED (estrutural, semantica fiscal, monofasicos, auditoria de beneficios, aliquotas, C190, DIFAL/FCP, base de calculo, destinatario, parametrizacao, governanca) com 175 regras implementadas
+3. **Validacao** em 22 camadas dos arquivos SPED (estrutural, semantica fiscal, monofasicos, auditoria de beneficios, aliquotas, C190, DIFAL/FCP, base de calculo, destinatario, parametrizacao, governanca, **Simples Nacional**) com 186 regras implementadas
 4. **Busca automatica** da documentacao relevante para cada erro encontrado
 5. **API REST** (FastAPI) com endpoints para upload, validacao, correcao e exportacao
 6. **Frontend React** com interface para upload, visualizacao de erros e relatorios
@@ -152,7 +152,7 @@ Execute `git-push.bat` no Windows — pede a mensagem do commit, faz rebase na m
 ```
 SPED/
 |-- README.md                       # Este arquivo
-|-- rules.yaml                      # Catalogo de 175 regras de validacao (YAML)
+|-- rules.yaml                      # Catalogo de 186 regras de validacao (YAML)
 |-- pyproject.toml                  # Dependencias e metadados (v0.1.0)
 |-- config.py                       # Caminhos, modelo embedding, parametros
 |-- start.bat                       # Inicia API + Frontend (Windows)
@@ -196,12 +196,14 @@ SPED/
 |   |   |-- bloco_d_validator.py         # Bloco D: transporte
 |   |   |-- pendentes_validator.py       # Regras pendentes de contexto externo
 |   |   |-- audit_rules.py              # Regras de auditoria gerais
+|   |   |-- simples_validator.py          # Simples Nacional: CSOSN, CST PIS/COFINS, credito ICMS (11 regras)
 |   |   |-- retificador_validator.py     # Validacoes de retificacao
 |   |   |-- helpers.py                   # Funcoes auxiliares dos validadores
 |   |   |-- tolerance.py                 # Constantes de tolerancia de calculo
 |   |   |-- correction_hypothesis.py     # Hipoteses de correcao automatica
 |   |   |-- cst_hypothesis.py            # Hipoteses de correcao de CST
 |   |-- services/
+|   |   |-- reference_loader.py          # Carrega tabelas YAML de referencia (lazy loading)
 |   |   |-- __init__.py
 |   |   |-- database.py                 # Schema SQLite de auditoria (6 tabelas)
 |   |   |-- file_service.py             # Upload, hash, parse, metadados, CRUD, clear_audit
@@ -246,6 +248,18 @@ SPED/
 |   |-- audit.db                    # Banco de auditoria (arquivos, erros, correcoes)
 |
 |-- data/
+|   |-- reference/                  # Tabelas YAML de referencia fiscal
+|   |   |-- aliquotas_internas_uf.yaml    # Aliquota interna padrao por UF (CONFAZ)
+|   |   |-- fcp_por_uf.yaml               # Fundo de Combate a Pobreza por UF
+|   |   |-- ibge_municipios.yaml           # Codigos IBGE de municipios
+|   |   |-- ncm_tipi_categorias.yaml       # NCM: normal/isento/monofasico/NT
+|   |   |-- codigos_ajuste_uf.yaml         # Tabela 5.1.1 - codigos de ajuste
+|   |   |-- mva_por_ncm_uf.yaml            # MVA por NCM para ST
+|   |   |-- csosn_tabela_b.yaml            # CSOSN Tabela B - Simples Nacional
+|   |   |-- cst_pis_cofins_sn.yaml         # CST PIS/COFINS validos/proibidos para SN
+|   |   |-- sn_anexos_aliquotas.yaml       # Anexos I-V com aliquotas por faixa (LC 155/2016)
+|   |   |-- sn_sublimites_uf.yaml          # Sublimites ICMS/ISS por UF
+|   |   |-- vigencias/                     # Tabelas versionadas por periodo
 |   |-- markdown/
 |   |   |-- guia/                   # Guia Pratico EFD v3.2.2 + cabecalhos + exemplos
 |   |   |-- legislacao/             # 78 arquivos convertidos da legislacao

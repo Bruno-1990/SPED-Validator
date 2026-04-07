@@ -9,9 +9,9 @@
 
 ## 1. Visao Geral
 
-O motor de validacao SPED EFD conta com **175 regras** definidas no `rules.yaml`, **todas implementadas** em 21 blocos de validacao. O catalogo completo cobre cenarios de formato, cruzamento, recalculo, semantica fiscal, auditoria de beneficios, aliquotas, DIFAL/FCP, base de calculo, destinatario, devolucoes, parametrizacao e governanca.
+O motor de validacao SPED EFD conta com **186 regras** definidas no `rules.yaml`, **todas implementadas** em 22 blocos de validacao. O catalogo completo cobre cenarios de formato, cruzamento, recalculo, semantica fiscal, auditoria de beneficios, aliquotas, DIFAL/FCP, base de calculo, destinatario, devolucoes, parametrizacao, governanca e **Simples Nacional**.
 
-**Estado atual:** 175 regras implementadas | 1473 testes automatizados | 0 pendentes.
+**Estado atual:** 186 regras implementadas | 1473 testes automatizados | 0 pendentes.
 
 ---
 
@@ -42,8 +42,9 @@ O motor de validacao SPED EFD conta com **175 regras** definidas no `rules.yaml`
 | parametrizacao | 3 | parametrizacao_validator.py |
 | ncm | 2 | ncm_validator.py |
 | governanca | 5 | audit_rules.py |
+| simples_nacional | 11 | simples_validator.py |
 
-**Severidades:** 50 critical, 39 error, 70 warning, 16 info
+**Severidades:** 50 critical, 43 error, 75 warning, 16 info
 
 ### 2.2 Detalhamento — Bloco `auditoria_beneficios` (50 regras)
 
@@ -265,6 +266,33 @@ Permanecem como alerta de revisao (warning), nao como erro objetivo (critical).
 | GOV_003 | Explicitar dependencia externa | metarregra | metarregra | informativa | sim |
 | GOV_004 | Checklist mestre aliquotas/DIFAL | metarregra | metarregra | informativa | sim |
 
+### 3.16 Simples Nacional (11 regras)
+
+| ID | Titulo | Tipo | Achado | Severidade | Automatizavel |
+|---|---|---|---|---|---|
+| SN_001 | CST Tabela A em contribuinte SN | semantica | erro_objetivo | error | sim |
+| SN_002 | CSOSN invalido (fora Tabela B) | semantica | erro_objetivo | error | sim |
+| SN_003 | Credito ICMS zerado ou acima do teto pCredSN | matematica | erro_objetivo | error | sim |
+| SN_004 | CSOSN com ST sem base/valor ST | semantica | erro_objetivo | error | sim |
+| SN_005 | CSOSN 300 (imune) com ICMS preenchido | semantica | erro_objetivo | warning | sim |
+| SN_006 | CSOSN 400 (nao tributada) com ICMS preenchido | semantica | erro_objetivo | warning | sim |
+| SN_007 | CSOSN 500 sem base ST retida | semantica | erro_objetivo | warning | sim |
+| SN_009 | CST PIS/COFINS proibido para SN (01/02/03/05) | semantica | erro_objetivo | error | sim |
+| SN_010 | IND_PERFIL diferente de C para SN | semantica | inconsistencia | warning | sim |
+| SN_011 | CST PIS 04 (monofasico) em NCM nao monofasico | hibrida | indicio | warning | sim |
+| SN_012 | Aliquota credito ICMS inconsistente entre itens | matematica | indicio | warning | sim |
+
+**Registros envolvidos:** 0000, 0200, C170
+**Tabelas de referencia:** csosn_tabela_b.yaml, cst_pis_cofins_sn.yaml, sn_anexos_aliquotas.yaml, sn_sublimites_uf.yaml
+**Legislacao:** LC 123/2006, LC 155/2016, Ajuste SINIEF 07/2005, IN RFB 1.252/2012, Tabela 4.3.3 EFD-Contribuicoes
+
+**Validacao inteligente SN_003 (sem RBT12):**
+O SPED Fiscal nao contem o campo RBT12 (receita bruta acumulada). A validacao opera por range:
+- `ALIQ_ICMS = 0` para CSOSN 101/201 → erro (credito nao preenchido)
+- `ALIQ_ICMS > 4,01%` → erro (usando aliquota cheia ao inves de pCredSN)
+- Itens com aliquotas divergentes entre si → alerta (SN_012)
+Os limites sao calculados a partir dos Anexos I-V da LC 155/2016.
+
 ---
 
 ## 4. Resumo Consolidado
@@ -273,10 +301,10 @@ Permanecem como alerta de revisao (warning), nao como erro objetivo (critical).
 
 | Origem | Qtd | Status |
 |---|---|---|
-| Regras implementadas (rules.yaml) | 175 | Todas implementadas |
+| Regras implementadas (rules.yaml) | 186 | Todas implementadas |
 | Regras com error_type no codigo | 135 | Produzem alertas |
 | Regras planejadas (error_type futuro) | 40 | Definidas no YAML, implementacao futura |
-| **TOTAL** | **175** | |
+| **TOTAL** | **186** | |
 
 ### 4.2 Total por Severidade
 
@@ -332,6 +360,7 @@ src/validators/
   parametrizacao_validator.py # PARAM_001..003
   ncm_validator.py            # NCM_001..002
   governanca.py               # GOV_001..004, AMOSTRA_001
+  simples_validator.py        # SN_001..012
   audit_rules.py              # AUD_* pendentes (expandir existente)
   fiscal_semantics.py         # PEND_* (expandir existente)
 ```
@@ -399,6 +428,10 @@ Para regras com `depende_externo: true`, o motor precisara de tabelas de referen
 | `faixa_cep_uf.yaml` | faixa CEP -> UF | DEST_003 |
 | `ncm_tributacao.yaml` | NCM -> regime esperado | NCM_001 |
 | `codigos_ajuste_uf.yaml` | COD_AJ -> descricao + vigencia | APUR_003 |
+| `csosn_tabela_b.yaml` | CSOSN -> descricao + permite_credito + aplica_st | SN_001..007 |
+| `cst_pis_cofins_sn.yaml` | CST -> permitido/proibido + motivo | SN_009 |
+| `sn_anexos_aliquotas.yaml` | Anexo x Faixa -> aliquota + partilha | SN_003, SN_012 |
+| `sn_sublimites_uf.yaml` | UF -> sublimite ICMS/ISS | (futuro) |
 
 ---
 
@@ -549,7 +582,7 @@ Requer construcao de tabelas de referencia externas:
 
 ## 9. Metricas de Sucesso
 
-- **Cobertura atual:** 175/175 regras implementadas (100%)
+- **Cobertura atual:** 186/186 regras implementadas (100%)
 - **Falsos positivos:** < 5% em arquivo de referencia (regras analiticas rebaixadas para warning)
 - **Performance:** Validacao completa < 30s para arquivo de 15k registros
 - **Testes:** 1473 testes automatizados passando

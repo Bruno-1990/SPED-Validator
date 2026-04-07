@@ -1,0 +1,48 @@
+meta:
+  fonte: 'Resolucao CGSN no 140/2018, art. 9o'
+  vigencia_de: '2018-01-01'
+  vigencia_ate: null
+  descricao: >
+    Sublimites de receita bruta anual para recolhimento de ICMS/ISS
+    dentro do DAS. Empresas que ultrapassam o sublimite da UF devem
+    recolher ICMS/ISS separadamente, fora do DAS.
+
+limite_maximo_sn: 4800000.00
+
+sublimites:
+  # UFs com sublimite reduzido de R$ 1.800.000,00
+  AC: 1800000.00
+  AP: 1800000.00
+  RO: 1800000.00
+  RR: 1800000.00
+  TO: 1800000.00
+
+  # UFs sem sublimite (limite pleno de R$ 4.800.000,00)
+  AL: 4800000.00
+  AM: 4800000.00
+  BA: 4800000.00
+  CE: 4800000.00
+  DF: 4800000.00
+  ES: 4800000.00
+  GO: 4800000.00
+  MA: 4800000.00
+  MG: 4800000.00
+  MS: 4800000.00
+  MT: 4800000.00
+  PA: 4800000.00
+  PB: 4800000.00
+  PE: 4800000.00
+  PI: 4800000.00
+  PR: 4800000.00
+  RJ: 4800000.00
+  RN: 4800000.00
+  RS: 4800000.00
+  SC: 4800000.00
+  SE: 4800000.00
+  SP: 4800000.00
+
+efeitos_estouro:
+  descricao: >
+    Quando a RBT12 supera o sublimite da UF, ICMS e ISS sao excluidos
+    do DAS a partir do 1o dia do mes seguinte ao trimestre do excesso.
+    A empresa continua optante do SN para tributos federais.

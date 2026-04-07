@@ -26,6 +26,14 @@ class ReferenceLoader:
         self._municipios: set[str] | None = None
         self._ncm_map: dict[str, str] | None = None
         self._matriz_data: dict | None = None
+        self._codigos_ajuste: dict[str, list[dict]] | None = None
+        self._mva_data: dict[str, list[dict]] | None = None
+        self._csosn_data: dict[str, dict] | None = None
+        self._cst_pis_cofins_sn: dict[str, dict] | None = None
+        self._cst_pis_cofins_proibidos: dict[str, dict] | None = None
+        self._sn_anexos: dict | None = None
+        self._sn_sublimites: dict[str, float] | None = None
+        self._sn_limite_maximo: float | None = None
 
     # ── Carregamento lazy ──
 
@@ -85,6 +93,81 @@ class ReferenceLoader:
             tributacao = item.get("tributacao", "normal")
             if ncm:
                 self._ncm_map[ncm] = tributacao
+
+    def _ensure_codigos_ajuste(self) -> None:
+        if self._codigos_ajuste is not None:
+            return
+        path = self._data_dir / "codigos_ajuste_uf.yaml"
+        if not path.exists():
+            self._codigos_ajuste = {}
+            return
+        with open(path, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        self._codigos_ajuste = data.get("ajustes", {})
+
+    def _ensure_mva(self) -> None:
+        if self._mva_data is not None:
+            return
+        path = self._data_dir / "mva_por_ncm_uf.yaml"
+        if not path.exists():
+            self._mva_data = {}
+            return
+        with open(path, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        # Flatten: NCM prefix -> mva_pct
+        self._mva_data = {}
+        for seg_data in (data.get("segmentos") or {}).values():
+            for item in seg_data.get("ncms", []):
+                ncm = str(item.get("ncm", ""))
+                if ncm:
+                    self._mva_data[ncm] = item
+
+    def _ensure_cst_pis_cofins_sn(self) -> None:
+        if self._cst_pis_cofins_sn is not None:
+            return
+        path = self._data_dir / "cst_pis_cofins_sn.yaml"
+        if not path.exists():
+            self._cst_pis_cofins_sn = {}
+            return
+        with open(path, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        self._cst_pis_cofins_sn = data.get("cst_pis_cofins", {})
+        self._cst_pis_cofins_proibidos = data.get("cst_proibidos", {})
+
+    def _ensure_sn_anexos(self) -> None:
+        if self._sn_anexos is not None:
+            return
+        path = self._data_dir / "sn_anexos_aliquotas.yaml"
+        if not path.exists():
+            self._sn_anexos = {}
+            return
+        with open(path, encoding="utf-8") as f:
+            self._sn_anexos = yaml.safe_load(f) or {}
+
+    def _ensure_sn_sublimites(self) -> None:
+        if self._sn_sublimites is not None:
+            return
+        path = self._data_dir / "sn_sublimites_uf.yaml"
+        if not path.exists():
+            self._sn_sublimites = {}
+            self._sn_limite_maximo = 4_800_000.0
+            return
+        with open(path, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        self._sn_limite_maximo = float(data.get("limite_maximo_sn", 4_800_000.0))
+        raw = data.get("sublimites", {})
+        self._sn_sublimites = {uf: float(v) for uf, v in raw.items()}
+
+    def _ensure_csosn(self) -> None:
+        if self._csosn_data is not None:
+            return
+        path = self._data_dir / "csosn_tabela_b.yaml"
+        if not path.exists():
+            self._csosn_data = {}
+            return
+        with open(path, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        self._csosn_data = data.get("csosn", {})
 
     def _ensure_matriz(self) -> None:
         if self._matriz_data is not None:
@@ -176,6 +259,162 @@ class ReferenceLoader:
             return 7.0
         return 12.0
 
+    def get_codigos_ajuste(self, uf: str) -> list[dict]:
+        """Retorna lista de códigos de ajuste (tabela 5.1.1) para a UF."""
+        self._ensure_codigos_ajuste()
+        assert self._codigos_ajuste is not None
+        return self._codigos_ajuste.get(uf.upper(), [])
+
+    def get_codigo_ajuste_info(self, codigo: str) -> dict | None:
+        """Retorna info de um código de ajuste específico (ex: 'SP020001')."""
+        uf = codigo[:2].upper() if len(codigo) >= 2 else ""
+        for item in self.get_codigos_ajuste(uf):
+            if item.get("codigo") == codigo:
+                return item
+        return None
+
+    def get_mva(self, ncm: str) -> float | None:
+        """Retorna MVA original (%) para o NCM, buscando por prefixo.
+
+        Ex: NCM '40111000' casa com entrada '4011' (pneumáticos, MVA 45.19%).
+        Retorna None se não encontrado.
+        """
+        self._ensure_mva()
+        assert self._mva_data is not None
+        # Busca por prefixo decrescente: 8 dígitos, 6, 4
+        for length in (8, 6, 4):
+            prefix = ncm[:length]
+            if prefix in self._mva_data:
+                return float(self._mva_data[prefix].get("mva_pct", 0))
+        return None
+
+    def get_cst_pis_cofins_sn_validos(self) -> set[str]:
+        """Retorna conjunto de CSTs PIS/COFINS válidos para Simples Nacional."""
+        self._ensure_cst_pis_cofins_sn()
+        assert self._cst_pis_cofins_sn is not None
+        return set(self._cst_pis_cofins_sn.keys())
+
+    def get_cst_pis_cofins_sn_info(self, cst: str) -> dict | None:
+        """Retorna info de um CST PIS/COFINS SN (descrição, exige_ncm_monofasico)."""
+        self._ensure_cst_pis_cofins_sn()
+        assert self._cst_pis_cofins_sn is not None
+        return self._cst_pis_cofins_sn.get(cst)
+
+    def get_cst_pis_cofins_sn_descricao(self, cst: str) -> str:
+        """Retorna descrição legível do CST PIS/COFINS para SN."""
+        info = self.get_cst_pis_cofins_sn_info(cst)
+        if info:
+            return info.get("descricao", cst)
+        return cst
+
+    def cst_pis_cofins_exige_monofasico(self, cst: str) -> bool:
+        """Retorna True se o CST exige que o NCM seja monofásico."""
+        info = self.get_cst_pis_cofins_sn_info(cst)
+        if info:
+            return bool(info.get("exige_ncm_monofasico", False))
+        return False
+
+    def get_cst_pis_cofins_sn_proibidos(self) -> dict[str, dict]:
+        """Retorna CSTs PIS/COFINS explicitamente proibidos para SN com motivo."""
+        self._ensure_cst_pis_cofins_sn()
+        assert self._cst_pis_cofins_proibidos is not None
+        return self._cst_pis_cofins_proibidos
+
+    def get_sn_sublimite(self, uf: str) -> float:
+        """Retorna sublimite de ICMS/ISS da UF para o Simples Nacional."""
+        self._ensure_sn_sublimites()
+        assert self._sn_sublimites is not None
+        assert self._sn_limite_maximo is not None
+        return self._sn_sublimites.get(uf.upper(), self._sn_limite_maximo)
+
+    def get_sn_limite_maximo(self) -> float:
+        """Retorna limite máximo anual do Simples Nacional."""
+        self._ensure_sn_sublimites()
+        assert self._sn_limite_maximo is not None
+        return self._sn_limite_maximo
+
+    def get_sn_aliquota_efetiva(self, anexo: str, rbt12: float) -> dict | None:
+        """Calcula alíquota efetiva do SN para um anexo e receita bruta.
+
+        Retorna dict com faixa, aliquota_nominal, parcela_deduzir,
+        aliquota_efetiva, partilha. None se anexo não encontrado.
+        """
+        self._ensure_sn_anexos()
+        assert self._sn_anexos is not None
+        key = f"anexo_{anexo}" if not anexo.startswith("anexo_") else anexo
+        anexo_data = self._sn_anexos.get(key)
+        if not anexo_data:
+            return None
+        faixas = anexo_data.get("faixas", [])
+        selected = None
+        for f in faixas:
+            limite = f.get("rbt12_ate", 0)
+            if rbt12 <= limite:
+                selected = f
+                break
+        if not selected:
+            selected = faixas[-1] if faixas else None
+        if not selected:
+            return None
+        nominal = selected["aliquota_nominal"]
+        pd = selected["parcela_deduzir"]
+        efetiva = ((rbt12 * nominal) - pd) / rbt12 if rbt12 > 0 else 0
+        return {
+            "faixa": selected.get("faixa"),
+            "aliquota_nominal": nominal,
+            "parcela_deduzir": pd,
+            "aliquota_efetiva": round(efetiva, 6),
+            "partilha": selected.get("partilha", {}),
+        }
+
+    def get_sn_credito_icms_range(self) -> tuple[float, float]:
+        """Retorna (pCredSN_max, pCredSN_tipico_max) para validação de range.
+
+        Calculado a partir dos limites teóricos das faixas do SN.
+        Sem conhecer o RBT12, valida se o crédito está dentro do possível.
+        """
+        self._ensure_sn_anexos()
+        assert self._sn_anexos is not None
+        credito = self._sn_anexos.get("credito_icms", {})
+        return (
+            float(credito.get("pCredSN_max", 0.0401)),
+            float(credito.get("pCredSN_tipico_max", 0.0200)),
+        )
+
+    def get_csosn_validos(self) -> set[str]:
+        """Retorna conjunto de CSOSNs válidos da Tabela B."""
+        self._ensure_csosn()
+        assert self._csosn_data is not None
+        return set(self._csosn_data.keys())
+
+    def get_csosn_info(self, csosn: str) -> dict | None:
+        """Retorna info completa de um CSOSN (descrição, permite_credito, exige_st, campos)."""
+        self._ensure_csosn()
+        assert self._csosn_data is not None
+        return self._csosn_data.get(csosn)
+
+    def get_csosn_com_credito(self) -> set[str]:
+        """Retorna CSOSNs que permitem crédito de ICMS."""
+        self._ensure_csosn()
+        assert self._csosn_data is not None
+        return {k for k, v in self._csosn_data.items() if v.get("permite_credito") is True}
+
+    def get_csosn_com_st(self) -> set[str]:
+        """Retorna CSOSNs que exigem ST."""
+        self._ensure_csosn()
+        assert self._csosn_data is not None
+        return {
+            k for k, v in self._csosn_data.items()
+            if v.get("aplica_st") is True or v.get("exige_st") is True
+        }
+
+    def get_csosn_descricao(self, csosn: str) -> str:
+        """Retorna descrição legível do CSOSN."""
+        info = self.get_csosn_info(csosn)
+        if info:
+            return info.get("descricao", csosn)
+        return csosn
+
     def has_municipios_table(self) -> bool:
         """Retorna True se a tabela de municípios está disponível e não vazia."""
         self._ensure_municipios()
@@ -193,6 +432,18 @@ class ReferenceLoader:
             tables.append("ibge_municipios")
         if (self._data_dir / "ncm_tipi_categorias.yaml").exists():
             tables.append("ncm_tipi_categorias")
+        if (self._data_dir / "codigos_ajuste_uf.yaml").exists():
+            tables.append("codigos_ajuste_uf")
+        if (self._data_dir / "mva_por_ncm_uf.yaml").exists():
+            tables.append("mva_por_ncm_uf")
+        if (self._data_dir / "csosn_tabela_b.yaml").exists():
+            tables.append("csosn_tabela_b")
+        if (self._data_dir / "cst_pis_cofins_sn.yaml").exists():
+            tables.append("cst_pis_cofins_sn")
+        if (self._data_dir / "sn_anexos_aliquotas.yaml").exists():
+            tables.append("sn_anexos_aliquotas")
+        if (self._data_dir / "sn_sublimites_uf.yaml").exists():
+            tables.append("sn_sublimites_uf")
         # Vigências
         vig_dir = self._data_dir / "vigencias"
         if vig_dir.exists():

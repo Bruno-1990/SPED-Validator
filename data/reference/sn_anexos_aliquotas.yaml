@@ -1,0 +1,443 @@
+meta:
+  fonte: 'Lei Complementar 123/2006 + LC 155/2016 (valores oficiais)'
+  vigencia_de: '2018-01-01'
+  vigencia_ate: null
+  descricao: >
+    Tabelas de aliquotas progressivas do Simples Nacional por Anexo.
+    Aliquota Efetiva = ((RBT12 * Aliquota Nominal) - PD) / RBT12
+
+limite_anual_sn: 4800000.00
+
+formula:
+  descricao: "Calculo da aliquota efetiva"
+  formula: "((RBT12 * aliquota_nominal) - parcela_deduzir) / RBT12"
+
+# Limites de pCredSN (aliquota de credito ICMS para CSOSN 101/201)
+# calculados a partir das faixas: aliq_efetiva * pct_ICMS
+# Usado para validacao SN_003 sem conhecer o RBT12
+credito_icms:
+  pCredSN_max: 0.0401   # 4,01% - teto absoluto (Anexo II, F5, inicio)
+  pCredSN_tipico_max: 0.0200  # 2,00% - acima disso merece alerta
+
+# --- ANEXO I - Comercio ---
+anexo_I:
+  atividade: "Comercio (revenda de mercadorias)"
+  faixas:
+    - faixa: 1
+      rbt12_ate: 180000.00
+      aliquota_nominal: 0.0400
+      parcela_deduzir: 0.00
+      partilha:
+        IRPJ: 5.50
+        CSLL: 3.50
+        COFINS: 12.74
+        PIS: 2.76
+        CPP: 41.50
+        ICMS: 34.00
+
+    - faixa: 2
+      rbt12_de: 180000.01
+      rbt12_ate: 360000.00
+      aliquota_nominal: 0.0730
+      parcela_deduzir: 5940.00
+      partilha:
+        IRPJ: 5.50
+        CSLL: 3.50
+        COFINS: 12.74
+        PIS: 2.76
+        CPP: 41.50
+        ICMS: 34.00
+
+    - faixa: 3
+      rbt12_de: 360000.01
+      rbt12_ate: 720000.00
+      aliquota_nominal: 0.0950
+      parcela_deduzir: 13860.00
+      partilha:
+        IRPJ: 5.50
+        CSLL: 3.50
+        COFINS: 12.74
+        PIS: 2.76
+        CPP: 42.00
+        ICMS: 33.50
+
+    - faixa: 4
+      rbt12_de: 720000.01
+      rbt12_ate: 1800000.00
+      aliquota_nominal: 0.1070
+      parcela_deduzir: 22500.00
+      partilha:
+        IRPJ: 5.50
+        CSLL: 3.50
+        COFINS: 12.74
+        PIS: 2.76
+        CPP: 42.00
+        ICMS: 33.50
+
+    - faixa: 5
+      rbt12_de: 1800000.01
+      rbt12_ate: 3600000.00
+      aliquota_nominal: 0.1430
+      parcela_deduzir: 87300.00
+      partilha:
+        IRPJ: 5.50
+        CSLL: 3.50
+        COFINS: 12.74
+        PIS: 2.76
+        CPP: 42.00
+        ICMS: 33.50
+
+    - faixa: 6
+      rbt12_de: 3600000.01
+      rbt12_ate: 4800000.00
+      aliquota_nominal: 0.1900
+      parcela_deduzir: 378000.00
+      partilha:
+        IRPJ: 13.50
+        CSLL: 10.00
+        COFINS: 28.27
+        PIS: 6.13
+        CPP: 42.10
+        ICMS: 0.00
+      observacao: "ICMS recolhido fora do DAS nesta faixa"
+
+# --- ANEXO II - Industria ---
+anexo_II:
+  atividade: "Industria (fabricacao de produtos)"
+  faixas:
+    - faixa: 1
+      rbt12_ate: 180000.00
+      aliquota_nominal: 0.0450
+      parcela_deduzir: 0.00
+      partilha:
+        IRPJ: 5.50
+        CSLL: 3.50
+        COFINS: 11.51
+        PIS: 2.49
+        CPP: 37.50
+        ICMS: 32.00
+        IPI: 7.50
+
+    - faixa: 2
+      rbt12_de: 180000.01
+      rbt12_ate: 360000.00
+      aliquota_nominal: 0.0780
+      parcela_deduzir: 5940.00
+      partilha:
+        IRPJ: 5.50
+        CSLL: 3.50
+        COFINS: 11.51
+        PIS: 2.49
+        CPP: 37.50
+        ICMS: 32.00
+        IPI: 7.50
+
+    - faixa: 3
+      rbt12_de: 360000.01
+      rbt12_ate: 720000.00
+      aliquota_nominal: 0.1000
+      parcela_deduzir: 13860.00
+      partilha:
+        IRPJ: 5.50
+        CSLL: 3.50
+        COFINS: 11.51
+        PIS: 2.49
+        CPP: 37.50
+        ICMS: 32.50
+        IPI: 7.00
+
+    - faixa: 4
+      rbt12_de: 720000.01
+      rbt12_ate: 1800000.00
+      aliquota_nominal: 0.1120
+      parcela_deduzir: 22500.00
+      partilha:
+        IRPJ: 5.50
+        CSLL: 3.50
+        COFINS: 11.51
+        PIS: 2.49
+        CPP: 37.50
+        ICMS: 32.50
+        IPI: 7.00
+
+    - faixa: 5
+      rbt12_de: 1800000.01
+      rbt12_ate: 3600000.00
+      aliquota_nominal: 0.1470
+      parcela_deduzir: 85500.00
+      partilha:
+        IRPJ: 5.50
+        CSLL: 3.50
+        COFINS: 11.51
+        PIS: 2.49
+        CPP: 37.50
+        ICMS: 32.50
+        IPI: 7.00
+
+    - faixa: 6
+      rbt12_de: 3600000.01
+      rbt12_ate: 4800000.00
+      aliquota_nominal: 0.3000
+      parcela_deduzir: 720000.00
+      partilha:
+        IRPJ: 8.50
+        CSLL: 7.50
+        COFINS: 20.96
+        PIS: 4.54
+        CPP: 23.00
+        ICMS: 0.00
+        IPI: 35.50
+      observacao: "ICMS recolhido fora do DAS nesta faixa"
+
+# --- ANEXO III - Servicos I ---
+anexo_III:
+  atividade: >
+    Servicos: agencia de turismo, arquitetura, medicina, odontologia,
+    psicologia, fisioterapia, academia, laboratorio, escola, creche,
+    escritorio de contabilidade (receita <= 78k/mes ou fator r >= 28%).
+  faixas:
+    - faixa: 1
+      rbt12_ate: 180000.00
+      aliquota_nominal: 0.0600
+      parcela_deduzir: 0.00
+      partilha:
+        IRPJ: 4.00
+        CSLL: 3.50
+        COFINS: 12.82
+        PIS: 2.78
+        CPP: 43.40
+        ISS: 33.50
+
+    - faixa: 2
+      rbt12_de: 180000.01
+      rbt12_ate: 360000.00
+      aliquota_nominal: 0.1120
+      parcela_deduzir: 9360.00
+      partilha:
+        IRPJ: 4.00
+        CSLL: 3.50
+        COFINS: 14.05
+        PIS: 3.05
+        CPP: 43.40
+        ISS: 32.00
+
+    - faixa: 3
+      rbt12_de: 360000.01
+      rbt12_ate: 720000.00
+      aliquota_nominal: 0.1350
+      parcela_deduzir: 17640.00
+      partilha:
+        IRPJ: 4.00
+        CSLL: 3.50
+        COFINS: 13.64
+        PIS: 2.96
+        CPP: 43.40
+        ISS: 32.50
+
+    - faixa: 4
+      rbt12_de: 720000.01
+      rbt12_ate: 1800000.00
+      aliquota_nominal: 0.1600
+      parcela_deduzir: 35640.00
+      partilha:
+        IRPJ: 4.00
+        CSLL: 3.50
+        COFINS: 13.64
+        PIS: 2.96
+        CPP: 43.40
+        ISS: 32.50
+
+    - faixa: 5
+      rbt12_de: 1800000.01
+      rbt12_ate: 3600000.00
+      aliquota_nominal: 0.2100
+      parcela_deduzir: 125640.00
+      partilha:
+        IRPJ: 4.00
+        CSLL: 3.50
+        COFINS: 12.82
+        PIS: 2.78
+        CPP: 43.40
+        ISS: 33.50
+
+    - faixa: 6
+      rbt12_de: 3600000.01
+      rbt12_ate: 4800000.00
+      aliquota_nominal: 0.3300
+      parcela_deduzir: 648000.00
+      partilha:
+        IRPJ: 35.00
+        CSLL: 15.00
+        COFINS: 16.03
+        PIS: 3.47
+        CPP: 30.50
+        ISS: 0.00
+      observacao: "ISS recolhido fora do DAS nesta faixa"
+
+# --- ANEXO IV - Servicos II ---
+anexo_IV:
+  atividade: >
+    Servicos: construcao civil, vigilancia, limpeza, obras, servicos advocaticios.
+  observacao_cpp: "CPP NAO esta incluida no DAS - recolhimento separado pelo INSS"
+  faixas:
+    - faixa: 1
+      rbt12_ate: 180000.00
+      aliquota_nominal: 0.0450
+      parcela_deduzir: 0.00
+      partilha:
+        IRPJ: 18.80
+        CSLL: 15.20
+        COFINS: 17.67
+        PIS: 3.83
+        ISS: 44.50
+
+    - faixa: 2
+      rbt12_de: 180000.01
+      rbt12_ate: 360000.00
+      aliquota_nominal: 0.0900
+      parcela_deduzir: 8100.00
+      partilha:
+        IRPJ: 19.80
+        CSLL: 15.20
+        COFINS: 20.55
+        PIS: 4.47
+        ISS: 40.00
+
+    - faixa: 3
+      rbt12_de: 360000.01
+      rbt12_ate: 720000.00
+      aliquota_nominal: 0.1020
+      parcela_deduzir: 12420.00
+      partilha:
+        IRPJ: 20.80
+        CSLL: 15.20
+        COFINS: 19.73
+        PIS: 4.28
+        ISS: 40.00
+
+    - faixa: 4
+      rbt12_de: 720000.01
+      rbt12_ate: 1800000.00
+      aliquota_nominal: 0.1400
+      parcela_deduzir: 39780.00
+      partilha:
+        IRPJ: 17.80
+        CSLL: 19.20
+        COFINS: 18.90
+        PIS: 4.10
+        ISS: 40.00
+
+    - faixa: 5
+      rbt12_de: 1800000.01
+      rbt12_ate: 3600000.00
+      aliquota_nominal: 0.2200
+      parcela_deduzir: 183780.00
+      partilha:
+        IRPJ: 18.80
+        CSLL: 19.20
+        COFINS: 18.08
+        PIS: 3.92
+        ISS: 40.00
+
+    - faixa: 6
+      rbt12_de: 3600000.01
+      rbt12_ate: 4800000.00
+      aliquota_nominal: 0.3300
+      parcela_deduzir: 828000.00
+      partilha:
+        IRPJ: 53.50
+        CSLL: 21.50
+        COFINS: 20.55
+        PIS: 4.47
+        ISS: 0.00
+      observacao: "ISS recolhido fora do DAS nesta faixa"
+
+# --- ANEXO V - Servicos III ---
+anexo_V:
+  atividade: >
+    Servicos: TI, publicidade, engenharia, medicina veterinaria,
+    representacao comercial, pericia, auditoria, consultoria
+    quando fator r < 28%.
+  fator_r:
+    descricao: "Fator R = Folha de Salarios (12m) / RBT12"
+    regra: >
+      Se fator_r >= 28%: tributar pelo Anexo III.
+      Se fator_r < 28%: tributar pelo Anexo V.
+  faixas:
+    - faixa: 1
+      rbt12_ate: 180000.00
+      aliquota_nominal: 0.1550
+      parcela_deduzir: 0.00
+      partilha:
+        IRPJ: 25.00
+        CSLL: 15.00
+        COFINS: 14.10
+        PIS: 3.05
+        CPP: 28.85
+        ISS: 14.00
+
+    - faixa: 2
+      rbt12_de: 180000.01
+      rbt12_ate: 360000.00
+      aliquota_nominal: 0.1800
+      parcela_deduzir: 4500.00
+      partilha:
+        IRPJ: 23.00
+        CSLL: 15.00
+        COFINS: 14.10
+        PIS: 3.05
+        CPP: 27.85
+        ISS: 17.00
+
+    - faixa: 3
+      rbt12_de: 360000.01
+      rbt12_ate: 720000.00
+      aliquota_nominal: 0.1950
+      parcela_deduzir: 9900.00
+      partilha:
+        IRPJ: 24.00
+        CSLL: 15.00
+        COFINS: 14.92
+        PIS: 3.23
+        CPP: 23.85
+        ISS: 19.00
+
+    - faixa: 4
+      rbt12_de: 720000.01
+      rbt12_ate: 1800000.00
+      aliquota_nominal: 0.2050
+      parcela_deduzir: 17100.00
+      partilha:
+        IRPJ: 21.00
+        CSLL: 15.00
+        COFINS: 15.74
+        PIS: 3.41
+        CPP: 23.85
+        ISS: 21.00
+
+    - faixa: 5
+      rbt12_de: 1800000.01
+      rbt12_ate: 3600000.00
+      aliquota_nominal: 0.2300
+      parcela_deduzir: 62100.00
+      partilha:
+        IRPJ: 23.00
+        CSLL: 12.50
+        COFINS: 14.10
+        PIS: 3.05
+        CPP: 23.85
+        ISS: 23.50
+
+    - faixa: 6
+      rbt12_de: 3600000.01
+      rbt12_ate: 4800000.00
+      aliquota_nominal: 0.3050
+      parcela_deduzir: 540000.00
+      partilha:
+        IRPJ: 35.00
+        CSLL: 15.50
+        COFINS: 16.44
+        PIS: 3.56
+        CPP: 29.50
+        ISS: 0.00
+      observacao: "ISS recolhido fora do DAS nesta faixa"

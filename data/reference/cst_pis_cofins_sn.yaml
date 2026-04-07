@@ -1,0 +1,86 @@
+meta:
+  fonte: 'Tabela 4.3.3 EFD-Contribuicoes / IN RFB 1.252/2012'
+  vigencia_de: '2022-01-01'
+  vigencia_ate: null
+  descricao: >
+    CSTs PIS/COFINS validos e proibidos para contribuintes do Simples Nacional.
+    O SN nao apura PIS/COFINS pelo regime nao-cumulativo, portanto CSTs de
+    credito/debito pleno sao invalidos.
+
+# CSTs PERMITIDOS para o Simples Nacional
+cst_pis_cofins:
+  "04":
+    descricao: "Operacao Tributavel (tributacao concentrada/monofasica - revenda)"
+    aplica: saida
+    exige_ncm_monofasico: true
+    observacao: "Revenda de produtos sujeitos a substituicao tributaria de PIS/COFINS"
+
+  "06":
+    descricao: "Operacao Tributavel (aliquota zero)"
+    aplica: saida
+    exige_ncm_monofasico: false
+    observacao: "Produtos com aliquota zero por lei especifica"
+
+  "07":
+    descricao: "Operacao Isenta da Contribuicao"
+    aplica: saida
+    exige_ncm_monofasico: false
+    observacao: "Isencao prevista em lei"
+
+  "08":
+    descricao: "Operacao sem Incidencia da Contribuicao"
+    aplica: saida
+    exige_ncm_monofasico: false
+    observacao: "Nao incidencia por previsao legal (ex: exportacao)"
+
+  "09":
+    descricao: "Operacao com Suspensao da Contribuicao"
+    aplica: saida
+    exige_ncm_monofasico: false
+    observacao: "Suspensao prevista em lei (ex: venda p/ ZFM)"
+
+  "49":
+    descricao: "Outras Operacoes de Saida"
+    aplica: saida
+    exige_ncm_monofasico: false
+    observacao: "Demais saidas nao enquadradas nos codigos anteriores"
+
+  "50":
+    descricao: "Operacao com Direito a Credito - Vinculada a Receitas Tributadas"
+    aplica: entrada
+    exige_ncm_monofasico: false
+    observacao: "Uso restrito; SN normalmente nao gera credito"
+
+  "70":
+    descricao: "Operacao de Aquisicao sem Direito a Credito"
+    aplica: entrada
+    exige_ncm_monofasico: false
+    observacao: "Mais comum para entradas no SN"
+
+  "98":
+    descricao: "Outras Operacoes de Entrada"
+    aplica: entrada
+    exige_ncm_monofasico: false
+
+  "99":
+    descricao: "Outras Operacoes"
+    aplica: ambos
+    exige_ncm_monofasico: false
+
+# CSTs PROIBIDOS para o Simples Nacional (regime cumulativo/nao-cumulativo)
+cst_proibidos:
+  "01":
+    descricao: "Operacao Tributavel (aliquota basica)"
+    motivo: "Exclusivo do regime de lucro real nao-cumulativo"
+
+  "02":
+    descricao: "Operacao Tributavel (aliquota diferenciada)"
+    motivo: "Exclusivo do regime de lucro real nao-cumulativo"
+
+  "03":
+    descricao: "Operacao Tributavel (aliquota por unidade)"
+    motivo: "Exclusivo do regime de lucro real nao-cumulativo"
+
+  "05":
+    descricao: "Operacao Tributavel (substituicao tributaria - ST)"
+    motivo: "Reservado para substitutos tributarios, nao aplicavel ao SN"

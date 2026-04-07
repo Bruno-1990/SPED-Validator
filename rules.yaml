@@ -3277,3 +3277,195 @@ governanca:
   certeza: objetivo
   impacto: informativo
   categoria: governance
+simples_nacional:
+- id: SN_001
+  register: C170
+  fields: [CST_ICMS]
+  error_type: SN_CST_TABELA_A
+  severity: error
+  description: CST Tabela A (Regime Normal) usado em contribuinte do Simples Nacional — deve usar CSOSN (Tabela B)
+  condition: regime == SIMPLES_NACIONAL AND CST_ICMS in {00,10,20,30,40,41,50,51,60,70,90}
+  implemented: true
+  module: simples_validator.py
+  legislation: 'Ajuste SINIEF 07/2005 - Tabela B'
+  vigencia_de: '2018-01-01'
+  vigencia_ate: null
+  version: '2.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  categoria: simples_nacional
+- id: SN_002
+  register: C170
+  fields: [CST_ICMS]
+  error_type: SN_CSOSN_INVALIDO
+  severity: error
+  description: CSOSN informado nao pertence a Tabela B (101-900)
+  condition: regime == SIMPLES_NACIONAL AND CSOSN not in CSOSN_VALIDOS
+  implemented: true
+  module: simples_validator.py
+  legislation: 'Ajuste SINIEF 07/2005 - Tabela B'
+  vigencia_de: '2018-01-01'
+  vigencia_ate: null
+  version: '2.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  categoria: simples_nacional
+- id: SN_003
+  register: C170
+  fields: [ALIQ_ICMS, VL_ICMS]
+  error_type: SN_CREDITO_ZERADO
+  severity: error
+  description: >
+    CSOSN 101/201 permite credito ICMS mas ALIQ_ICMS zerada, ou acima do teto maximo
+    de pCredSN (~4%). Validacao inteligente por range sem necessidade de RBT12.
+  condition: CSOSN in {101,201} AND (ALIQ==0 OR ALIQ > 4.01%)
+  implemented: true
+  module: simples_validator.py
+  legislation: 'LC 123/2006 art. 23 + LC 155/2016'
+  vigencia_de: '2018-01-01'
+  vigencia_ate: null
+  version: '2.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  categoria: simples_nacional
+- id: SN_004
+  register: C170
+  fields: [VL_BC_ICMS_ST, VL_ICMS_ST]
+  error_type: SN_ST_NAO_PREENCHIDA
+  severity: error
+  description: CSOSN 201/202/203 indica ST mas campos de base e valor ST zerados
+  condition: CSOSN in {201,202,203} AND VL_BC_ICMS_ST == 0 AND VL_ICMS_ST == 0
+  implemented: true
+  module: simples_validator.py
+  legislation: 'Ajuste SINIEF 07/2005'
+  vigencia_de: '2018-01-01'
+  vigencia_ate: null
+  version: '2.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  categoria: simples_nacional
+- id: SN_005
+  register: C170
+  fields: [VL_BC_ICMS, VL_ICMS]
+  error_type: SN_CSOSN_300_COM_ICMS
+  severity: warning
+  description: CSOSN 300 (imune) com BC ou valor ICMS preenchido
+  condition: CSOSN == 300 AND (VL_BC_ICMS > 0 OR VL_ICMS > 0)
+  implemented: true
+  module: simples_validator.py
+  vigencia_de: '2018-01-01'
+  vigencia_ate: null
+  version: '2.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  categoria: simples_nacional
+- id: SN_006
+  register: C170
+  fields: [VL_BC_ICMS, VL_ICMS]
+  error_type: SN_CSOSN_400_COM_ICMS
+  severity: warning
+  description: CSOSN 400 (nao tributada) com BC ou valor ICMS preenchido
+  condition: CSOSN == 400 AND (VL_BC_ICMS > 0 OR VL_ICMS > 0)
+  implemented: true
+  module: simples_validator.py
+  vigencia_de: '2018-01-01'
+  vigencia_ate: null
+  version: '2.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  categoria: simples_nacional
+- id: SN_007
+  register: C170
+  fields: [VL_BC_ICMS_ST]
+  error_type: SN_500_SEM_BC_ST
+  severity: warning
+  description: CSOSN 500 (ST retida anteriormente) sem base ST preenchida
+  condition: CSOSN == 500 AND VL_BC_ICMS_ST == 0
+  implemented: true
+  module: simples_validator.py
+  vigencia_de: '2018-01-01'
+  vigencia_ate: null
+  version: '2.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  categoria: simples_nacional
+- id: SN_009
+  register: C170
+  fields: [CST_PIS, CST_COFINS]
+  error_type: SN_PIS_CST_PROIBIDO
+  severity: error
+  description: >
+    CST PIS/COFINS proibido para Simples Nacional. CSTs 01/02/03 exclusivos
+    do regime nao-cumulativo; CST 05 reservado a substitutos tributarios.
+  condition: regime == SIMPLES_NACIONAL AND CST_PIS not in {04,06,07,08,09,49,50,70,98,99}
+  implemented: true
+  module: simples_validator.py
+  legislation: 'Tabela 4.3.3 EFD-Contribuicoes / IN RFB 1.252/2012'
+  vigencia_de: '2018-01-01'
+  vigencia_ate: null
+  version: '2.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  categoria: simples_nacional
+- id: SN_010
+  register: '0000'
+  fields: [IND_PERFIL]
+  error_type: SN_PERFIL_INVALIDO
+  severity: warning
+  description: Contribuinte do Simples Nacional com IND_PERFIL diferente de C
+  condition: regime == SIMPLES_NACIONAL AND IND_PERFIL != 'C'
+  implemented: true
+  module: simples_validator.py
+  vigencia_de: '2018-01-01'
+  vigencia_ate: null
+  version: '2.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  categoria: simples_nacional
+- id: SN_011
+  register: C170
+  fields: [CST_PIS, COD_NCM]
+  error_type: SN_CST_MONOFASICO_NCM_INVALIDO
+  severity: warning
+  description: >
+    CST PIS 04 (monofasico) em produto cujo NCM nao consta na lista
+    de monofasicos da RFB. Possivel erro de classificacao fiscal.
+  condition: CST_PIS == '04' AND NCM not in NCM_MONOFASICOS
+  implemented: true
+  module: simples_validator.py
+  legislation: 'Lei 10.147/2000, Lei 10.485/2002'
+  vigencia_de: '2018-01-01'
+  vigencia_ate: null
+  version: '2.0'
+  last_updated: '2026-04-06'
+  certeza: indicio
+  impacto: relevante
+  categoria: simples_nacional
+- id: SN_012
+  register: C170
+  fields: [ALIQ_ICMS]
+  error_type: SN_CREDITO_INCONSISTENTE
+  severity: warning
+  description: >
+    Aliquota de credito ICMS varia entre itens. No SN a aliquota efetiva
+    (pCredSN) depende da faixa de RBT12 e deveria ser uniforme.
+  condition: max(ALIQ_ICMS) - min(ALIQ_ICMS) > 0.01 para CSOSN 101/201
+  implemented: true
+  module: simples_validator.py
+  legislation: 'LC 123/2006 art. 23'
+  vigencia_de: '2018-01-01'
+  vigencia_ate: null
+  version: '2.0'
+  last_updated: '2026-04-06'
+  certeza: indicio
+  impacto: relevante
+  categoria: simples_nacional
