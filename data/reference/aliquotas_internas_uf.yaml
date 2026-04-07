@@ -1,33 +1,35 @@
 meta:
   fonte: 'CONFAZ + legislações estaduais'
-  vigencia_de: '2022-01-01'
+  vigencia_de: '2024-01-01'
   vigencia_ate: null
 
+# Alíquotas internas padrão por UF (CONFAZ / RICMS estadual)
+# Fonte: legislações estaduais vigentes em 2024
 aliquotas:
-  AC: 17.0
-  AL: 17.0
-  AM: 18.0
-  AP: 18.0
-  BA: 19.0
-  CE: 18.0
-  DF: 18.0
-  ES: 17.0
-  GO: 17.0
-  MA: 18.0
-  MG: 18.0
-  MS: 17.0
-  MT: 17.0
-  PA: 17.0
-  PB: 18.0
-  PE: 18.0
-  PI: 18.0
-  PR: 19.0
-  RJ: 20.0
-  RN: 18.0
-  RO: 17.0
-  RR: 17.0
-  RS: 17.0
-  SC: 17.0
-  SE: 18.0
-  SP: 18.0
-  TO: 18.0
+  AC: 17.0   # Acre
+  AL: 17.0   # Alagoas
+  AM: 20.0   # Amazonas (Decreto 20.686/2000)
+  AP: 18.0   # Amapá
+  BA: 19.0   # Bahia (Dec. 6.284/97)
+  CE: 20.0   # Ceará (Dec. 24.569/97)
+  DF: 18.0   # Distrito Federal
+  ES: 17.0   # Espírito Santo
+  GO: 17.0   # Goiás
+  MA: 18.0   # Maranhão
+  MG: 18.0   # Minas Gerais (Lei 6.763/75)
+  MS: 17.0   # Mato Grosso do Sul
+  MT: 17.0   # Mato Grosso
+  PA: 17.0   # Pará
+  PB: 18.0   # Paraíba
+  PE: 18.0   # Pernambuco
+  PI: 18.0   # Piauí
+  PR: 19.0   # Paraná (Lei 11.580/96)
+  RJ: 20.0   # Rio de Janeiro (Lei 2.657/96)
+  RN: 18.0   # Rio Grande do Norte
+  RO: 17.5   # Rondônia
+  RR: 17.0   # Roraima
+  RS: 18.0   # Rio Grande do Sul (Decreto 37.699/97)
+  SC: 17.0   # Santa Catarina
+  SE: 18.0   # Sergipe
+  SP: 18.0   # São Paulo (Lei 6.374/89)
+  TO: 18.0   # Tocantins

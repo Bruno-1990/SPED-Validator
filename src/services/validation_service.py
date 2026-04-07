@@ -37,6 +37,7 @@ from ..validators.aliquota_validator import validate_aliquotas  # noqa: E402
 from ..validators.audit_rules import validate_audit_rules  # noqa: E402
 from ..validators.beneficio_audit_validator import validate_beneficio_audit  # noqa: E402
 from ..validators.bloco_c_servicos_validator import validate_bloco_c_servicos  # noqa: E402
+from ..validators.bloco_k_validator import validate_bloco_k  # noqa: E402
 from ..validators.c190_validator import validate_c190  # noqa: E402
 from ..validators.correction_hypothesis import validate_with_hypotheses  # noqa: E402
 from ..validators.cross_block_validator import validate_cross_blocks  # noqa: E402
@@ -135,6 +136,7 @@ def run_full_validation(
 
     # 16. Bloco C Servicos — C400/C490/C500/C590 (MOD-17)
     all_errors.extend(validate_bloco_c_servicos(records, context=context))
+    all_errors.extend(validate_bloco_k(records, context=context))
 
     # Persistir erros
     _persist_errors(db, file_id, all_errors)

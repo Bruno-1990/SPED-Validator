@@ -451,3 +451,26 @@ class ReferenceLoader:
                 if subdir.is_dir() and any(subdir.glob("*.yaml")):
                     tables.append(f"vigencias/{subdir.name}")
         return tables
+
+
+# ── Funções de conveniência (standalone, sem instância) ──
+
+from functools import lru_cache as _lru_cache
+
+
+@_lru_cache(maxsize=1)
+def load_aliquotas_internas_uf() -> dict[str, float]:
+    """Carrega alíquotas internas por UF do arquivo YAML de referência."""
+    path = _DATA_DIR / "aliquotas_internas_uf.yaml"
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    raw = data.get("aliquotas", data)  # suporta formato com ou sem meta
+    return {uf: float(v) for uf, v in raw.items() if isinstance(v, (int, float))}
+
+
+def get_aliquota_interna_uf(uf: str, default: float = 17.0) -> float:
+    """Retorna a alíquota interna padrão para a UF informada."""
+    tabela = load_aliquotas_internas_uf()
+    return float(tabela.get(uf.upper(), default))

@@ -30,6 +30,10 @@ DB_DIR = ROOT_DIR / "db"
 DB_DIR.mkdir(exist_ok=True)
 DB_PATH = DB_DIR / "sped.db"
 
+# Limite de upload (padrão: 50MB, configurável via env)
+MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))
+MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
+
 # Modelo de embeddings
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 EMBEDDING_DIM = 384

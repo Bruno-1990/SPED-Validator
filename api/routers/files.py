@@ -6,28 +6,33 @@ import sqlite3
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 
 from api.deps import get_db
 from api.schemas.models import FileInfo, FileUploadResponse
+from config import MAX_UPLOAD_BYTES, MAX_UPLOAD_MB
 from src.services.file_service import clear_all_audit, clear_audit, delete_file, get_file, list_files, upload_file
+from src.services.rate_limiter import check_upload_rate_limit
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
-MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
+MAX_FILE_SIZE = MAX_UPLOAD_BYTES
 
 
 @router.post("/upload", response_model=FileUploadResponse)
 def upload(
+    request: Request,
     file: UploadFile,
     regime: str | None = None,
     db: sqlite3.Connection = Depends(get_db),
 ) -> FileUploadResponse:
-    """Upload de arquivo SPED EFD com limite de 100 MB e leitura streaming.
+    """Upload de arquivo SPED EFD com limite configurável e leitura streaming.
 
     Query params:
         regime: 'normal' | 'simples_nacional' | None (auto-detectar via IND_PERFIL)
     """
+    check_upload_rate_limit(request)
+
     # Leitura streaming em chunks de 1 MB
     chunk_size = 1024 * 1024
     total_read = 0
@@ -38,11 +43,17 @@ def upload(
                 break
             total_read += len(chunk)
             if total_read > MAX_FILE_SIZE:
-                tmp_path = Path(tmp.name)
-                tmp_path.unlink(missing_ok=True)
+                tmp.close()
+                Path(tmp.name).unlink(missing_ok=True)
                 raise HTTPException(
                     status_code=413,
-                    detail=f"Arquivo excede o limite de 100 MB ({total_read / (1024*1024):.0f} MB recebidos)",
+                    detail={
+                        "error": "FILE_TOO_LARGE",
+                        "message": f"Arquivo excede o limite de {MAX_UPLOAD_MB}MB. "
+                                   f"Tamanho recebido: {total_read / 1024 / 1024:.1f}MB.",
+                        "limit_mb": MAX_UPLOAD_MB,
+                        "received_mb": round(total_read / 1024 / 1024, 1),
+                    },
                 )
             tmp.write(chunk)
         tmp_path = Path(tmp.name)

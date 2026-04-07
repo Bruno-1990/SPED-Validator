@@ -215,3 +215,36 @@ class TestMetarregras:
         data = resp.json()["data"]
         for err in data:
             assert err["severity"] == "info"
+
+
+# ──────────────────────────────────────────────
+# Endpoint global /api/audit-scope (sem file_id)
+# ──────────────────────────────────────────────
+
+class TestGlobalAuditScope:
+    """Testes do endpoint GET /api/audit-scope (escopo geral do sistema)."""
+
+    def test_audit_scope_returns_200(self) -> None:
+        c = TestClient(app)
+        resp = c.get("/api/audit-scope")
+        assert resp.status_code == 200
+
+    def test_audit_scope_has_required_fields(self) -> None:
+        c = TestClient(app)
+        resp = c.get("/api/audit-scope").json()
+        assert "validacao_cobre" in resp
+        assert "validacao_nao_cobre" in resp
+        assert "aviso_legal" in resp
+        assert len(resp["validacao_nao_cobre"]) >= 4
+
+    def test_aviso_legal_is_string(self) -> None:
+        c = TestClient(app)
+        resp = c.get("/api/audit-scope").json()
+        assert isinstance(resp["aviso_legal"], str)
+        assert len(resp["aviso_legal"]) > 50
+
+    def test_apontamentos_por_certeza(self) -> None:
+        c = TestClient(app)
+        resp = c.get("/api/audit-scope").json()
+        assert "apontamentos_por_certeza" in resp
+        assert "objetivo" in resp["apontamentos_por_certeza"]

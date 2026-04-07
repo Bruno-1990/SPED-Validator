@@ -6,7 +6,7 @@ import asyncio
 import json
 import sqlite3
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from api.deps import get_db, get_doc_db_path
@@ -21,14 +21,16 @@ from api.schemas.models import (
 from src.services.context_builder import TaxRegime, build_context
 from src.services.pipeline import PipelineProgress, cleanup_pipeline, get_pipeline_progress, run_pipeline
 from src.services.reference_loader import ReferenceLoader
+from src.services.rate_limiter import check_validation_rate_limit
 from src.services.validation_service import get_error_summary, get_errors
 
 router = APIRouter(prefix="/api/files/{file_id}", tags=["validation"])
 
 
 @router.post("/validate", response_model=ValidationResponse)
-def validate(file_id: int, db: sqlite3.Connection = Depends(get_db)) -> ValidationResponse:
+def validate(file_id: int, request: Request, db: sqlite3.Connection = Depends(get_db)) -> ValidationResponse:
     """Executa validação completa do arquivo (síncrono, compatível com versão anterior)."""
+    check_validation_rate_limit(request)
     doc_db = get_doc_db_path()
     progress = run_pipeline(db, file_id, doc_db_path=doc_db)
     cleanup_pipeline(file_id)

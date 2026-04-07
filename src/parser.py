@@ -132,6 +132,64 @@ def _read_with_fallback(filepath: Path) -> str:
     return raw.decode("latin-1", errors="replace")
 
 
+def parse_sped_file_stream(
+    filepath: str | Path,
+    encoding: str | None = None,
+    max_bytes: int | None = None,
+) -> Generator[SpedRecord, None, None]:
+    """Parser com streaming — usa generator para não carregar o arquivo inteiro na memória.
+
+    Ideal para arquivos grandes (>50MB).
+
+    Yields SpedRecord um a um conforme lê o arquivo linha a linha.
+
+    Args:
+        filepath: caminho para o arquivo SPED
+        encoding: encoding forçado; se None, detecta automaticamente
+        max_bytes: limite de bytes a processar; None = sem limite
+
+    Raises:
+        ValueError: se o arquivo exceder max_bytes
+        FileNotFoundError: se o arquivo não existir
+    """
+    filepath = Path(filepath)
+    if not filepath.exists():
+        raise FileNotFoundError(f"Arquivo não encontrado: {filepath}")
+
+    # Detectar encoding se não fornecido
+    if encoding is None:
+        encoding = _detect_encoding(filepath)
+
+    # Verificar tamanho antes de abrir
+    file_size = filepath.stat().st_size
+    if max_bytes and file_size > max_bytes:
+        raise ValueError(
+            f"Arquivo muito grande: {file_size / 1024 / 1024:.1f}MB. "
+            f"Limite: {max_bytes / 1024 / 1024:.0f}MB. "
+            f"Configure MAX_UPLOAD_MB para aumentar o limite."
+        )
+
+    with open(filepath, encoding=encoding, errors="replace") as f:
+        for line_number, raw_line in enumerate(f, start=1):
+            raw_line = raw_line.rstrip("\n\r")
+            if not raw_line.startswith("|"):
+                continue
+            parts = raw_line.split("|")
+            if len(parts) >= 3:
+                parts = parts[1:-1]
+            else:
+                continue
+            register = parts[0].strip() if parts else ""
+            if not register:
+                continue
+            yield SpedRecord(
+                line_number=line_number,
+                register=register,
+                fields=fields_to_dict(register, parts),
+                raw_line=raw_line,
+            )
+
+
 def group_by_register(records: list[SpedRecord]) -> dict[str, list[SpedRecord]]:
     """Agrupa registros pelo código de registro (ex: todos os C100 juntos)."""
     groups: dict[str, list[SpedRecord]] = {}

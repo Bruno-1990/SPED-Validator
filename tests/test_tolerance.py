@@ -139,5 +139,61 @@ class TestIntegrationTaxRecalcUsesTolerance(unittest.TestCase):
         assert len(errors) > 0, "Deveria detectar divergência de 0.02"
 
 
+class TestToleranceResolver(unittest.TestCase):
+    """Testes para ToleranceResolver com contextos."""
+
+    def test_item_icms_within(self) -> None:
+        from src.validators.tolerance import ToleranceResolver, ToleranceType
+        assert ToleranceResolver.is_within_tolerance(0.005, tolerance_type=ToleranceType.ITEM_ICMS) is True
+
+    def test_item_icms_at_limit(self) -> None:
+        from src.validators.tolerance import ToleranceResolver, ToleranceType
+        assert ToleranceResolver.is_within_tolerance(0.01, tolerance_type=ToleranceType.ITEM_ICMS) is True
+
+    def test_item_icms_above_limit(self) -> None:
+        from src.validators.tolerance import ToleranceResolver, ToleranceType
+        assert ToleranceResolver.is_within_tolerance(0.02, tolerance_type=ToleranceType.ITEM_ICMS) is False
+
+    def test_apuracao_e110_half_real(self) -> None:
+        from src.validators.tolerance import ToleranceResolver, ToleranceType
+        assert ToleranceResolver.is_within_tolerance(0.50, tolerance_type=ToleranceType.APURACAO_E110) is True
+
+    def test_apuracao_e110_above(self) -> None:
+        from src.validators.tolerance import ToleranceResolver, ToleranceType
+        assert ToleranceResolver.is_within_tolerance(1.50, tolerance_type=ToleranceType.APURACAO_E110) is False
+
+    def test_consolidacao_within(self) -> None:
+        from src.validators.tolerance import ToleranceResolver, ToleranceType
+        assert ToleranceResolver.is_within_tolerance(0.05, tolerance_type=ToleranceType.CONSOLIDACAO) is True
+
+    def test_absolute_zero(self) -> None:
+        from src.validators.tolerance import ToleranceResolver, ToleranceType
+        assert ToleranceResolver.is_within_tolerance(0.0, tolerance_type=ToleranceType.ABSOLUTE) is True
+        assert ToleranceResolver.is_within_tolerance(0.001, tolerance_type=ToleranceType.ABSOLUTE) is False
+
+    def test_string_tolerance_type(self) -> None:
+        from src.validators.tolerance import ToleranceResolver
+        assert ToleranceResolver.is_within_tolerance(0.005, tolerance_type="item_icms") is True
+
+    def test_invalid_string_uses_fallback(self) -> None:
+        from src.validators.tolerance import ToleranceResolver
+        assert ToleranceResolver.is_within_tolerance(0.005, tolerance_type="tipo_invalido") is True
+
+    def test_negative_difference(self) -> None:
+        from src.validators.tolerance import ToleranceResolver, ToleranceType
+        assert ToleranceResolver.is_within_tolerance(-0.005, tolerance_type=ToleranceType.ITEM_ICMS) is True
+
+    def test_format_tolerance_info(self) -> None:
+        from src.validators.tolerance import ToleranceResolver, ToleranceType
+        info = ToleranceResolver.format_tolerance_info(ToleranceType.ITEM_ICMS)
+        assert "R$0.01" in info
+
+    def test_get_config_returns_dataclass(self) -> None:
+        from src.validators.tolerance import ToleranceResolver, ToleranceType, ToleranceConfig
+        config = ToleranceResolver.get_config(ToleranceType.APURACAO_E110)
+        assert isinstance(config, ToleranceConfig)
+        assert config.absolute_brl == 1.00
+
+
 if __name__ == "__main__":
     unittest.main()

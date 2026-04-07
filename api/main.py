@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
 from api.auth import verify_api_key  # noqa: E402
 from api.routers import files, records, report, rules, search, validation  # noqa: E402
+from api.routers.audit_scope import router as audit_scope_router  # noqa: E402
 
 app = FastAPI(
     title="SPED EFD Audit API",
@@ -41,6 +42,7 @@ app.include_router(validation.router, dependencies=_auth)
 app.include_router(report.router, dependencies=_auth)
 app.include_router(search.router, dependencies=_auth)
 app.include_router(rules.router, dependencies=_auth)
+app.include_router(audit_scope_router)
 
 
 @app.on_event("startup")

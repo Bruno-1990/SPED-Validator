@@ -7,7 +7,8 @@ formato:
   - CNPJ
   error_type: FORMATO_INVALIDO
   severity: error
-  corrigivel: automatico
+  corrigivel: investigar
+  corrigivel_nota: 'CNPJ com DV inválido não pode ser corrigido automaticamente — o sistema não conhece o valor correto. Consulte o documento fiscal original.'
   description: CNPJ deve ter 14 digitos numericos com digitos verificadores validos (modulo 11)
   condition: len(CNPJ) != 14 OR digitos iguais OR DV invalido
   implemented: true
@@ -15,7 +16,7 @@ formato:
   vigencia_de: '2000-01-01'
   vigencia_ate: null
   version: '1.0'
-  last_updated: '2026-04-05'
+  last_updated: '2026-04-07'
   certeza: objetivo
   impacto: relevante
 - id: FMT_CPF
@@ -24,7 +25,8 @@ formato:
   - CPF
   error_type: FORMATO_INVALIDO
   severity: error
-  corrigivel: automatico
+  corrigivel: investigar
+  corrigivel_nota: 'CPF com DV inválido não pode ser corrigido automaticamente — o sistema não conhece o valor correto. Consulte o documento fiscal original.'
   description: CPF deve ter 11 digitos numericos com digitos verificadores validos (modulo 11)
   condition: len(CPF) != 11 OR digitos iguais OR DV invalido
   implemented: true
@@ -32,7 +34,7 @@ formato:
   vigencia_de: '2000-01-01'
   vigencia_ate: null
   version: '1.0'
-  last_updated: '2026-04-05'
+  last_updated: '2026-04-07'
   certeza: objetivo
   impacto: relevante
 - id: FMT_DATA
@@ -3693,3 +3695,89 @@ simples_nacional:
   version: '3.0'
   last_updated: '2026-04-06'
   categoria: simples_nacional
+
+bloco_k:
+- id: K_001
+  register: K001
+  fields: [IND_MOV]
+  error_type: K_BLOCO_SEM_MOVIMENTO_COM_REGISTROS
+  severity: error
+  corrigivel: proposta
+  description: K001 com IND_MOV=1 mas existem registros analiticos K210/K220/K230
+  condition: IND_MOV=1 AND existe(K210 OR K220 OR K230)
+  implemented: true
+  module: bloco_k_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-07'
+  certeza: objetivo
+  impacto: relevante
+
+- id: K_002
+  register: K200
+  fields: [COD_ITEM]
+  error_type: K_REF_ITEM_INEXISTENTE
+  severity: warning
+  corrigivel: proposta
+  description: COD_ITEM do K200 nao encontrado no cadastro 0200
+  condition: COD_ITEM not in {0200.COD_ITEM}
+  implemented: true
+  module: bloco_k_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-07'
+  certeza: objetivo
+  impacto: relevante
+
+- id: K_003
+  register: K200
+  fields: [QTD]
+  error_type: K_QTD_NEGATIVA
+  severity: error
+  corrigivel: proposta
+  description: Quantidade no inventario K200 negativa
+  condition: QTD < 0
+  implemented: true
+  module: bloco_k_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-07'
+  certeza: objetivo
+  impacto: relevante
+
+- id: K_004
+  register: K230
+  fields: [COD_ITEM]
+  error_type: K_REF_ITEM_INEXISTENTE
+  severity: warning
+  corrigivel: proposta
+  description: COD_ITEM do K230 nao encontrado no 0200
+  condition: COD_ITEM not in {0200.COD_ITEM}
+  implemented: true
+  module: bloco_k_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-07'
+  certeza: objetivo
+  impacto: relevante
+
+- id: K_005
+  register: K230
+  fields: [COD_DOC_OP]
+  error_type: K_ORDEM_SEM_COMPONENTES
+  severity: info
+  corrigivel: investigar
+  description: Ordem de producao K230 sem registros K235 de componentes
+  condition: K230.COD_DOC_OP not in {K235 filhos}
+  implemented: true
+  module: bloco_k_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-07'
+  certeza: provavel
+  impacto: informativo

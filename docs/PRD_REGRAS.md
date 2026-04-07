@@ -1,15 +1,29 @@
 # PRD - Motor de Regras de Validacao SPED EFD
 
-**Versao:** 4.0
-**Data:** 2026-04-06
+**Versao:** 5.0
+**Data:** 2026-04-07
 **Autor:** Bruno
-**Status:** Concluido v4
+**Status:** Concluido v5
 
 ---
 
 ## 1. Visao Geral
 
-O motor de validacao SPED EFD conta com **186 regras** definidas no `rules.yaml`, **todas implementadas** em 22 blocos de validacao, com campo `corrigivel` obrigatorio em todas as regras (automatico|proposta|investigar|impossivel). O catalogo completo cobre cenarios de formato, cruzamento, recalculo, semantica fiscal, auditoria de beneficios, aliquotas, DIFAL/FCP, base de calculo, destinatario, devolucoes, parametrizacao, governanca e **Simples Nacional**.
+O motor de validacao SPED EFD conta com **191 regras** definidas no `rules.yaml`, **todas implementadas** em 23 blocos de validacao, com campo `corrigivel` obrigatorio em todas as regras (automatico|proposta|investigar|impossivel). O catalogo completo cobre cenarios de formato, cruzamento, recalculo, semantica fiscal, auditoria de beneficios, aliquotas, DIFAL/FCP, base de calculo, destinatario, devolucoes, parametrizacao, governanca, **Simples Nacional** e **Bloco K (producao e estoque)**.
+
+**Novidades v5:**
+- **Bloco K**: 5 regras de producao e estoque (K_001 a K_005) — integridade referencial, fechamento, quantidades
+- **Governanca aprimorada**: 22 campos sensiveis bloqueados para correcao automatica (CNPJ, CPF, valores, CST, CFOP); FMT_CNPJ/FMT_CPF reclassificados para `investigar`
+- **Tolerancia por contexto**: `ToleranceResolver` com 8 tipos (item R$0,01, consolidacao R$0,10, apuracao R$1,00)
+- **FieldRegistry**: acesso seguro a campos por nome via singleton com fallback DB/memoria
+- **RegimeDetector**: deteccao multi-sinal (IND_PERFIL + CSOSN + CST) com grau de confianca
+- **ErrorDeduplicator**: remove apontamentos duplicados por grupo semantico na mesma linha/campo
+- **Rate limiting**: 10 uploads/min, 5 validacoes/min por IP nos endpoints criticos
+- **Streaming**: `parse_sped_file_stream()` para arquivos grandes sem carregar em memoria
+- **Aliquotas por UF**: 27 UFs parametrizadas com fontes legislativas (AM=20%, CE=20%, SP=18%)
+- **Audit scope**: endpoint GET /api/audit-scope com escopo e limitacoes da validacao
+- **6 fixtures fiscais**: cenarios reais (SN, ST, exportacao, devolucao, erros multiplos)
+- **Lint AST**: check_hardcoded_indices.py proibe `fields[N]` com N >= 2
 
 **Novidades v4:**
 - Campo `corrigivel` em 100% das regras, com governanca de correcoes no `correction_service.py`
@@ -18,13 +32,13 @@ O motor de validacao SPED EFD conta com **186 regras** definidas no `rules.yaml`
 - Filtros UI no frontend: severidade, registro, certeza, ordenacao
 - Vigencia de regras enforced no engine (regras de 2024 nao aplicam a arquivo de 2022)
 
-**Estado atual:** 186 regras implementadas | 1472 testes automatizados | campo corrigivel em 100% das regras
+**Estado atual:** 191 regras implementadas | 1601 testes automatizados | campo corrigivel em 100% das regras
 
 ---
 
 ## 2. Situacao Atual
 
-### 2.1 Regras Implementadas (186)
+### 2.1 Regras Implementadas (191)
 
 | Bloco | Qtd | Modulo |
 |---|---|---|
@@ -50,8 +64,9 @@ O motor de validacao SPED EFD conta com **186 regras** definidas no `rules.yaml`
 | ncm | 2 | ncm_validator.py |
 | governanca | 5 | audit_rules.py |
 | simples_nacional | 11 | simples_validator.py |
+| **bloco_k** | **5** | **bloco_k_validator.py** *(novo v5)* |
 
-**Severidades:** 50 critical, 43 error, 75 warning, 16 info
+**Severidades:** 50 critical, 43 error, 75 warning, 21 info
 
 ### 2.2 Detalhamento — Bloco `auditoria_beneficios` (50 regras)
 
@@ -308,10 +323,10 @@ Os limites sao calculados a partir dos Anexos I-V da LC 155/2016.
 
 | Origem | Qtd | Status |
 |---|---|---|
-| Regras implementadas (rules.yaml) | 186 | Todas implementadas |
-| Regras com error_type no codigo | 135 | Produzem alertas |
+| Regras implementadas (rules.yaml) | 191 | Todas implementadas |
+| Regras com error_type no codigo | 140 | Produzem alertas |
 | Regras planejadas (error_type futuro) | 40 | Definidas no YAML, implementacao futura |
-| **TOTAL** | **186** | |
+| **TOTAL** | **191** | |
 
 ### 4.2 Total por Severidade
 
@@ -368,6 +383,7 @@ src/validators/
   ncm_validator.py            # NCM_001..002
   governanca.py               # GOV_001..004, AMOSTRA_001
   simples_validator.py        # SN_001..012
+  bloco_k_validator.py        # K_001..005 (novo v5)
   audit_rules.py              # AUD_* pendentes (expandir existente)
   fiscal_semantics.py         # PEND_* (expandir existente)
 ```
@@ -589,10 +605,10 @@ Requer construcao de tabelas de referencia externas:
 
 ## 9. Metricas de Sucesso
 
-- **Cobertura atual:** 186/186 regras implementadas (100%)
+- **Cobertura atual:** 191/191 regras implementadas (100%)
 - **Falsos positivos:** < 5% em arquivo de referencia (regras analiticas rebaixadas para warning)
 - **Performance:** Validacao completa < 30s para arquivo de 15k registros
-- **Testes:** 1472 testes automatizados passando
+- **Testes:** 1601 testes automatizados passando (78 novos v5)
 - **Regressao:** Zero regras existentes quebradas
 
 ---
@@ -630,3 +646,67 @@ Requer construcao de tabelas de referencia externas:
 ### Embedding
 - config.py: EMBEDDING_MODEL_NOTES documentado
 - python -m src.embeddings --info
+
+---
+
+## 11. Melhorias PRD v5 (2026-04-07)
+
+### Bloco K — Producao e Estoque (5 regras)
+
+| ID | Registro | error_type | Severidade | Descricao |
+|---|---|---|---|---|
+| K_001 | K001 | K_BLOCO_SEM_MOVIMENTO_COM_REGISTROS | error | K001 IND_MOV=1 com registros analiticos K210/K220/K230 |
+| K_002 | K200 | K_REF_ITEM_INEXISTENTE | warning | COD_ITEM do K200 nao encontrado no cadastro 0200 |
+| K_003 | K200 | K_QTD_NEGATIVA | error | Quantidade no inventario K200 negativa |
+| K_004 | K230 | K_REF_ITEM_INEXISTENTE | warning | COD_ITEM do K230 nao encontrado no 0200 |
+| K_005 | K230 | K_ORDEM_SEM_COMPONENTES | info | Ordem de producao K230 sem registros K235 de componentes |
+
+### Governanca de Correcoes Aprimorada
+
+- `CorrectionBlockedError`: levantado quando correcao automatica tenta alterar campo sensivel
+- 22 campos bloqueados: CNPJ, CPF, IE, CHV_NFE, CHV_CTE, NUM_DOC, SER, COD_MOD, VL_DOC, VL_ICMS, VL_BC_ICMS, VL_ICMS_ST, VL_IPI, VL_PIS, VL_COFINS, VL_TOT_DEBITOS, VL_TOT_CREDITOS, CST_ICMS, CSOSN, CST_PIS, CST_COFINS, CFOP, DT_DOC
+- FMT_CNPJ e FMT_CPF reclassificados de `automatico` para `investigar`
+- Validacao integrada no inicio de `apply_correction()`
+
+### Tolerancia por Contexto
+
+- `ToleranceResolver` com `ToleranceType` enum (8 tipos) e `ToleranceConfig` dataclass
+- Substitui tolerancia unica de R$0,02 por tolerancias diferenciadas:
+  - Item (ICMS/IPI/PIS/COFINS): R$0,01
+  - Documento (VL_DOC): R$0,02
+  - Consolidacao (C190 vs C170): R$0,10
+  - Apuracao (E110): R$1,00
+  - Inventario (H010): R$0,10
+- API retrocompativel: `get_tolerance()` e `CALCULATION_TOLERANCE` mantidos
+
+### Novos Modulos de Infraestrutura
+
+| Modulo | Funcao |
+|---|---|
+| `field_registry.py` | FieldRegistry singleton — acesso a campos por nome via DB ou REGISTER_FIELDS |
+| `helpers_registry.py` | fval/fnum/fstr — shorthand para acesso seguro a campos |
+| `regime_detector.py` | RegimeDetector multi-sinal com confianca (IND_PERFIL + CSOSN + CST) |
+| `error_deduplicator.py` | ErrorDeduplicator — agrupa por (linha, campo, grupo semantico), mantém o de maior impacto |
+| `rate_limiter.py` | SlidingWindowRateLimiter — 10 uploads/min, 5 validacoes/min por IP |
+| `audit_scope.py` | GET /api/audit-scope — escopo e limitacoes do sistema |
+
+### Aliquotas Internas por UF
+
+- `aliquotas_internas_uf.yaml` atualizado com 27 UFs e fontes legislativas
+- AM=20% (Dec. 20.686/2000), CE=20% (Dec. 24.569/97), RJ=20% (Lei 2.657/96)
+- `get_aliquota_interna_uf(uf, default)` para consulta direta
+- Usado na regra CST_004 para parametrizar piso por UF
+
+### Streaming e Limites
+
+- `parse_sped_file_stream()`: generator para arquivos grandes (>50MB) sem OOM
+- `MAX_UPLOAD_MB` configuravel via env (padrao: 50MB)
+- Upload retorna HTTP 413 com detalhes estruturados se exceder limite
+
+### Qualidade e Testes
+
+- 78 novos testes (total: 1601)
+- 6 fixtures de cenarios fiscais reais
+- `scripts/check_hardcoded_indices.py`: lint AST para proibir campos hardcoded
+- `Makefile` com targets: lint, check-indices, test, ci
+- Migracao DB v11: ind_regime, regime_confidence, regime_signals em sped_files

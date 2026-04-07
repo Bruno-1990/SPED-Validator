@@ -177,6 +177,11 @@ _MIGRATIONS: dict[int, list[str]] = {
     10: [
         "ALTER TABLE validation_errors ADD COLUMN materialidade REAL DEFAULT 0",
     ],
+    11: [
+        "ALTER TABLE sped_files ADD COLUMN ind_regime TEXT DEFAULT 'DESCONHECIDO'",
+        "ALTER TABLE sped_files ADD COLUMN regime_confidence REAL DEFAULT 0.0",
+        "ALTER TABLE sped_files ADD COLUMN regime_signals TEXT DEFAULT '[]'",
+    ],
 }
 
 

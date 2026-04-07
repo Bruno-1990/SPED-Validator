@@ -21,9 +21,30 @@ class CorrectionNotAllowed(Exception):
     pass
 
 
+class CorrectionBlockedError(Exception):
+    """Levantada quando uma correção automática é bloqueada por regra de governança."""
+    pass
+
+
 class MissingJustificativa(Exception):
     """Correcao proposta requer justificativa nao vazia."""
     pass
+
+
+# Campos que NUNCA devem ter correção automática — requerem validação humana
+FIELDS_BLOCKED_FROM_AUTO_CORRECTION: frozenset[str] = frozenset({
+    # Identificadores fiscais — o sistema não sabe o valor correto
+    "CNPJ", "CPF", "IE", "CHV_NFE", "CHV_CTE",
+    # Chaves de documento — correção invalida a NF
+    "NUM_DOC", "SER", "COD_MOD",
+    # Valores monetários — requerem recálculo com contexto completo
+    "VL_DOC", "VL_ICMS", "VL_BC_ICMS", "VL_ICMS_ST", "VL_IPI",
+    "VL_PIS", "VL_COFINS", "VL_TOT_DEBITOS", "VL_TOT_CREDITOS",
+    # Classificações fiscais — podem ter base legal específica
+    "CST_ICMS", "CSOSN", "CST_PIS", "CST_COFINS", "CFOP",
+    # Datas de documento — devem refletir o documento original
+    "DT_DOC",
+})
 
 
 # Cache rule_id -> corrigivel
@@ -41,6 +62,42 @@ def _get_corrigivel(rule_id: str | None) -> str:
     if not rule_id:
         return "proposta"
     return _corrigivel_cache.get(rule_id, "proposta")
+
+
+def _validate_correction_governance(
+    field_name: str,
+    corrigivel: str,
+    new_value: str,
+) -> None:
+    """Valida a governança antes de aplicar uma correção.
+
+    Raises:
+        CorrectionBlockedError: se a correção viola as regras de governança
+    """
+    field_upper = field_name.upper()
+
+    # Bloco 1: campo bloqueado para automação
+    if corrigivel == "automatico" and field_upper in FIELDS_BLOCKED_FROM_AUTO_CORRECTION:
+        raise CorrectionBlockedError(
+            f"Campo {field_name!r} não pode ser corrigido automaticamente. "
+            f"Este campo requer validação humana. "
+            f"Use corrigivel=proposta e forneça uma justificativa."
+        )
+
+    # Bloco 2: impossível = nunca pode ser corrigido automaticamente
+    if corrigivel == "impossivel":
+        raise CorrectionBlockedError(
+            "Este apontamento está marcado como impossível de corrigir "
+            "apenas com dados do arquivo SPED. "
+            "É necessário consultar documentos externos (XML, ato concessivo, etc.)."
+        )
+
+    # Bloco 3: investigar = nunca automático, mas pode ser proposta com justificativa
+    if corrigivel == "investigar" and not new_value.strip():
+        raise CorrectionBlockedError(
+            "Apontamento do tipo investigar requer análise externa. "
+            "Forneça uma justificativa e o novo valor proposto após investigação."
+        )
 
 
 def _enforce_corrigivel(rule_id: str | None, justificativa: str | None) -> None:
@@ -99,6 +156,10 @@ def apply_correction(
     exige justificativa para regras proposta.
     """
     _enforce_corrigivel(rule_id, justificativa)
+
+    # Governança de campos sensíveis
+    corrigivel = _get_corrigivel(rule_id)
+    _validate_correction_governance(field_name, corrigivel, new_value)
 
     row = db.execute(
         "SELECT fields_json, register FROM sped_records WHERE id = ? AND file_id = ?",

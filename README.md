@@ -12,7 +12,7 @@ Este sistema resolve isso automatizando:
 
 1. **Conversao** de PDFs/DOCX/TXT da documentacao oficial para Markdown estruturado
 2. **Indexacao** com Full-Text Search (FTS5) + embeddings vetoriais para busca semantica
-3. **Validacao** em 22 camadas dos arquivos SPED (estrutural, semantica fiscal, monofasicos, auditoria de beneficios, aliquotas, C190, DIFAL/FCP, base de calculo, destinatario, parametrizacao, governanca, **Simples Nacional**) com 186 regras implementadas, governanca de correcoes (4 niveis: automatico/proposta/investigar/impossivel), materialidade financeira estimada e workflow de resolucao de apontamentos
+3. **Validacao** em 23 camadas dos arquivos SPED (estrutural, semantica fiscal, monofasicos, auditoria de beneficios, aliquotas, C190, DIFAL/FCP, base de calculo, destinatario, parametrizacao, governanca, **Simples Nacional**, **Bloco K**) com 191 regras implementadas, governanca de correcoes (4 niveis: automatico/proposta/investigar/impossivel) com bloqueio de campos sensiveis (CNPJ/CPF/valores), materialidade financeira estimada, workflow de resolucao de apontamentos, tolerancias por contexto, rate limiting, streaming de arquivos grandes e deduplicacao de apontamentos
 4. **Busca automatica** da documentacao relevante para cada erro encontrado
 5. **API REST** (FastAPI) com endpoints para upload, validacao, correcao e exportacao
 6. **Frontend React** com interface para upload, visualizacao de erros e relatorios
@@ -152,7 +152,7 @@ Execute `git-push.bat` no Windows — pede a mensagem do commit, faz rebase na m
 ```
 SPED/
 |-- README.md                       # Este arquivo
-|-- rules.yaml                      # Catalogo de 186 regras com corrigivel obrigatorio (automatico|proposta|investigar|impossivel)
+|-- rules.yaml                      # Catalogo de 191 regras com corrigivel obrigatorio (automatico|proposta|investigar|impossivel)
 |-- pyproject.toml                  # Dependencias e metadados (v0.1.0)
 |-- config.py                       # Caminhos, modelo embedding, parametros
 |-- start.bat                       # Inicia API + Frontend (Windows)
@@ -194,24 +194,31 @@ SPED/
 |   |   |-- ncm_validator.py             # NCM tributacao incompativel, generico
 |   |   |-- bloco_c_servicos_validator.py # Servicos no Bloco C
 |   |   |-- bloco_d_validator.py         # Bloco D: transporte
+|   |   |-- bloco_k_validator.py         # Bloco K: producao e estoque (5 regras K_001-K_005)
 |   |   |-- pendentes_validator.py       # Regras pendentes de contexto externo
 |   |   |-- audit_rules.py              # Regras de auditoria gerais
 |   |   |-- simples_validator.py          # Simples Nacional: CSOSN, CST PIS/COFINS, credito ICMS (11 regras)
 |   |   |-- retificador_validator.py     # Validacoes de retificacao
-|   |   |-- helpers.py                   # Funcoes auxiliares dos validadores
-|   |   |-- tolerance.py                 # Constantes de tolerancia de calculo
+|   |   |-- helpers.py                   # Funcoes auxiliares dos validadores + REGISTER_FIELDS (incl. K001-K990)
+|   |   |-- tolerance.py                 # ToleranceResolver por contexto (item/consolidacao/apuracao) + compatibilidade retroativa
+|   |   |-- field_registry.py            # FieldRegistry: resolve (register, field_name) -> indice via singleton
+|   |   |-- helpers_registry.py          # fval/fnum/fstr — acesso seguro a campos por nome
+|   |   |-- regime_detector.py           # RegimeDetector: multi-sinal (IND_PERFIL + CSOSN + CST) com confianca
+|   |   |-- error_deduplicator.py        # ErrorDeduplicator: remove duplicatas por linha/campo/grupo semantico
 |   |   |-- correction_hypothesis.py     # Hipoteses de correcao automatica
 |   |   |-- cst_hypothesis.py            # Hipoteses de correcao de CST
 |   |-- services/
 |   |   |-- reference_loader.py          # Carrega tabelas YAML de referencia (lazy loading)
 |   |   |-- __init__.py
-|   |   |-- database.py                 # Schema SQLite de auditoria (8 tabelas, 10 migracoes)
+|   |   |-- database.py                 # Schema SQLite de auditoria (8 tabelas, 11 migracoes)
 |   |   |-- file_service.py             # Upload, hash, parse, metadados, CRUD, clear_audit
-|   |   |-- validation_service.py       # Orquestrador de validacao (7 camadas, 4 severidades)
+|   |   |-- validation_service.py       # Orquestrador de validacao (23 camadas, 4 severidades)
 |   |   |-- pipeline.py                 # Pipeline estagiado com SSE (progresso em tempo real)
 |   |   |-- error_messages.py           # 30+ tipos de erro com mensagens amigaveis e orientacao
 |   |   |-- auto_correction_service.py  # Correcoes automaticas deterministicas
-|   |   |-- correction_service.py       # Aplicar/desfazer correcoes com governanca (automatico/proposta/investigar/impossivel)
+|   |   |-- correction_service.py       # Governanca de correcoes com bloqueio de campos sensiveis (CNPJ/CPF/valores)
+|   |   |-- rate_limiter.py             # SlidingWindowRateLimiter: 10 uploads/min, 5 validacoes/min por IP
+|   |   |-- reference_loader.py         # Carrega tabelas YAML de referencia (lazy loading) + aliquotas por UF
 |   |   |-- export_service.py           # Exportar SPED, relatorio MD/CSV/JSON
 |
 |-- api/
@@ -221,12 +228,13 @@ SPED/
 |   |-- schemas/
 |   |   |-- models.py                   # 10 Pydantic models (request/response)
 |   |-- routers/
-|   |   |-- files.py                    # Upload, listar, detalhe, deletar
+|   |   |-- files.py                    # Upload com rate limiting e limite configuravel (MAX_UPLOAD_MB)
 |   |   |-- records.py                  # Listar registros, detalhe, corrigir
-|   |   |-- validation.py              # Validar, erros, resumo
+|   |   |-- validation.py              # Validar com rate limiting, erros, resumo
 |   |   |-- report.py                   # Relatorio MD/CSV/JSON, download SPED
 |   |   |-- search.py                   # Busca na documentacao
 |   |   |-- rules.py                    # Gerar, listar e implementar regras via API
+|   |   |-- audit_scope.py             # GET /api/audit-scope — escopo e limitacoes da validacao
 |
 |-- frontend/
 |   |-- package.json                    # React 18 + Vite + TailwindCSS + TypeScript
@@ -276,10 +284,26 @@ SPED/
 |   |-- test_searcher.py            # Testes do buscador (FTS, semantico, RRF, search_for_error)
 |   |-- test_embeddings.py          # Testes de embeddings (blob roundtrip, mock model)
 |   |-- test_fiscal_semantics.py    # Testes semantica fiscal: aliquota zero, CST x CFOP, monofasicos (73 testes)
+|   |-- test_field_registry.py      # Testes FieldRegistry (9 testes)
+|   |-- test_parser_stream.py       # Testes streaming parser (6 testes)
+|   |-- test_correction_governance.py # Testes bloqueio campos sensiveis (9 testes)
+|   |-- test_regime_detector.py     # Testes RegimeDetector multi-sinal (8 testes)
+|   |-- test_error_deduplicator.py  # Testes ErrorDeduplicator (8 testes)
+|   |-- test_aliquota_interna_uf.py # Testes aliquota por UF (8 testes)
+|   |-- test_rate_limiter.py        # Testes SlidingWindowRateLimiter (5 testes)
+|   |-- test_bloco_k_validator.py   # Testes Bloco K (11 testes)
+|   |-- test_fiscal_scenarios.py    # Testes cenarios fiscais reais (7 testes)
+|   |-- test_check_hardcoded_indices.py # Testes lint AST (7 testes)
 |   |-- fixtures/
 |   |   |-- sped_minimal.txt        # SPED minimo (0000 + blocos vazios + 9999)
 |   |   |-- sped_valid.txt          # SPED completo com NFs, itens, apuracao (57 registros)
 |   |   |-- sped_errors.txt         # SPED com erros conhecidos (tipo, valor, malformed)
+|   |   |-- sped_simples_nacional.txt       # SN correto: CSOSN 400/101/500
+|   |   |-- sped_simples_nacional_erros.txt # SN com CST Tabela A e credito acima do teto
+|   |   |-- sped_regime_normal_icms_st.txt  # Regime Normal com ICMS-ST
+|   |   |-- sped_exportacao.txt             # Operacoes de exportacao (CFOP 7101)
+|   |   |-- sped_devolucao.txt              # Devolucoes com espelhamento
+|   |   |-- sped_erros_multiplos.txt        # Erros deliberados multiplos
 ```
 
 **Repositorio remoto:** https://github.com/Bruno-1990/SPED-Validator.git
@@ -317,6 +341,7 @@ Le arquivos SPED EFD no formato pipe-delimited da Receita Federal.
 | Funcao | Descricao |
 |--------|-----------|
 | `parse_sped_file(filepath)` | Le arquivo com fallback de encoding (latin-1 -> cp1252 -> utf-8) |
+| `parse_sped_file_stream(filepath, max_bytes)` | Parser com streaming (generator) para arquivos grandes (>50MB) sem carregar em memoria |
 | `group_by_register(records)` | Agrupa registros por codigo (ex: todos C100 juntos) |
 | `get_register_hierarchy(records)` | Identifica relacao pai-filho (C100 -> C170, C190) |
 
@@ -446,12 +471,13 @@ FastAPI com 5 routers e banco SQLite de auditoria.
 
 | Router | Endpoints | Funcao |
 |--------|-----------|--------|
-| `files.py` | `POST /api/files/upload`, `GET /api/files`, `GET /api/files/{id}`, `DELETE /api/files/{id}`, `DELETE /api/files/{id}/audit` | Upload, listagem, detalhe, exclusao e limpeza de audit |
-| `validation.py` | `POST /api/files/{id}/validate`, `GET /api/files/{id}/errors`, `GET /api/files/{id}/summary`, `POST /api/findings/{id}/resolve` | Validacao, erros, resumo, workflow de resolucao |
+| `files.py` | `POST /api/files/upload`, `GET /api/files`, `GET /api/files/{id}`, `DELETE /api/files/{id}`, `DELETE /api/files/{id}/audit` | Upload (rate limited: 10/min, limite configuravel via MAX_UPLOAD_MB), listagem, detalhe, exclusao |
+| `validation.py` | `POST /api/files/{id}/validate`, `GET /api/files/{id}/errors`, `GET /api/files/{id}/summary`, `POST /api/findings/{id}/resolve` | Validacao (rate limited: 5/min), erros, resumo, workflow de resolucao |
 | `records.py` | `GET /api/files/{id}/records`, `PATCH /api/records/{id}` | Listagem de registros, correcao de campos |
 | `report.py` | `GET /api/files/{id}/report` | Relatorio em MD/CSV/JSON, download do SPED corrigido |
 | `search.py` | `GET /api/search` | Busca na documentacao oficial |
 | `rules.py` | `GET /api/rules`, `POST /api/rules/generate`, `POST /api/rules/implement` | Listar, gerar e implementar regras de validacao |
+| `audit_scope.py` | `GET /api/audit-scope` | Escopo e limitacoes da validacao (o que cobre e o que nao cobre) |
 
 **Banco de auditoria (`db/audit.db`):**
 
@@ -888,7 +914,7 @@ Arquivos SPED gerados pelo PVA (Programa Validador e Assinador) da Receita Feder
 
 ## Testes e Cobertura
 
-**1473 testes | 97% de cobertura total | 0 falhas | 4 testes E2E**
+**1601 testes | 97% de cobertura total | 0 regressoes | 78 novos testes v5**
 
 **Lint: 0 erros ruff | 0 erros mypy | 0 alertas bandit**
 
@@ -992,7 +1018,7 @@ Camada 3 do motor — vai alem da consistencia numerica e verifica se o tratamen
 
 Catalogo centralizado de todas as regras de validacao em formato YAML. Permite rastrear, adicionar e auditar regras sem precisar ler o codigo.
 
-**Arquivo `rules.yaml`:** 186 regras em 22 blocos (todas implementadas):
+**Arquivo `rules.yaml`:** 191 regras em 23 blocos (todas implementadas):
 
 | Bloco | Regras | Descricao |
 |-------|--------|-----------|
@@ -1017,8 +1043,10 @@ Catalogo centralizado de todas as regras de validacao em formato YAML. Permite r
 | `parametrizacao` | 3 | Erros sistematicos por item/UF/data |
 | `ncm` | 2 | NCM tributacao incompativel, generico |
 | `governanca` | 5 | Classificacao erro, grau confianca, dependencia externa, checklist, amostragem |
+| `simples_nacional` | 11 | CSOSN, CST PIS/COFINS, credito ICMS, IND_PERFIL |
+| `bloco_k` | 5 | **NOVO v5** — K001 IND_MOV, K200 COD_ITEM/QTD, K230 referencia, K235 componentes |
 
-**Severidades:** 50 critical, 39 error, 70 warning, 16 info
+**Severidades:** 50 critical, 39 error, 75 warning, 21 info
 
 **CLI (`python -m src.rules`):**
 
@@ -1133,7 +1161,15 @@ O sistema valida arquivos SPED EFD seguindo rigorosamente o **Guia Pratico EFD v
 - UNID diferente da UNID_INV do 0200 exige 0220 (exceto TIPO_ITEM = 07)
 - Bloco 9: contagem de cada registro (9900) e total de linhas (9999) deve bater com contagem real
 
-**Tolerancia de calculo:** R$ 0,02 para todos os recalculos (ICMS, ICMS-ST, IPI, PIS, COFINS).
+**Tolerancia de calculo (por contexto via ToleranceResolver):**
+
+| Contexto | Tolerancia | Descricao |
+|----------|-----------|-----------|
+| `item_icms/ipi/pis/cofins` | R$ 0,01 | Calculo por item (C170) |
+| `doc_vl_doc` | R$ 0,02 | Soma componentes vs VL_DOC (C100) |
+| `consolidacao` | R$ 0,10 | C190 vs C170 (acumula arredondamentos) |
+| `apuracao_e110` | R$ 1,00 | Apuracao E110 (multiplos documentos) |
+| `inventario` | R$ 0,10 | Inventario H010 |
 
 ### Qualidade de codigo (lint)
 
@@ -1193,7 +1229,7 @@ Correcoes de lint aplicadas:
 |--------|-----------|
 | `database.py` | Schema SQLite com 6 tabelas: sped_files (metadados), sped_records (registros parseados), validation_errors (erros com severidade), cross_validations (cruzamentos), corrections (historico de correcoes), audit_log (rastreabilidade) |
 | `file_service.py` | Upload com hash SHA-256 (detecta duplicata), parse, extracao de metadados do 0000 (empresa, CNPJ, periodo), persistencia dos registros, delete cascade, listagem |
-| `validation_service.py` | Orquestrador: executa 22 camadas de validacao (186 regras) em sequencia, classifica severidade (critical/error/warning/info), persiste erros, permite revalidacao sem duplicar |
+| `validation_service.py` | Orquestrador: executa 23 camadas de validacao (191 regras) em sequencia, classifica severidade (critical/error/warning/info), persiste erros, permite revalidacao sem duplicar |
 | `fiscal_semantics.py` | Validacao semantica: CST x CFOP (3 regras), classificador aliquota zero (7 cenarios), monofasicos PIS/COFINS x NCM (5 regras, 100+ NCMs) |
 | `pipeline.py` | Pipeline estagiado com progresso em tempo real via SSE: 4 estagios (estrutural, cruzamento+semantica, enriquecimento, auto-correcao) com detalhes por sub-passo |
 | `error_messages.py` | 71 tipos de erro com template amigavel, orientacao de correcao e icone. Cobre monofasicos, CST x CFOP, aliquota zero, auditoria de beneficios, DIFAL, C190 |
@@ -1412,3 +1448,59 @@ Apos adicionar, execute `python -m src.rules --check` para validar a integridade
 | `cli.py` | 275 | Interface de linha de comando |
 | `config.py` | 38 | Configuracoes |
 | **Total** | **~4.502** | |
+
+---
+
+## Melhorias PRD v5 (2026-04-07)
+
+### Novos modulos
+
+| Modulo | Descricao |
+|--------|-----------|
+| `field_registry.py` | FieldRegistry singleton: resolve (register, field_name) -> indice via DB ou REGISTER_FIELDS |
+| `helpers_registry.py` | fval/fnum/fstr: acesso seguro a campos por nome para validadores |
+| `regime_detector.py` | RegimeDetector multi-sinal: IND_PERFIL + CSOSN + CST com grau de confianca |
+| `error_deduplicator.py` | ErrorDeduplicator: remove duplicatas por (linha, campo, grupo semantico) |
+| `bloco_k_validator.py` | 5 regras Bloco K: IND_MOV, COD_ITEM referencia, QTD negativa, K235 componentes |
+| `rate_limiter.py` | SlidingWindowRateLimiter: 10 uploads/min, 5 validacoes/min por IP |
+| `audit_scope.py` | GET /api/audit-scope: escopo e limitacoes da validacao em JSON estruturado |
+
+### Governanca de correcoes aprimorada
+
+- 22 campos sensíveis bloqueados para correcao automatica (CNPJ, CPF, CHV_NFE, valores monetarios, CST, CFOP, DT_DOC)
+- `CorrectionBlockedError` levantado ao tentar correcao automatica de campo sensivel
+- FMT_CNPJ e FMT_CPF reclassificados de `automatico` para `investigar`
+
+### Tolerancia por contexto
+
+- `ToleranceResolver` com `ToleranceType` enum e `ToleranceConfig` dataclass
+- Item: R$0,01 | Documento: R$0,02 | Consolidacao: R$0,10 | Apuracao: R$1,00
+- Compatibilidade retroativa mantida via `get_tolerance()` e `CALCULATION_TOLERANCE`
+
+### Streaming e limites
+
+- `parse_sped_file_stream()`: generator para arquivos grandes sem carregar em memoria
+- `MAX_UPLOAD_MB` configuravel via variavel de ambiente (padrao: 50MB)
+- Rate limiting integrado nos endpoints de upload e validacao
+
+### Aliquotas internas por UF
+
+- 27 UFs mapeadas em `aliquotas_internas_uf.yaml` com fontes legislativas
+- `get_aliquota_interna_uf()` para consulta direta
+- AM=20%, CE=20%, RJ=20%, BA/PR=19%, SP/MG/RS=18%
+
+### Bloco K — Producao e Estoque
+
+- 5 regras: K_001 (IND_MOV), K_002/K_004 (COD_ITEM referencia), K_003 (QTD negativa), K_005 (ordem sem componentes)
+- Registros K001-K990 adicionados ao REGISTER_FIELDS
+- Integrado no pipeline de validacao
+
+### Lint e qualidade
+
+- `scripts/check_hardcoded_indices.py`: lint AST para proibir `fields[N]` com N >= 2
+- `Makefile` com targets: lint, check-indices, test, ci
+- 6 fixtures de cenarios fiscais reais (SN, ST, exportacao, devolucao, erros multiplos)
+
+### Metricas
+
+- 1601 testes (78 novos) | zero regressoes | 191 regras | 23 camadas de validacao
