@@ -45,3 +45,24 @@ def embedding_to_blob(embedding: np.ndarray) -> bytes:
 def blob_to_embedding(blob: bytes) -> np.ndarray:
     """Converte bytes do SQLite de volta para numpy array."""
     return np.frombuffer(blob, dtype=np.float32)
+
+
+def info() -> dict[str, str | int]:
+    """Retorna informacoes sobre o modelo de embedding carregado."""
+    from config import EMBEDDING_MODEL, EMBEDDING_DIM, EMBEDDING_MODEL_NOTES
+    return {
+        "model": EMBEDDING_MODEL,
+        "dim": EMBEDDING_DIM,
+        "notes": EMBEDDING_MODEL_NOTES,
+    }
+
+
+if __name__ == "__main__":
+    import sys
+    if "--info" in sys.argv:
+        data = info()
+        print(f"Modelo: {data['model']}")
+        print(f"Dimensao: {data['dim']}")
+        print(f"Notas: {data['notes']}")
+    else:
+        print("Uso: python -m src.embeddings --info")

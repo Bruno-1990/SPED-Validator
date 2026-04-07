@@ -7,6 +7,7 @@ formato:
   - CNPJ
   error_type: FORMATO_INVALIDO
   severity: error
+  corrigivel: automatico
   description: CNPJ deve ter 14 digitos numericos com digitos verificadores validos (modulo 11)
   condition: len(CNPJ) != 14 OR digitos iguais OR DV invalido
   implemented: true
@@ -23,6 +24,7 @@ formato:
   - CPF
   error_type: FORMATO_INVALIDO
   severity: error
+  corrigivel: automatico
   description: CPF deve ter 11 digitos numericos com digitos verificadores validos (modulo 11)
   condition: len(CPF) != 11 OR digitos iguais OR DV invalido
   implemented: true
@@ -42,6 +44,7 @@ formato:
   - DT_FIN
   error_type: INVALID_DATE
   severity: error
+  corrigivel: automatico
   description: Datas devem estar no formato DDMMAAAA com valores validos
   condition: len != 8 OR ano < 1900 OR ano > 2100 OR dia/mes invalido
   implemented: true
@@ -59,6 +62,7 @@ formato:
   - DT_E_S
   error_type: DATE_OUT_OF_PERIOD
   severity: warning
+  corrigivel: automatico
   description: Data deve estar dentro do periodo DT_INI..DT_FIN do registro 0000
   condition: data < DT_INI OR data > DT_FIN
   implemented: true
@@ -75,6 +79,7 @@ formato:
   - CEP
   error_type: FORMATO_INVALIDO
   severity: error
+  corrigivel: automatico
   description: CEP deve ter 8 digitos numericos e nao ser 00000000
   condition: len(CEP) != 8 OR CEP == '00000000'
   implemented: true
@@ -91,6 +96,7 @@ formato:
   - CFOP
   error_type: FORMATO_INVALIDO
   severity: error
+  corrigivel: automatico
   description: CFOP deve ter 4 digitos, primeiro digito entre 1 e 7
   condition: nao bate com [1-7]\d{3}
   implemented: true
@@ -107,6 +113,7 @@ formato:
   - NCM
   error_type: FORMATO_INVALIDO
   severity: error
+  corrigivel: automatico
   description: NCM deve ter 8 digitos numericos
   condition: len(NCM) != 8 OR nao numerico
   implemented: true
@@ -123,6 +130,7 @@ formato:
   - CHV_NFE
   error_type: FORMATO_INVALIDO
   severity: error
+  corrigivel: automatico
   description: Chave NFe deve ter 44 digitos com DV modulo 11 valido
   condition: len != 44 OR DV invalido (pesos 2-9 ciclicos)
   implemented: true
@@ -139,6 +147,7 @@ formato:
   - COD_MUN
   error_type: FORMATO_INVALIDO
   severity: error
+  corrigivel: automatico
   description: Codigo municipio IBGE deve ter 7 digitos, primeiro digito 1-5
   condition: len != 7 OR primeiro digito nao em (1-5)
   implemented: true
@@ -156,6 +165,7 @@ campo_a_campo:
   - '*'
   error_type: MISSING_REQUIRED
   severity: error
+  corrigivel: proposta
   description: Campo marcado como obrigatorio (O) deve estar preenchido
   condition: required='O' AND (campo ausente OR valor vazio)
   implemented: true
@@ -172,6 +182,7 @@ campo_a_campo:
   - '*'
   error_type: WRONG_TYPE
   severity: error
+  corrigivel: proposta
   description: Campo tipo N (numerico) deve conter valor numerico valido
   condition: field_type='N' AND valor nao parseavel como float
   implemented: true
@@ -188,6 +199,7 @@ campo_a_campo:
   - '*'
   error_type: WRONG_SIZE
   severity: error
+  corrigivel: proposta
   description: Valor do campo nao pode exceder tamanho maximo definido
   condition: len(valor) > field_size
   implemented: true
@@ -204,6 +216,7 @@ campo_a_campo:
   - '*'
   error_type: INVALID_VALUE
   severity: error
+  corrigivel: proposta
   description: Valor deve estar na lista de valores permitidos
   condition: valid_values definido AND valor nao esta na lista
   implemented: true
@@ -223,6 +236,7 @@ intra_registro:
   - COD_SIT
   error_type: MISSING_CONDITIONAL
   severity: warning
+  corrigivel: proposta
   description: Entrada (IND_OPER=0) com documento regular exige DT_E_S preenchida
   condition: IND_OPER='0' AND COD_SIT in ('00','01','') AND DT_E_S vazio
   implemented: true
@@ -240,6 +254,7 @@ intra_registro:
   - COD_SIT
   error_type: INCONSISTENCY
   severity: error
+  corrigivel: proposta
   description: Documento cancelado/inutilizado deve ter VL_DOC = 0
   condition: COD_SIT in ('02','03','04') AND VL_DOC > 0
   implemented: true
@@ -257,6 +272,7 @@ intra_registro:
   - DT_E_S
   error_type: DATE_ORDER
   severity: warning
+  corrigivel: proposta
   description: DT_DOC deve ser anterior ou igual a DT_E_S
   condition: DT_DOC > DT_E_S (ambas preenchidas)
   implemented: true
@@ -274,6 +290,7 @@ intra_registro:
   - IND_OPER
   error_type: CFOP_MISMATCH
   severity: error
+  corrigivel: proposta
   description: CFOP do item deve ser compativel com tipo de operacao do C100 pai
   condition: IND_OPER=0 AND CFOP inicia com 5/6/7; OU IND_OPER=1 AND CFOP inicia com 1/2/3
   implemented: true
@@ -290,6 +307,7 @@ intra_registro:
   - VL_OPR
   error_type: SOMA_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: VL_OPR do C190 deve ser igual a soma dos VL_ITEM dos C170 com mesmo CFOP
   condition: '|soma(C170.VL_ITEM) - C190.VL_OPR| > tolerancia'
   tolerance_type: consolidacao
@@ -307,6 +325,7 @@ intra_registro:
   - VL_BC_ICMS
   error_type: SOMA_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: VL_BC_ICMS do C190 deve ser igual a soma dos C170 com mesmo CFOP
   condition: '|soma(C170.VL_BC_ICMS) - C190.VL_BC_ICMS| > tolerancia'
   tolerance_type: consolidacao
@@ -324,6 +343,7 @@ intra_registro:
   - VL_ICMS
   error_type: SOMA_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: VL_ICMS do C190 deve ser igual a soma dos C170 com mesmo CFOP
   condition: '|soma(C170.VL_ICMS) - C190.VL_ICMS| > tolerancia'
   tolerance_type: consolidacao
@@ -343,6 +363,7 @@ intra_registro:
   - VL_TOT_CREDITOS
   error_type: CALCULO_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: VL_SLD_APURADO = (debitos + ajustes) - (creditos + ajustes + saldo anterior)
   condition: '|calculado - declarado| > tolerancia'
   tolerance_type: apuracao_e110
@@ -362,6 +383,7 @@ intra_registro:
   - VL_TOT_DED
   error_type: CALCULO_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: 'Se saldo > 0: VL_ICMS_RECOLHER = VL_SLD_APURADO - VL_TOT_DED'
   condition: VL_SLD_APURADO > 0 AND |calculado - declarado| > tolerancia
   tolerance_type: apuracao_e110
@@ -380,6 +402,7 @@ intra_registro:
   - VL_SLD_APURADO
   error_type: CALCULO_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: 'Se saldo <= 0: VL_SLD_CREDOR_TRANSPORTAR = abs(VL_SLD_APURADO)'
   condition: VL_SLD_APURADO <= 0 AND |calculado - declarado| > tolerancia
   tolerance_type: apuracao_e110
@@ -398,6 +421,7 @@ cruzamento:
   - COD_PART
   error_type: REF_INEXISTENTE
   severity: warning
+  corrigivel: proposta
   description: COD_PART do C100 deve existir no cadastro 0150
   condition: COD_PART nao encontrado em nenhum registro 0150
   implemented: true
@@ -414,6 +438,7 @@ cruzamento:
   - COD_ITEM
   error_type: REF_INEXISTENTE
   severity: warning
+  corrigivel: proposta
   description: COD_ITEM do C170 deve existir no cadastro 0200
   condition: COD_ITEM nao encontrado em nenhum registro 0200
   implemented: true
@@ -430,6 +455,7 @@ cruzamento:
   - COD_PART
   error_type: REF_INEXISTENTE
   severity: warning
+  corrigivel: proposta
   description: COD_PART do D100 deve existir no cadastro 0150
   condition: COD_PART nao encontrado em nenhum registro 0150
   implemented: false
@@ -447,6 +473,7 @@ cruzamento:
   - VL_TOT_DEBITOS
   error_type: CRUZAMENTO_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: VL_TOT_DEBITOS do E110 = soma VL_ICMS dos C190 com CFOP de saida (5/6/7xxx)
   condition: '|soma(C190+D690 saida) - E110.VL_TOT_DEBITOS| > tolerancia'
   tolerance_type: apuracao_e110
@@ -464,6 +491,7 @@ cruzamento:
   - VL_TOT_CREDITOS
   error_type: CRUZAMENTO_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: VL_TOT_CREDITOS do E110 = soma VL_ICMS dos C190 com CFOP de entrada (1/2/3xxx)
   condition: '|soma(C190+D690 entrada) - E110.VL_TOT_CREDITOS| > tolerancia'
   tolerance_type: apuracao_e110
@@ -482,6 +510,7 @@ cruzamento:
   - QTD_REG
   error_type: CONTAGEM_DIVERGENTE
   severity: critical
+  corrigivel: automatico
   description: Quantidade declarada no 9900 deve bater com contagem real do registro
   condition: contagem_real(REG_NAME) != QTD_REG
   implemented: true
@@ -498,6 +527,7 @@ cruzamento:
   - QTD_LIN
   error_type: CONTAGEM_DIVERGENTE
   severity: critical
+  corrigivel: automatico
   description: QTD_LIN do 9999 deve ser igual ao total de linhas do arquivo
   condition: total_linhas_real != QTD_LIN
   implemented: true
@@ -515,6 +545,7 @@ cruzamento:
   - COD_PART
   error_type: D_REF_INEXISTENTE
   severity: warning
+  corrigivel: proposta
   description: COD_PART do D100 deve existir no cadastro 0150
   condition: COD_PART nao encontrado em nenhum registro 0150
   implemented: true
@@ -531,6 +562,7 @@ cruzamento:
   - CFOP
   error_type: D_CFOP_DIRECAO_INCOMPATIVEL
   severity: critical
+  corrigivel: proposta
   description: CFOP do D190 deve ser compativel com IND_OPER do D100 (entrada=1/2/3, saida=5/6/7)
   condition: IND_OPER=0 + CFOP 5/6/7 OU IND_OPER=1 + CFOP 1/2/3
   implemented: true
@@ -548,6 +580,7 @@ cruzamento:
   - VL_ICMS
   error_type: D190_DIVERGE_D100
   severity: critical
+  corrigivel: proposta
   description: D190 deve fechar com D100 — soma VL_OPR e VL_ICMS dos D190 vs D100
   condition: '|soma(D190.VL_OPR) - D100.VL_DOC| > tolerancia OU |soma(D190.VL_ICMS) - D100.VL_ICMS| > tolerancia'
   tolerance_type: consolidacao
@@ -565,6 +598,7 @@ cruzamento:
   - VL_TOT_DEBITOS
   error_type: D_DEBITOS_EXCEDE_E110
   severity: critical
+  corrigivel: proposta
   description: VL_ICMS de saida do Bloco D (D190+D690) deve estar contido em E110.VL_TOT_DEBITOS
   condition: soma(D190+D690 saida VL_ICMS) > E110.VL_TOT_DEBITOS + tolerancia
   tolerance_type: apuracao_e110
@@ -582,6 +616,7 @@ cruzamento:
   - CST_ICMS
   error_type: D_CST_REGIME_INCOMPATIVEL
   severity: warning
+  corrigivel: proposta
   description: CST_ICMS do D190 deve ser compativel com regime tributario (Tabela A para Normal, Tabela B para SN)
   condition: Regime Normal + CSOSN OU Simples Nacional + CST Tabela A
   implemented: true
@@ -598,6 +633,7 @@ cruzamento:
   - CHV_CTE
   error_type: D_CHAVE_CTE_INVALIDA
   severity: critical
+  corrigivel: proposta
   description: Chave CT-e (CHV_CTE) deve ter 44 digitos numericos com DV valido modulo 11
   condition: len(CHV_CTE) != 44 OU digito_verificador_invalido
   implemented: true
@@ -617,6 +653,7 @@ recalculo:
   - VL_DESC
   error_type: CALCULO_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: BC ICMS = VL_ITEM - VL_DESC (quando tributado e BC declarada > 0)
   condition: '|VL_ITEM - VL_DESC - VL_BC_ICMS| > tolerancia'
   tolerance_type: item_icms
@@ -636,6 +673,7 @@ recalculo:
   - ALIQ_ICMS
   error_type: CALCULO_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: VL_ICMS = VL_BC_ICMS * ALIQ_ICMS / 100
   condition: '|VL_BC_ICMS * ALIQ_ICMS / 100 - VL_ICMS| > tolerancia'
   tolerance_type: item_icms
@@ -655,6 +693,7 @@ recalculo:
   - CST_ICMS
   error_type: CALCULO_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: Para CSTs de ST (10,30,60,70), BC_ST > 0 exige VL_ICMS_ST > 0
   condition: CST in ST AND VL_BC_ST > 0 AND VL_ICMS_ST = 0
   tolerance_type: item_icms
@@ -674,6 +713,7 @@ recalculo:
   - ALIQ_ST
   error_type: CALCULO_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: VL_ICMS_ST = VL_BC_ICMS_ST * ALIQ_ST / 100
   condition: '|calculado - declarado| > tolerancia (quando ALIQ_ST > 0)'
   tolerance_type: item_icms
@@ -693,6 +733,7 @@ recalculo:
   - ALIQ_IPI
   error_type: CALCULO_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: VL_IPI = VL_BC_IPI * ALIQ_IPI / 100
   condition: '|calculado - declarado| > tolerancia'
   tolerance_type: item_ipi
@@ -712,6 +753,7 @@ recalculo:
   - ALIQ_PIS
   error_type: CALCULO_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: VL_PIS = VL_BC_PIS * ALIQ_PIS / 100
   condition: '|calculado - declarado| > tolerancia (quando BC > 0 e ALIQ > 0)'
   tolerance_type: item_pis
@@ -731,6 +773,7 @@ recalculo:
   - ALIQ_COFINS
   error_type: CALCULO_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: VL_COFINS = VL_BC_COFINS * ALIQ_COFINS / 100
   condition: '|calculado - declarado| > tolerancia (quando BC > 0 e ALIQ > 0)'
   tolerance_type: item_cofins
@@ -749,6 +792,7 @@ recalculo:
   - VL_TOT_CREDITOS
   error_type: CALCULO_DIVERGENTE
   severity: critical
+  corrigivel: proposta
   description: Totais E110 recalculados a partir de C190 + D690
   condition: '|soma(C190+D690) - E110| > tolerancia'
   tolerance_type: apuracao_e110
@@ -767,6 +811,7 @@ cst_isencoes:
   - CST_ICMS
   error_type: CST_INVALIDO
   severity: error
+  corrigivel: proposta
   description: 'CST ICMS deve ser codigo valido: 2 digitos (Tabela B) ou 3 digitos (origem 0-8 + Tabela B) ou CSOSN'
   condition: CST nao pertence a lista de codigos validos
   implemented: true
@@ -785,6 +830,7 @@ cst_isencoes:
   - VL_ICMS
   error_type: ISENCAO_INCONSISTENTE
   severity: error
+  corrigivel: proposta
   description: CST isento/NT (40,41,50,60) deve ter BC e ICMS zerados
   condition: CST in (40,41,50,60) AND (VL_BC_ICMS > 0 OR VL_ICMS > 0)
   implemented: true
@@ -803,6 +849,7 @@ cst_isencoes:
   - VL_ICMS
   error_type: TRIBUTACAO_INCONSISTENTE
   severity: error
+  corrigivel: proposta
   description: CST tributado (00,10,20,70,90) com BC > 0 deve ter ICMS > 0
   condition: CST in (00,10,20,70,90) AND VL_BC_ICMS > 0 AND VL_ICMS = 0
   implemented: true
@@ -819,6 +866,7 @@ cst_isencoes:
   - COD_ITEM
   error_type: REF_INEXISTENTE
   severity: warning
+  corrigivel: proposta
   description: COD_ITEM do H010 deve existir no cadastro 0200
   condition: COD_ITEM nao encontrado no 0200
   implemented: true
@@ -835,6 +883,7 @@ cst_isencoes:
   - QTD
   error_type: VALOR_NEGATIVO
   severity: error
+  corrigivel: proposta
   description: Quantidade do inventario nao pode ser negativa
   condition: QTD < 0
   implemented: true
@@ -851,6 +900,7 @@ cst_isencoes:
   - VL_ITEM
   error_type: VALOR_NEGATIVO
   severity: error
+  corrigivel: proposta
   description: Valor do item no inventario nao pode ser negativo
   condition: VL_ITEM < 0
   implemented: true
@@ -870,6 +920,7 @@ semantica_aliquota_zero:
   - ALIQ_ICMS
   error_type: CST_ALIQ_ZERO_FORTE
   severity: warning
+  corrigivel: proposta
   description: CST tributado com BC preenchida mas aliquota zero (provavel erro de parametrizacao)
   condition: CST in (00,10,20,70,90) AND VL_BC > 0 AND ALIQ = 0 AND CFOP nao e exportacao/remessa
   implemented: true
@@ -889,6 +940,7 @@ semantica_aliquota_zero:
   - VL_ICMS
   error_type: CST_ALIQ_ZERO_MODERADO
   severity: info
+  corrigivel: proposta
   description: CST tributado com base, aliquota e imposto todos zerados (classificacao possivelmente incorreta)
   condition: CST in (00,10,20,70,90) AND BC=0 AND ALIQ=0 AND ICMS=0 AND CFOP nao e exportacao/remessa
   implemented: true
@@ -908,6 +960,7 @@ semantica_aliquota_zero:
   - VL_IPI
   error_type: IPI_CST_ALIQ_ZERO
   severity: info
+  corrigivel: proposta
   description: CST_IPI tributado com base, aliquota e valor todos zerados
   condition: CST_IPI in (00,01,49,50,99) AND BC=0 AND ALIQ=0 AND VL=0
   implemented: true
@@ -927,6 +980,7 @@ semantica_aliquota_zero:
   - VL_PIS
   error_type: PIS_CST_ALIQ_ZERO
   severity: info
+  corrigivel: proposta
   description: CST_PIS tributavel com base, aliquota e valor todos zerados
   condition: CST_PIS in (01,02,03,49) AND BC=0 AND ALIQ=0 AND VL=0
   implemented: true
@@ -946,6 +1000,7 @@ semantica_aliquota_zero:
   - VL_COFINS
   error_type: COFINS_CST_ALIQ_ZERO
   severity: info
+  corrigivel: proposta
   description: CST_COFINS tributavel com base, aliquota e valor todos zerados
   condition: CST_COFINS in (01,02,03,49) AND BC=0 AND ALIQ=0 AND VL=0
   implemented: true
@@ -964,6 +1019,7 @@ semantica_cst_cfop:
   - CFOP
   error_type: CST_CFOP_INCOMPATIVEL
   severity: warning
+  corrigivel: proposta
   description: CFOP de venda com CST isento/NT sem justificativa
   condition: CFOP in CFOPs_venda AND CST in (40,41,50,60)
   implemented: true
@@ -982,6 +1038,7 @@ semantica_cst_cfop:
   - ALIQ_ICMS
   error_type: CST_CFOP_INCOMPATIVEL
   severity: warning
+  corrigivel: proposta
   description: Operacao interestadual com CST tributado e aliquota zero (deveria ser 4%, 7% ou 12%)
   condition: CFOP inicia com 2/6 AND CST tributado AND ALIQ=0 AND nao e remessa/devolucao
   implemented: true
@@ -1000,6 +1057,7 @@ semantica_cst_cfop:
   - ALIQ_ICMS
   error_type: CST_CFOP_INCOMPATIVEL
   severity: warning
+  corrigivel: proposta
   description: Exportacao com CST tributado e aliquota > 0 (exportacao tem imunidade)
   condition: CFOP in CFOPs_exportacao AND CST tributado AND ALIQ > 0
   implemented: true
@@ -1020,6 +1078,7 @@ monofasicos:
   - ALIQ_COFINS
   error_type: MONOFASICO_ALIQ_INVALIDA
   severity: error
+  corrigivel: proposta
   description: CST 04 (monofasico) na revenda exige aliquota zero (tributo ja recolhido na origem)
   condition: CST_PIS=04 AND ALIQ_PIS > 0; OU CST_COFINS=04 AND ALIQ_COFINS > 0
   implemented: true
@@ -1040,6 +1099,7 @@ monofasicos:
   - VL_COFINS
   error_type: MONOFASICO_VALOR_INDEVIDO
   severity: error
+  corrigivel: proposta
   description: CST 04 (monofasico) na revenda exige valor zero de PIS/COFINS
   condition: CST_PIS=04 AND VL_PIS > 0; OU CST_COFINS=04 AND VL_COFINS > 0
   implemented: true
@@ -1059,6 +1119,7 @@ monofasicos:
   - NCM
   error_type: MONOFASICO_NCM_INCOMPATIVEL
   severity: warning
+  corrigivel: proposta
   description: CST 04 informado mas NCM do produto nao consta na lista de monofasicos
   condition: CST=04 AND NCM (via 0200) nao pertence a nenhuma categoria monofasica
   implemented: true
@@ -1079,6 +1140,7 @@ monofasicos:
   - CFOP
   error_type: MONOFASICO_CST_INCORRETO
   severity: warning
+  corrigivel: proposta
   description: NCM monofasico na revenda (saida) deveria usar CST 04, mas esta com CST tributavel
   condition: NCM monofasico AND CST in (01,02,03) AND CFOP de saida
   implemented: true
@@ -1098,6 +1160,7 @@ monofasicos:
   - CFOP
   error_type: MONOFASICO_ENTRADA_CST04
   severity: info
+  corrigivel: investigar
   description: CST 04 em entrada pode indicar revenda sem credito ou erro de classificacao
   condition: CST=04 AND CFOP inicia com 1/2/3
   implemented: true
@@ -1117,6 +1180,7 @@ pendentes:
   - COD_BEN
   error_type: BENEFICIO_NAO_VINCULADO
   severity: warning
+  corrigivel: investigar
   description: CST tributado com aliquota zero deveria ter beneficio fiscal vinculado
   condition: CST tributado AND ALIQ=0 AND sem codigo de beneficio
   implemented: true
@@ -1134,6 +1198,7 @@ pendentes:
   - MOT_DES_ICMS
   error_type: DESONERACAO_SEM_MOTIVO
   severity: error
+  corrigivel: proposta
   description: Desoneracao de ICMS exige motivo (MOT_DES_ICMS) preenchido
   condition: VL_ICMS_DESON > 0 AND MOT_DES_ICMS vazio
   implemented: true
@@ -1152,6 +1217,7 @@ pendentes:
   - CHV_NFE_REF
   error_type: DEVOLUCAO_INCONSISTENTE
   severity: warning
+  corrigivel: proposta
   description: Devolucao deve ter tributacao coerente com documento de origem
   condition: CFOP de devolucao AND CST diverge do documento referenciado
   implemented: true
@@ -1170,6 +1236,7 @@ pendentes:
   - ALIQ_ICMS
   error_type: ANOMALIA_HISTORICA
   severity: info
+  corrigivel: investigar
   description: Item historicamente tributado aparecendo com aliquota zero (anomalia)
   condition: Item tem historico de CST tributado e agora esta zerado
   implemented: true
@@ -1188,6 +1255,7 @@ pendentes:
   - UF_DEST
   error_type: ALIQ_INTERESTADUAL_INVALIDA
   severity: warning
+  corrigivel: proposta
   description: Aliquota interestadual deve ser 4%, 7% ou 12% conforme Resolucao Senado 13/2012
   condition: CFOP interestadual AND ALIQ nao in (4, 7, 12)
   implemented: true
@@ -1206,6 +1274,7 @@ pendentes:
   - ALIQ_IPI
   error_type: IPI_ALIQ_NCM_DIVERGENTE
   severity: warning
+  corrigivel: proposta
   description: Aliquota IPI informada diverge da prevista na TIPI para o NCM
   condition: ALIQ_IPI != TIPI[NCM].aliquota
   implemented: true
@@ -1226,6 +1295,7 @@ auditoria_beneficios:
   - COD_AJ_APUR
   error_type: BENEFICIO_DEBITO_NAO_INTEGRAL
   severity: critical
+  corrigivel: investigar
   description: Debito de ICMS das saidas nao esta integral na apuracao; beneficio pode ter sido reduzido no documento em vez
     de tratado no E111
   condition: soma(C190.VL_ICMS saida) diverge de E110.VL_TOT_DEBITOS E nao ha E111 com ajuste de beneficio
@@ -1248,6 +1318,7 @@ auditoria_beneficios:
   - CST_ICMS
   error_type: BENEFICIO_CARGA_REDUZIDA_DOCUMENTO
   severity: critical
+  corrigivel: investigar
   description: Operacao interestadual tributavel com aliquota efetiva reduzida no documento sem ajuste correspondente no E111
   condition: CFOP interestadual AND ALIQ_ICMS < aliquota interestadual esperada (4/7/12%) AND sem E111 de beneficio
   implemented: true
@@ -1268,6 +1339,7 @@ auditoria_beneficios:
   - CHV_DOC
   error_type: AJUSTE_SEM_LASTRO_DOCUMENTAL
   severity: warning
+  corrigivel: investigar
   description: Ajuste de beneficio no E111 sem detalhamento em E112/E113 quando exigivel
   condition: E111.VL_AJ_APUR > 0 AND nao existe E112 ou E113 vinculado
   implemented: true
@@ -1288,6 +1360,7 @@ auditoria_beneficios:
   - VL_AJ_APUR
   error_type: AJUSTE_SOMA_DIVERGENTE
   severity: critical
+  corrigivel: investigar
   description: Soma dos ajustes do E111 nao bate com os campos totalizadores do E110
   condition: soma(E111.VL_AJ_APUR por natureza) != E110.VL_TOT_AJ_CREDITOS ou VL_TOT_AJ_DEBITOS
   implemented: true
@@ -1308,6 +1381,7 @@ auditoria_beneficios:
   - COD_AJ_APUR
   error_type: DEVOLUCAO_BENEFICIO_NAO_REVERTIDO
   severity: warning
+  corrigivel: investigar
   description: Devolucao de venda beneficiada sem reversao proporcional do ajuste de beneficio no E111
   condition: CFOP devolucao AND E111 do periodo nao reflete reducao proporcional ao volume devolvido
   implemented: true
@@ -1328,6 +1402,7 @@ auditoria_beneficios:
   - UF
   error_type: CFOP_INTERESTADUAL_DESTINO_INTERNO
   severity: critical
+  corrigivel: investigar
   description: CFOP 6xxx com destinatario da mesma UF do declarante (operacao interna mascarada como interestadual)
   condition: CFOP inicia com 6 AND 0150.UF do COD_PART == 0000.UF
   implemented: true
@@ -1345,6 +1420,7 @@ auditoria_beneficios:
   - VL_SLD_CREDOR_TRANSPORTAR
   error_type: SALDO_CREDOR_RECORRENTE
   severity: warning
+  corrigivel: investigar
   description: Saldo credor recorrente em empresa com volume relevante de saidas tributadas
   condition: VL_SLD_CREDOR_TRANSPORTAR > 0 em multiplos periodos consecutivos AND soma(C190 saidas tributadas) > 0
   implemented: true
@@ -1367,6 +1443,7 @@ auditoria_beneficios:
   - NCM
   error_type: CREDITO_USO_CONSUMO_INDEVIDO
   severity: warning
+  corrigivel: investigar
   description: Entrada com CFOP de comercializacao (1102/2102) para item que parece ser uso/consumo (NCM de limpeza, escritorio,
     etc.)
   condition: CFOP in (1102,2102) AND NCM indica uso/consumo AND item nunca aparece em saidas
@@ -1387,6 +1464,7 @@ auditoria_beneficios:
   - COD_AJ_APUR
   error_type: SOBREPOSICAO_BENEFICIOS
   severity: warning
+  corrigivel: investigar
   description: Mesma operacao com reducao de base no documento (CST 020) e credito presumido no E111
   condition: CST 020 (base reduzida) em C170 AND E111 com ajuste de credito presumido sobre mesma operacao
   implemented: true
@@ -1407,6 +1485,7 @@ auditoria_beneficios:
   - VL_ICMS
   error_type: BENEFICIO_VALOR_DESPROPORCIONAL
   severity: warning
+  corrigivel: investigar
   description: Valor do ajuste de beneficio no E111 desproporcional ao volume de operacoes elegiveis no C190
   condition: E111.VL_AJ_APUR > soma(C190.VL_ICMS de operacoes interestaduais tributadas)
   implemented: true
@@ -1425,6 +1504,7 @@ auditoria_beneficios:
   - VL_OPR
   error_type: VOLUME_ISENTO_ATIPICO
   severity: warning
+  corrigivel: investigar
   description: Volume excessivo de operacoes com CST isento/NT/suspenso incompativel com perfil do contribuinte
   condition: soma(C190.VL_OPR com CST 040/041/050/060) / soma(C190.VL_OPR total) > 50%
   implemented: true
@@ -1443,6 +1523,7 @@ auditoria_beneficios:
   - COD_ITEM
   error_type: REMESSA_SEM_RETORNO
   severity: warning
+  corrigivel: investigar
   description: Remessa (CFOP 5901/6901) sem retorno correspondente no mesmo periodo ou seguinte
   condition: CFOP de remessa AND nao ha CFOP de retorno para mesmo COD_ITEM no periodo
   implemented: true
@@ -1463,6 +1544,7 @@ auditoria_beneficios:
   - VL_ICMS
   error_type: DIFERIMENTO_COM_DEBITO
   severity: warning
+  corrigivel: investigar
   description: CST 051 (diferimento) gerando debito de ICMS quando deveria ser diferido
   condition: CST 051 AND VL_ICMS > 0 no C170/C190
   implemented: true
@@ -1482,6 +1564,7 @@ auditoria_beneficios:
   - VL_SLD_APURADO_ST
   error_type: ST_APURACAO_INCONSISTENTE
   severity: critical
+  corrigivel: investigar
   description: Item com ST correto no C170 mas apuracao ICMS-ST (E200/E210) inconsistente
   condition: CST indica ST (010/030/060/070) AND soma(VL_ICMS_ST) diverge de E210
   implemented: true
@@ -1501,6 +1584,7 @@ auditoria_beneficios:
   - VL_ITEM
   error_type: INVENTARIO_ITEM_PARADO
   severity: info
+  corrigivel: investigar
   description: Item no inventario sem movimento (entrada ou saida) no periodo
   condition: COD_ITEM no H010 AND COD_ITEM nao aparece em nenhum C170 do periodo
   implemented: true
@@ -1519,6 +1603,7 @@ auditoria_beneficios:
   - VL_AJ_APUR
   error_type: AJUSTE_CODIGO_GENERICO
   severity: warning
+  corrigivel: investigar
   description: Ajuste no E111 usando codigo generico (outros) em vez de codigo especifico do beneficio
   condition: COD_AJ_APUR termina com '999' ou '000' AND VL_AJ_APUR > 0
   implemented: true
@@ -1539,6 +1624,7 @@ auditoria_beneficios:
   - NCM
   error_type: PARAMETRIZACAO_SISTEMICA_INCORRETA
   severity: critical
+  corrigivel: investigar
   description: Padrao repetitivo de CST/CFOP incompativel no mesmo produto indica erro de ERP
   condition: Mesmo COD_ITEM com CST incompativel em > 80% das ocorrencias
   implemented: true
@@ -1559,6 +1645,7 @@ auditoria_beneficios:
   - CST_ICMS
   error_type: ESCRITURACAO_DIVERGE_DOCUMENTO
   severity: critical
+  corrigivel: impossivel
   description: Valores escriturados no SPED divergem do documento fiscal de origem (XML)
   condition: Requer cruzamento com XML externo — no SPED, detectavel por inconsistencias internas C170 vs C190
   implemented: true
@@ -1579,6 +1666,7 @@ auditoria_beneficios:
   - '*'
   error_type: CHECKLIST_INCOMPLETO
   severity: info
+  corrigivel: investigar
   description: 'Checklist minimo de auditoria: cadastral, CST/CFOP, recalculo, C170xC190, E110xC190, E111, monofasicos, beneficio,
     inventario, integridade'
   condition: Verificacao de cobertura dos 10 pontos minimos de auditoria
@@ -1600,6 +1688,7 @@ auditoria_beneficios:
   - CHV_DOC
   error_type: TRILHA_BENEFICIO_INCOMPLETA
   severity: critical
+  corrigivel: investigar
   description: Beneficio relevante sem ligacao transparente entre operacao tributada, base original e ajuste efetuado
   condition: E111 com ajuste > tolerancia AND sem E112/E113 AND sem correspondencia proporcional com C190
   implemented: true
@@ -1621,6 +1710,7 @@ auditoria_beneficios:
   - COD_AJ_APUR
   error_type: ICMS_EFETIVO_SEM_TRILHA
   severity: critical
+  corrigivel: investigar
   description: Debito interestadual nao integral no documento ou ausencia de ajuste para compor carga efetiva final
   condition: CFOP interestadual AND (ALIQ < esperada OR sem E111 de beneficio)
   implemented: true
@@ -1641,6 +1731,7 @@ auditoria_beneficios:
   - CST_ICMS
   error_type: CFOP_CORRETO_CST_INCORRETO
   severity: critical
+  corrigivel: investigar
   description: CFOP compativel com a operacao mas CST incompativel com tributacao esperada
   condition: 'CFOP de venda/compra normal AND CST incompativel (ex: venda com CST isento)'
   implemented: true
@@ -1659,6 +1750,7 @@ auditoria_beneficios:
   - UF
   error_type: CFOP_INTERESTADUAL_DESTINO_INTERNO
   severity: critical
+  corrigivel: investigar
   description: CFOP 6xxx com participante da mesma UF do declarante
   condition: CFOP inicia com 6 AND 0150.UF == 0000.UF
   implemented: true
@@ -1676,6 +1768,7 @@ auditoria_beneficios:
   - '*'
   error_type: REGISTROS_ESSENCIAIS_AUSENTES
   severity: info
+  corrigivel: investigar
   description: Ausencia de registros essenciais para auditoria fiscal robusta
   condition: Um ou mais registros criticos (E111, H010, 0150) nao presentes no arquivo
   implemented: true
@@ -1694,6 +1787,7 @@ auditoria_beneficios:
   - VL_OPR
   error_type: VOLUME_ISENTO_ATIPICO
   severity: warning
+  corrigivel: investigar
   description: Volume excessivo de CST 040/041/050/060 incompativel com perfil do contribuinte
   condition: soma(VL_OPR CST especiais) / soma(VL_OPR total) > 50%
   implemented: true
@@ -1713,6 +1807,7 @@ auditoria_beneficios:
   - COD_AJ_APUR
   error_type: BENEFICIO_FORA_ESCOPO
   severity: critical
+  corrigivel: investigar
   description: Ajuste de beneficio calculado sobre operacoes nao elegiveis
   condition: E111 com ajuste AND operacoes internas/NT/excluidas na base aparente
   implemented: true
@@ -1735,6 +1830,7 @@ auditoria_beneficios:
   - CST_ICMS
   error_type: DIVERGENCIA_DOCUMENTO_ESCRITURACAO
   severity: warning
+  corrigivel: investigar
   description: Divergencia entre item, consolidado e apuracao indica quebra entre documento, escrituracao e calculo interno
   condition: C170 vs C190 vs E110 com divergencias em cascata
   implemented: true
@@ -1755,6 +1851,7 @@ auditoria_beneficios:
   - CHV_DOC
   error_type: AJUSTE_SEM_LASTRO_DOCUMENTAL
   severity: warning
+  corrigivel: investigar
   description: Ajuste relevante sem detalhamento complementar ou documento vinculado
   condition: E111.VL_AJ_APUR > tolerancia AND sem E112/E113
   implemented: true
@@ -1773,6 +1870,7 @@ auditoria_beneficios:
   - VL_ICMS
   error_type: DIFERIMENTO_COM_DEBITO
   severity: warning
+  corrigivel: investigar
   description: CST 051 (diferimento) gerando debito/credito indevido
   condition: CST 051 AND VL_ICMS > 0 no C170/C190
   implemented: true
@@ -1791,6 +1889,7 @@ auditoria_beneficios:
   - VL_ICMS_ST
   error_type: ST_APURACAO_INCONSISTENTE
   severity: critical
+  corrigivel: investigar
   description: ST correto no item mas apuracao ICMS-ST inconsistente
   condition: CST ST AND soma(VL_ICMS_ST) diverge de E210
   implemented: true
@@ -1812,6 +1911,7 @@ auditoria_beneficios:
   - VL_ICMS
   error_type: C190_CONSOLIDACAO_INDEVIDA
   severity: critical
+  corrigivel: investigar
   description: C190 consolidando itens com combinacoes indevidas de CST/CFOP/ALIQ
   condition: soma(C170) != C190 ou VL_ICMS/VL_BC_ICMS diverge da ALIQ declarada
   implemented: true
@@ -1831,6 +1931,7 @@ auditoria_beneficios:
   - CFOP
   error_type: CREDITO_ENTRADA_SEM_SAIDA
   severity: warning
+  corrigivel: investigar
   description: Item creditado na entrada sem historico de saida compativel
   condition: COD_ITEM com CFOP entrada creditada AND sem CFOP saida no periodo
   implemented: true
@@ -1850,6 +1951,7 @@ auditoria_beneficios:
   - VL_ITEM
   error_type: INVENTARIO_INCONSISTENTE_TRIBUTARIO
   severity: warning
+  corrigivel: investigar
   description: Inventario com inconsistencias que afetam creditos e beneficios
   condition: H010 inconsistente com cadastro, valores ou contexto de beneficios
   implemented: true
@@ -1867,6 +1969,7 @@ auditoria_beneficios:
   - CFOP
   error_type: OPERACAO_ESPECIAL_CONTAMINANDO
   severity: warning
+  corrigivel: investigar
   description: Remessa/retorno/conserto/demonstracao contaminando apuracao como venda
   condition: CFOP de remessa sem retorno ou classificacao incorreta como venda
   implemented: true
@@ -1886,6 +1989,7 @@ auditoria_beneficios:
   - TXT_COMPL
   error_type: BENEFICIO_SEM_GOVERNANCA
   severity: critical
+  corrigivel: investigar
   description: Beneficio relevante sem documentacao de apoio ou coerencia historica
   condition: E111 com ajuste > tolerancia AND sem E112 AND sem TXT_COMPL
   implemented: true
@@ -1905,6 +2009,7 @@ auditoria_beneficios:
   - UF
   error_type: TOTALIZACAO_BENEFICIO_DIVERGENTE
   severity: warning
+  corrigivel: investigar
   description: Saidas beneficiadas nao refletidas coerentemente nos totais por UF/CFOP/CST
   condition: Perfil das saidas no C190 incompativel com E110 totais
   implemented: true
@@ -1924,6 +2029,7 @@ auditoria_beneficios:
   - COD_AJ_APUR
   error_type: MISTURA_INSTITUTOS_TRIBUTARIOS
   severity: warning
+  corrigivel: investigar
   description: Mistura de credito presumido, reducao de base e isencao na mesma operacao
   condition: CST 020 + E111 credito presumido sobre mesma base
   implemented: true
@@ -1944,6 +2050,7 @@ auditoria_beneficios:
   - COD_AJ_APUR
   error_type: BENEFICIO_PERFIL_INCOMPATIVEL
   severity: warning
+  corrigivel: investigar
   description: Beneficio sem aderencia ao perfil operacional (CNAE, NCM, tipo de operacao)
   condition: E111 com beneficio AND operacoes incompativeis com escopo esperado
   implemented: true
@@ -1963,6 +2070,7 @@ auditoria_beneficios:
   - COD_AJ_APUR
   error_type: BENEFICIO_EXECUCAO_INCORRETA
   severity: critical
+  corrigivel: investigar
   description: Beneficio autorizado mas executado com parametrizacao incompativel no SPED
   condition: E111 presente mas CST/ALIQ/CFOP incompativeis com modelo do regime
   implemented: true
@@ -1982,6 +2090,7 @@ auditoria_beneficios:
   - IE
   error_type: BENEFICIO_SEM_SEGREGACAO_DESTINATARIO
   severity: warning
+  corrigivel: investigar
   description: Calculo do beneficio sem segregacao por tipo de destinatario
   condition: E111 com beneficio AND mistura de contribuintes/nao contribuintes/filiais na base
   implemented: true
@@ -2001,6 +2110,7 @@ auditoria_beneficios:
   - VL_AJ_APUR
   error_type: BASE_BENEFICIO_INFLADA
   severity: critical
+  corrigivel: investigar
   description: Base do beneficio com devolucoes, remessas, cancelamentos ou operacoes excluidas
   condition: E111 ajuste desproporcional ao volume de operacoes elegiveis liquidas
   implemented: true
@@ -2021,6 +2131,7 @@ auditoria_beneficios:
   - VL_COFINS
   error_type: SPED_CONTRIBUICOES_DIVERGENTE
   severity: warning
+  corrigivel: investigar
   description: Inconsistencia entre SPED Fiscal e EFD-Contribuicoes no tratamento de receitas
   condition: CSTs PIS/COFINS divergentes entre obrigacoes OU faturamento incompativel
   implemented: true
@@ -2042,6 +2153,7 @@ auditoria_beneficios:
   - CST_ICMS
   error_type: CREDITO_FORMA_SEM_SUBSTANCIA
   severity: warning
+  corrigivel: investigar
   description: Escrituracao formalmente correta mas credito incompativel com destinacao real do item
   condition: CFOP comercializacao AND item nunca vendido AND NCM indica uso/consumo
   implemented: true
@@ -2060,6 +2172,7 @@ auditoria_beneficios:
   - VL_AJ_APUR
   error_type: AJUSTE_NUMERICO_SEM_VALIDADE_JURIDICA
   severity: critical
+  corrigivel: investigar
   description: Ajuste fecha numericamente mas usa codigo inadequado ou sem fundamento
   condition: E111 fecha com E110 mas COD_AJ_APUR generico ou expirado
   implemented: true
@@ -2079,6 +2192,7 @@ auditoria_beneficios:
   - CST_IPI
   error_type: IPI_REFLEXO_INCORRETO
   severity: warning
+  corrigivel: investigar
   description: IPI tratado incorretamente no credito, custo ou BC do ICMS
   condition: IPI nao recuperavel nao incluido na BC ICMS ou vice-versa
   implemented: true
@@ -2096,6 +2210,7 @@ auditoria_beneficios:
   - COD_AJ_APUR
   error_type: CODIGO_AJUSTE_INCOMPATIVEL
   severity: critical
+  corrigivel: investigar
   description: Codigo de ajuste incompativel com beneficio, natureza ou vigencia
   condition: COD_AJ_APUR nao corresponde ao beneficio autorizado ou esta expirado
   implemented: true
@@ -2115,6 +2230,7 @@ auditoria_beneficios:
   - CHV_DOC
   error_type: TRILHA_BENEFICIO_AUSENTE
   severity: critical
+  corrigivel: investigar
   description: Beneficio sem trilha de auditoria entre operacao, base e ajuste
   condition: E111 com ajuste relevante AND sem vinculo documental E112/E113
   implemented: true
@@ -2132,6 +2248,7 @@ auditoria_beneficios:
   - '*'
   error_type: CLASSIFICACAO_TIPO_ERRO
   severity: info
+  corrigivel: investigar
   description: 'Meta-regra: classificar achado como erro material, parametrizacao ou tese fiscal'
   condition: Padrao do erro indica natureza pontual, sistemica ou interpretativa
   implemented: true
@@ -2149,6 +2266,7 @@ auditoria_beneficios:
   - '*'
   error_type: ACHADO_LIMITADO_AO_SPED
   severity: info
+  corrigivel: investigar
   description: 'Meta-regra: informar que achado depende apenas do SPED.txt sem documentos externos'
   condition: Regra sustentavel apenas por dados internos do arquivo
   implemented: true
@@ -2166,6 +2284,7 @@ auditoria_beneficios:
   - '*'
   error_type: CHECKLIST_AUDITORIA_INCOMPLETO
   severity: critical
+  corrigivel: investigar
   description: 'Checklist mestre: 10 pontos minimos de auditoria SPED'
   condition: Ausencia de conferencia nos pilares minimos (cadastral, CST/CFOP, recalculo, C170xC190, E110, E111, monofasicos,
     beneficio, inventario, integridade)
@@ -2186,6 +2305,7 @@ aliquotas:
   - ALIQ_ICMS
   error_type: ALIQ_INTERESTADUAL_INVALIDA
   severity: critical
+  corrigivel: proposta
   description: Operacao interestadual com aliquota fora do padrao (4/7/12)
   condition: CFOP 6xxx AND CST tributado AND ALIQ not in {4,7,12}
   implemented: true
@@ -2204,6 +2324,7 @@ aliquotas:
   - ALIQ_ICMS
   error_type: ALIQ_INTERNA_EM_INTERESTADUAL
   severity: error
+  corrigivel: proposta
   description: Aliquota interna usada em operacao interestadual (>= 17%, heuristica)
   condition: CFOP 6xxx AND ALIQ >= 17 (proxy — certeza provavel)
   implemented: true
@@ -2222,6 +2343,7 @@ aliquotas:
   - UF
   error_type: ALIQ_INTERESTADUAL_EM_INTERNA
   severity: warning
+  corrigivel: proposta
   description: Aliquota interestadual usada em operacao interna
   condition: CFOP 5xxx AND ALIQ in {4,7,12} AND mesma UF
   implemented: true
@@ -2240,6 +2362,7 @@ aliquotas:
   - UF
   error_type: ALIQ_UF_INCOMPATIVEL
   severity: critical
+  corrigivel: proposta
   description: Aliquota 7/12% incompativel com par UF origem-destino
   condition: CFOP 6xxx + par UF nao corresponde a aliquota padrao (RS 22/1989)
   implemented: true
@@ -2261,6 +2384,7 @@ aliquotas:
   - COD_NCM
   error_type: ALIQ_4_SEM_IMPORTACAO
   severity: warning
+  corrigivel: proposta
   description: Aliquota 4% sem suporte de importacao (RS 13/2012)
   condition: CFOP 6xxx + ALIQ=4 + NCM nao tipicamente importado
   implemented: true
@@ -2280,6 +2404,7 @@ aliquotas:
   - ALIQ_ICMS
   error_type: ALIQ_DIVERGENTE_MESMO_ITEM
   severity: warning
+  corrigivel: investigar
   description: Mesmo item com aliquotas ICMS divergentes no periodo
   condition: COD_ITEM com ALIQ_ICMS diferentes em documentos do mesmo periodo
   implemented: true
@@ -2300,6 +2425,7 @@ aliquotas:
   - CFOP
   error_type: ALIQ_MEDIA_INDEVIDA
   severity: critical
+  corrigivel: proposta
   description: Aliquota media indevida no C190 nao suportada pelos itens
   condition: C190.ALIQ intermediaria entre min e max dos C170 do documento
   implemented: true
@@ -2319,6 +2445,7 @@ c190_consolidacao:
   - VL_ICMS
   error_type: C190_DIVERGE_C170
   severity: critical
+  corrigivel: proposta
   description: C190 nao fecha com soma dos C170 por CST+CFOP+ALIQ
   condition: sum(C170 por CST+CFOP+ALIQ) != C190
   implemented: true
@@ -2338,6 +2465,7 @@ c190_consolidacao:
   - ALIQ_ICMS
   error_type: C190_COMBINACAO_INCOMPATIVEL
   severity: warning
+  corrigivel: proposta
   description: Combinacao incompativel de CST+CFOP+ALIQ no C190
   condition: CST isento com ALIQ>0, CST tributado com ALIQ=0, CFOP inter com ALIQ interna
   implemented: true
@@ -2377,6 +2505,7 @@ cst_expandido:
   - VL_IPI
   error_type: IPI_CST_INCOMPATIVEL
   severity: error
+  corrigivel: proposta
   description: CST IPI incompativel com campos monetarios
   condition: CST tributado com tudo zero OU CST isento com valores > 0
   implemented: true
@@ -2397,6 +2526,7 @@ difal:
   - UF
   error_type: DIFAL_FALTANTE_CONSUMO_FINAL
   severity: critical
+  corrigivel: investigar
   description: DIFAL faltante em operacao interestadual para consumidor final
   condition: CFOP 6xxx + IND_IE=9 + ALIQ == interestadual (sem DIFAL embutido)
   implemented: true
@@ -2417,6 +2547,7 @@ difal:
   - IND_IE
   error_type: DIFAL_INDEVIDO_REVENDA
   severity: warning
+  corrigivel: investigar
   description: DIFAL aplicado indevidamente em operacao de revenda ou industrializacao
   condition: IND_IE=1 + CFOP revenda/industria + ALIQ > 12%
   implemented: true
@@ -2434,6 +2565,7 @@ difal:
   - UF
   error_type: DIFAL_UF_DESTINO_INCONSISTENTE
   severity: warning
+  corrigivel: investigar
   description: UF destino inconsistente com CFOP interestadual
   condition: CFOP 6xxx + UF_DEST == UF_DECLARANTE
   implemented: true
@@ -2452,6 +2584,7 @@ difal:
   - UF
   error_type: DIFAL_ALIQ_INTERNA_INCORRETA
   severity: critical
+  corrigivel: investigar
   description: Aliquota interna do destino incorreta no calculo do DIFAL
   condition: CFOP 6xxx + consumo final + ALIQ != aliquota interna oficial UF destino
   implemented: true
@@ -2472,6 +2605,7 @@ difal:
   - VL_ICMS
   error_type: DIFAL_BASE_INCONSISTENTE
   severity: warning
+  corrigivel: investigar
   description: Base de calculo DIFAL inconsistente com operacao
   condition: BC x ALIQ diverge de VL_ICMS alem da tolerancia
   implemented: true
@@ -2489,6 +2623,7 @@ difal:
   - UF
   error_type: DIFAL_FCP_AUSENTE
   severity: warning
+  corrigivel: investigar
   description: FCP ausente ou incoerente em operacao com DIFAL
   condition: UF destino cobra FCP + operacao consumo final interestadual + sem destaque FCP
   implemented: true
@@ -2508,6 +2643,7 @@ difal:
   - IND_IE
   error_type: DIFAL_PERFIL_INCOMPATIVEL
   severity: warning
+  corrigivel: investigar
   description: Perfil destinatario incompativel com tratamento DIFAL
   condition: IND_IE=1 + CFOP consumo final OU IND_IE=9 + CFOP revenda
   implemented: true
@@ -2525,6 +2661,7 @@ difal:
   - IND_IE
   error_type: DIFAL_CONSUMO_FINAL_SEM_MARCADOR
   severity: info
+  corrigivel: investigar
   description: Consumo final sem marcadores consistentes para rastreio do DIFAL
   condition: IND_IE=9 + CFOP generico interestadual (nao usa CFOP de consumo final)
   implemented: true
@@ -2547,6 +2684,7 @@ difal:
   - VL_ICMS
   error_type: CS_C490_SOMA_DIVERGENTE
   severity: error
+  corrigivel: proposta
   description: C490 - VL_BC_ICMS x ALIQ_ICMS diverge de VL_ICMS declarado
   condition: VL_BC_ICMS * ALIQ_ICMS / 100 difere de VL_ICMS alem da tolerancia
   implemented: true
@@ -2563,6 +2701,7 @@ difal:
   - DT_DOC
   error_type: DATE_OUT_OF_PERIOD
   severity: warning
+  corrigivel: proposta
   description: C405 - DT_DOC fora do periodo informado no 0000
   condition: DT_DOC < DT_INI ou DT_DOC > DT_FIN do registro 0000
   implemented: true
@@ -2579,6 +2718,7 @@ difal:
   - COD_PART
   error_type: REF_INEXISTENTE
   severity: warning
+  corrigivel: proposta
   description: C500 - COD_PART referenciado nao existe no cadastro 0150
   condition: COD_PART informado no C500 nao encontrado entre os registros 0150
   implemented: true
@@ -2598,6 +2738,7 @@ difal:
   - ALIQ_ICMS
   error_type: CS_C590_DIVERGE_C510
   severity: error
+  corrigivel: proposta
   description: C590 - VL_ICMS diverge da soma dos C510 para mesma combinacao CST+CFOP+ALIQ
   condition: Soma VL_ICMS dos C510 por CST+CFOP+ALIQ difere do C590 correspondente
   implemented: true
@@ -2617,6 +2758,7 @@ base_calculo:
   - VL_ICMS
   error_type: CALCULO_DIVERGENTE
   severity: error
+  corrigivel: proposta
   description: Recalculo ICMS divergente - BC x ALIQ difere de VL_ICMS declarado
   condition: '|VL_BC_ICMS * ALIQ_ICMS / 100 - VL_ICMS| > tolerance[item_icms]'
   implemented: true
@@ -2635,6 +2777,7 @@ base_calculo:
   - CST_ICMS
   error_type: BASE_MENOR_SEM_JUSTIFICATIVA
   severity: error
+  corrigivel: proposta
   description: Base de calculo ICMS menor que 50% do valor do item sem CST de reducao (020, 070)
   condition: VL_BC_ICMS < (VL_ITEM * 0.5) AND CST not in (020, 070)
   implemented: true
@@ -2652,6 +2795,7 @@ base_calculo:
   - VL_ITEM
   error_type: BASE_SUPERIOR_RAZOAVEL
   severity: warning
+  corrigivel: investigar
   description: Base de calculo ICMS superior a 150% do valor do item
   condition: VL_BC_ICMS > VL_ITEM * 1.5
   implemented: true
@@ -2670,6 +2814,7 @@ base_calculo:
   - IND_FRT
   error_type: FRETE_CIF_FORA_BASE
   severity: error
+  corrigivel: proposta
   description: Frete CIF (IND_FRT=0) nao incluido na base de calculo do ICMS
   condition: VL_FRT > 0 AND IND_FRT=0 AND VL_BC_ICMS <= VL_ITEM
   implemented: true
@@ -2689,6 +2834,7 @@ base_calculo:
   - IND_FRT
   error_type: FRETE_FOB_NA_BASE
   severity: warning
+  corrigivel: investigar
   description: Frete FOB (IND_FRT=1) possivelmente incluido na base de calculo do ICMS
   condition: VL_FRT > 0 AND IND_FRT=1 AND VL_BC_ICMS > VL_ITEM
   implemented: true
@@ -2706,6 +2852,7 @@ base_calculo:
   - VL_OUT_DA
   error_type: DESPESAS_ACESSORIAS_FORA_BASE
   severity: warning
+  corrigivel: proposta
   description: Despesas acessorias (VL_OUT_DA) nao incluidas na base de calculo para CST tributado
   condition: VL_OUT_DA > 0 AND VL_BC_ICMS <= VL_ITEM AND CST tributado
   implemented: true
@@ -2727,6 +2874,7 @@ base_calculo:
   - VL_IPI
   error_type: IPI_REFLEXO_BC_ICMS
   severity: warning
+  corrigivel: proposta
   description: IPI reflexo incorreto na base ICMS — destinatario nao-contribuinte deve incluir IPI na BC; contribuinte nao
   condition: nao-contribuinte AND IPI fora da BC ICMS, ou contribuinte AND IPI na BC ICMS
   implemented: true
@@ -2747,6 +2895,7 @@ base_calculo:
   - VL_IPI
   error_type: CALCULO_DIVERGENTE
   severity: error
+  corrigivel: proposta
   description: Recalculo IPI divergente — VL_BC_IPI * ALIQ_IPI / 100 != VL_IPI
   condition: "|VL_BC_IPI * ALIQ_IPI / 100 - VL_IPI| > tolerancia"
   implemented: true
@@ -2765,6 +2914,7 @@ base_calculo:
   - VL_IPI
   error_type: IPI_CST_MONETARIO_INCOMPATIVEL
   severity: error
+  corrigivel: proposta
   description: CST IPI incompativel com campos monetarios — tributado sem valor, isento com valor, ou NT com valor
   condition: CST tributado (00/49/50) com VL_IPI=0 e BC>0, ou CST isento (01-05/51-55) com VL_IPI>0, ou CST 99 com valores
   implemented: true
@@ -2785,6 +2935,7 @@ base_calculo:
   - CFOP
   error_type: DEST_IE_INCONSISTENTE
   severity: warning
+  corrigivel: proposta
   description: IE ativa no 0150 mas CST indica isencao em operacao interestadual — tratamento fiscal inconsistente
   condition: IE ativa AND CST 40/41 AND CFOP 6xxx
   implemented: true
@@ -2802,6 +2953,7 @@ base_calculo:
   - UF
   error_type: DEST_UF_IE_INCOMPATIVEL
   severity: error
+  corrigivel: proposta
   description: Prefixo da IE nao corresponde a UF do participante no 0150
   condition: prefixo IE nao bate com padrao da UF
   implemented: true
@@ -2820,6 +2972,7 @@ base_calculo:
   - UF
   error_type: DEST_UF_CEP_INCOMPATIVEL
   severity: error
+  corrigivel: proposta
   description: CEP ou COD_MUN pertence a faixa de outra UF — endereco inconsistente
   condition: faixa CEP ou prefixo COD_MUN IBGE difere da UF informada
   implemented: true
@@ -2839,6 +2992,7 @@ base_calculo:
   - CFOP
   error_type: CFOP_INTERESTADUAL_MESMA_UF
   severity: error
+  corrigivel: proposta
   description: CFOP interestadual (6xxx) com destinatario na mesma UF do contribuinte
   condition: CFOP 6xxx AND UF_DEST == UF_CONTRIBUINTE (0000)
   implemented: true
@@ -2856,6 +3010,7 @@ base_calculo:
   - CFOP
   error_type: CFOP_INTERNO_OUTRA_UF
   severity: error
+  corrigivel: proposta
   description: CFOP interno (5xxx) com destinatario em outra UF
   condition: CFOP 5xxx AND UF_DEST != UF_CONTRIBUINTE (0000)
   implemented: true
@@ -2873,6 +3028,7 @@ base_calculo:
   - CFOP
   error_type: CFOP_DIFAL_INCOMPATIVEL
   severity: warning
+  corrigivel: proposta
   description: CFOP de remessa/retorno incompativel com tratamento DIFAL (E300 preenchido)
   condition: E300 preenchido AND CFOP 6xxx de remessa/retorno
   implemented: true
@@ -2893,6 +3049,7 @@ cst_expandido:
   - VL_ITEM
   error_type: CST_TRIBUTADO_ALIQ_ZERO
   severity: error
+  corrigivel: proposta
   description: CST tributado (00,10,20,70,90) com aliquota ICMS zero e valor de item
     positivo
   condition: CST in (00,10,20,70,90) AND ALIQ_ICMS = 0 AND VL_ITEM > 0
@@ -2914,6 +3071,7 @@ cst_expandido:
   - VL_BC_ICMS
   error_type: ISENCAO_INCONSISTENTE
   severity: error
+  corrigivel: proposta
   description: CST isento/NT (40,41,50) com valor de ICMS ou base de calculo positiva
   condition: CST in (40,41,50) AND (VL_ICMS > 0 OR VL_BC_ICMS > 0)
   implemented: true
@@ -2933,6 +3091,7 @@ cst_expandido:
   - ALIQ_ICMS
   error_type: CST_020_ALIQ_REDUZIDA
   severity: warning
+  corrigivel: proposta
   description: CST 020 com aliquota reduzida abaixo do piso interno sem decreto estadual
   condition: CST = 020 AND ALIQ_ICMS < 17% AND CFOP 5xxx (interno)
   implemented: true
@@ -2952,6 +3111,7 @@ cst_expandido:
   - VL_ICMS
   error_type: CST_051_DIFERIMENTO_DEBITO
   severity: error
+  corrigivel: proposta
   description: CST 051 (diferimento) gerando debito de ICMS indevido
   condition: CST = 051 AND VL_ICMS > 0
   implemented: true
@@ -2972,6 +3132,7 @@ beneficio_fiscal:
   - COD_AJ_APUR
   error_type: BENEFICIO_CONTAMINANDO_ALIQUOTA
   severity: error
+  corrigivel: investigar
   description: Beneficio fiscal no E111 contaminando aliquota do documento (C190)
   condition: E111 com ajuste de beneficio AND C190 com ALIQ_ICMS atipica em operacao
     interna
@@ -2992,6 +3153,7 @@ beneficio_fiscal:
   - CFOP
   error_type: BENEFICIO_CONTAMINANDO_DIFAL
   severity: warning
+  corrigivel: investigar
   description: Beneficio fiscal contaminando calculo do DIFAL interestadual
   condition: E111 beneficio AND C170 interestadual com ALIQ < 4%
   implemented: true
@@ -3012,6 +3174,7 @@ beneficio_fiscal:
   - CFOP
   error_type: BENEFICIO_BASE_NAO_ELEGIVEL
   severity: warning
+  corrigivel: investigar
   description: Base do beneficio fiscal inclui operacoes nao elegiveis (devolucao,
     cancelamento, remessa)
   condition: E111 beneficio AND C190 com CFOPs nao elegiveis > 5% do total
@@ -3033,6 +3196,7 @@ devolucoes:
   - COD_PART
   error_type: DEVOLUCAO_SEM_ESPELHAMENTO
   severity: warning
+  corrigivel: proposta
   description: Devolucao sem NF original correspondente (mesmo COD_PART, operacao
     inversa)
   condition: CFOP devolucao AND sem C100 com mesmo COD_PART e operacao inversa
@@ -3052,6 +3216,7 @@ devolucoes:
   - CFOP
   error_type: DEVOLUCAO_SEM_DIFAL
   severity: warning
+  corrigivel: proposta
   description: Devolucao interestadual sem tratamento do DIFAL (E300 ausente)
   condition: CFOP devolucao interestadual AND E300 ausente
   implemented: true
@@ -3071,6 +3236,7 @@ devolucoes:
   - ALIQ_ICMS
   error_type: DEVOLUCAO_ALIQ_DIVERGENTE
   severity: warning
+  corrigivel: investigar
   description: Devolucao interestadual com aliquota diferente das faixas interestaduais
     validas
   condition: CFOP devolucao interestadual AND ALIQ_ICMS not in (4, 7, 12)
@@ -3093,6 +3259,7 @@ parametrizacao:
   - CFOP
   error_type: PARAM_ERRO_SISTEMATICO_ITEM
   severity: warning
+  corrigivel: proposta
   description: Mesmo COD_ITEM com mesmo tipo de erro em mais de 80% de suas ocorrencias
   condition: COD_ITEM com erro repetitivo (>80%) indica parametrizacao incorreta no ERP
   implemented: true
@@ -3112,6 +3279,7 @@ parametrizacao:
   - UF
   error_type: PARAM_ERRO_SISTEMATICO_UF
   severity: warning
+  corrigivel: proposta
   description: Mesmo tipo de erro em mais de 80% das operacoes para mesma UF destino
   condition: Erro concentrado por UF destino (>80%) indica regra fiscal incorreta para
     a UF
@@ -3132,6 +3300,7 @@ parametrizacao:
   - DT_DOC
   error_type: PARAM_ERRO_INICIADO_EM_DATA
   severity: warning
+  corrigivel: proposta
   description: Tipo de erro concentrado apos determinada data (janela deslizante)
   condition: Taxa de erro >80% na segunda metade do periodo vs <20% na primeira metade
   implemented: true
@@ -3152,6 +3321,7 @@ ncm:
   - CST_ICMS
   error_type: NCM_TRIBUTACAO_INCOMPATIVEL
   severity: error
+  corrigivel: proposta
   description: NCM com tratamento tributario incompativel com CST (TIPI vs escrituracao)
   condition: NCM isento/NT na TIPI + CST tributado, ou NCM monofasico + CST incompativel
   implemented: true
@@ -3172,6 +3342,7 @@ ncm:
   - VL_ITEM
   error_type: NCM_GENERICO_RELEVANTE
   severity: warning
+  corrigivel: investigar
   description: NCM generico (terminado em 0000) com valor do item acima de R$ 1.000
   condition: NCM termina em 0000 AND VL_ITEM > 1000
   implemented: true
@@ -3191,6 +3362,7 @@ governanca:
   - '*'
   error_type: CLASSIFICACAO_TIPO_ERRO
   severity: info
+  corrigivel: investigar
   description: 'Governanca: classificar achado como erro material, parametrizacao ou
     tese fiscal'
   condition: Padrao do erro indica natureza pontual, sistemica ou interpretativa
@@ -3210,6 +3382,7 @@ governanca:
   - '*'
   error_type: GRAU_CONFIANCA_ACHADOS
   severity: info
+  corrigivel: investigar
   description: 'Governanca: explicitar grau de confianca (objetivo/provavel/indicio)
     dos achados'
   condition: Distribuicao dos achados por grau de certeza
@@ -3229,6 +3402,7 @@ governanca:
   - '*'
   error_type: ACHADO_LIMITADO_AO_SPED
   severity: info
+  corrigivel: investigar
   description: 'Governanca: explicitar que achados dependem exclusivamente do SPED
     sem documentos externos'
   condition: Regra sustentavel apenas por dados internos do arquivo
@@ -3248,6 +3422,7 @@ governanca:
   - '*'
   error_type: CHECKLIST_AUDITORIA_INCOMPLETO
   severity: critical
+  corrigivel: investigar
   description: 'Governanca: checklist mestre de 10 pontos minimos de auditoria SPED'
   condition: Ausencia de conferencia nos pilares minimos de auditoria
   implemented: true
@@ -3266,6 +3441,7 @@ governanca:
   - '*'
   error_type: AMOSTRAGEM_MATERIALIDADE
   severity: info
+  corrigivel: investigar
   description: 'Governanca: amostragem por materialidade e risco — cobertura da auditoria'
   condition: Percentual de registros com achados vs universo total
   implemented: true
@@ -3284,6 +3460,7 @@ simples_nacional:
   fields: [CST_ICMS]
   error_type: SN_CST_TABELA_A
   severity: error
+  corrigivel: investigar
   description: CST Tabela A (Regime Normal) usado em contribuinte do Simples Nacional — deve usar CSOSN (Tabela B)
   condition: regime == SIMPLES_NACIONAL AND CST_ICMS in {00,10,20,30,40,41,50,51,60,70,90}
   implemented: true
@@ -3301,6 +3478,7 @@ simples_nacional:
   fields: [CST_ICMS]
   error_type: SN_CSOSN_INVALIDO
   severity: error
+  corrigivel: investigar
   description: CSOSN informado nao pertence a Tabela B (101-900)
   condition: regime == SIMPLES_NACIONAL AND CSOSN not in CSOSN_VALIDOS
   implemented: true
@@ -3361,6 +3539,7 @@ simples_nacional:
   fields: [VL_BC_ICMS_ST, VL_ICMS_ST]
   error_type: SN_ST_NAO_PREENCHIDA
   severity: error
+  corrigivel: investigar
   description: CSOSN 201/202/203 indica ST mas campos de base e valor ST zerados
   condition: CSOSN in {201,202,203} AND VL_BC_ICMS_ST == 0 AND VL_ICMS_ST == 0
   implemented: true
@@ -3378,6 +3557,7 @@ simples_nacional:
   fields: [VL_BC_ICMS, VL_ICMS]
   error_type: SN_CSOSN_300_COM_ICMS
   severity: warning
+  corrigivel: investigar
   description: CSOSN 300 (imune) com BC ou valor ICMS preenchido
   condition: CSOSN == 300 AND (VL_BC_ICMS > 0 OR VL_ICMS > 0)
   implemented: true
@@ -3394,6 +3574,7 @@ simples_nacional:
   fields: [VL_BC_ICMS, VL_ICMS]
   error_type: SN_CSOSN_400_COM_ICMS
   severity: warning
+  corrigivel: investigar
   description: CSOSN 400 (nao tributada) com BC ou valor ICMS preenchido
   condition: CSOSN == 400 AND (VL_BC_ICMS > 0 OR VL_ICMS > 0)
   implemented: true
@@ -3410,6 +3591,7 @@ simples_nacional:
   fields: [VL_BC_ICMS_ST]
   error_type: SN_500_SEM_BC_ST
   severity: warning
+  corrigivel: investigar
   description: CSOSN 500 (ST retida anteriormente) sem base ST preenchida
   condition: CSOSN == 500 AND VL_BC_ICMS_ST == 0
   implemented: true
@@ -3426,6 +3608,7 @@ simples_nacional:
   fields: [CST_PIS, CST_COFINS]
   error_type: SN_PIS_CST_PROIBIDO
   severity: error
+  corrigivel: investigar
   description: >
     CST PIS/COFINS proibido para Simples Nacional. CSTs 01/02/03 exclusivos
     do regime nao-cumulativo; CST 05 reservado a substitutos tributarios.
@@ -3445,6 +3628,7 @@ simples_nacional:
   fields: [IND_PERFIL]
   error_type: SN_PERFIL_INVALIDO
   severity: warning
+  corrigivel: investigar
   description: Contribuinte do Simples Nacional com IND_PERFIL diferente de C
   condition: regime == SIMPLES_NACIONAL AND IND_PERFIL != 'C'
   implemented: true
@@ -3461,6 +3645,7 @@ simples_nacional:
   fields: [CST_PIS, COD_NCM]
   error_type: SN_CST_MONOFASICO_NCM_INVALIDO
   severity: warning
+  corrigivel: investigar
   description: >
     CST PIS 04 (monofasico) em produto cujo NCM nao consta na lista
     de monofasicos da RFB. Possivel erro de classificacao fiscal.

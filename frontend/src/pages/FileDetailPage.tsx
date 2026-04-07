@@ -557,6 +557,64 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
         )}
       </div>
 
+      {/* Filters */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginBottom: '16px', padding: '12px', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <label style={{ fontSize: '13px', color: '#6b7280', fontWeight: 500 }}>Severidade:</label>
+          <select
+            value={filterSeverity}
+            onChange={e => setFilterSeverity(e.target.value)}
+            style={{ fontSize: '13px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+          >
+            <option value="">Todos</option>
+            <option value="critical">Critico</option>
+            <option value="error">Erro</option>
+            <option value="warning">Aviso</option>
+            <option value="info">Info</option>
+          </select>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <label style={{ fontSize: '13px', color: '#6b7280', fontWeight: 500 }}>Registro:</label>
+          <select
+            value={filterRegister}
+            onChange={e => setFilterRegister(e.target.value)}
+            style={{ fontSize: '13px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+          >
+            <option value="">Todos</option>
+            {allRegisters.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <label style={{ fontSize: '13px', color: '#6b7280', fontWeight: 500 }}>Certeza:</label>
+          <select
+            value={filterCerteza}
+            onChange={e => setFilterCerteza(e.target.value)}
+            style={{ fontSize: '13px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+          >
+            <option value="">Todos</option>
+            <option value="erro_objetivo">Erro Objetivo</option>
+            <option value="inconsistencia">Inconsistencia</option>
+            <option value="indicio">Indicio</option>
+          </select>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <label style={{ fontSize: '13px', color: '#6b7280', fontWeight: 500 }}>Ordenar:</label>
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value)}
+            style={{ fontSize: '13px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+          >
+            <option value="severity">Severidade</option>
+            <option value="register">Registro</option>
+            <option value="type">Tipo</option>
+            <option value="line">Linha</option>
+          </select>
+        </div>
+        <span style={{ fontSize: '13px', color: '#6b7280', marginLeft: 'auto' }}>
+          {displayItems.length} de {baseItems.length} apontamentos
+        </span>
+      </div>
+
       {/* Cards */}
       <div className="space-y-2">
         {displayItems.map((e) => (
@@ -681,6 +739,11 @@ function ErrorCard({
             <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{error.register}</span>
             {error.field_name && <span className="text-xs text-gray-500">{error.field_name}</span>}
             <SeverityBadge severity={error.severity} />
+            {error.materialidade > 0 && (
+              <span className="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800 font-medium" title="Materialidade financeira">
+                R$ {error.materialidade.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            )}
             {error.certeza === 'indicio' && <span className="px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700">Indicio</span>}
             {isCorrected && <span className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">Corrigido</span>}
           </div>

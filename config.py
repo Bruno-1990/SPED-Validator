@@ -34,6 +34,12 @@ DB_PATH = DB_DIR / "sped.db"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 EMBEDDING_DIM = 384
 EMBEDDING_BATCH_SIZE = 64
+EMBEDDING_MODEL_NOTES = (
+    "Modelo multilingue leve (384 dims). Funciona razoavelmente para "
+    "terminologia fiscal em portugues mas pode nao distinguir nuances tecnicas como "
+    "'credito presumido' vs 'credito outorgado'. Candidato a substituicao por modelo "
+    "especializado em documentos legais/fiscais brasileiros."
+)
 
 # Busca
 SEARCH_TOP_K = 5

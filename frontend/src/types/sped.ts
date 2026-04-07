@@ -83,6 +83,7 @@ export interface ValidationError {
   certeza: string | null
   impacto: string | null
   categoria: string | null
+  materialidade: number
 }
 
 export interface SearchResult {

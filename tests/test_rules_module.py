@@ -43,6 +43,7 @@ def _make_rule(**overrides) -> Rule:
         vigencia_ate=None,
         version=None,
         last_updated=None,
+        corrigivel="proposta",
     )
     defaults.update(overrides)
     return Rule(**defaults)
@@ -520,7 +521,7 @@ class TestMain:
 
     def test_main_check_no_missing(self, capsys, monkeypatch, tmp_path):
         data = {"blk": [{"id": "M1", "implemented": True, "module": "x",
-                         "error_type": "FORMATO_INVALIDO"}]}
+                         "error_type": "FORMATO_INVALIDO", "corrigivel": "proposta"}]}
         path = _write_yaml(tmp_path, data)
         monkeypatch.setattr("sys.argv", ["rules", "--rules-file", str(path), "--check"])
         from src.rules import main

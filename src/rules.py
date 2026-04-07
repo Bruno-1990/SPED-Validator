@@ -103,6 +103,7 @@ class Rule:
     vigencia_ate: str | None = None
     version: str | None = None
     last_updated: str | None = None
+    corrigivel: str | None = None
 
 
 def load_rules(path: Path | None = None) -> list[Rule]:
@@ -136,6 +137,7 @@ def load_rules(path: Path | None = None) -> list[Rule]:
                 vigencia_ate=entry.get("vigencia_ate"),
                 version=entry.get("version"),
                 last_updated=entry.get("last_updated"),
+                corrigivel=entry.get("corrigivel"),
             ))
 
     return rules
@@ -152,6 +154,16 @@ def check_rules(rules: list[Rule]) -> dict:
         if r.error_type and r.error_type not in _KNOWN_ERROR_TYPES:
             missing_types.append(r)
 
+    # Verificar campo corrigivel obrigatorio
+    valid_corrigivel = {"automatico", "proposta", "investigar", "impossivel"}
+    missing_corrigivel: list[Rule] = []
+    invalid_corrigivel: list[Rule] = []
+    for r in rules:
+        if not r.corrigivel:
+            missing_corrigivel.append(r)
+        elif r.corrigivel not in valid_corrigivel:
+            invalid_corrigivel.append(r)
+
     return {
         "total": len(rules),
         "implemented": len(implemented),
@@ -160,6 +172,8 @@ def check_rules(rules: list[Rule]) -> dict:
         "pending_rules": pending,
         "by_block": _count_by_block(rules),
         "by_severity": _count_by_severity(rules),
+        "missing_corrigivel": missing_corrigivel,
+        "invalid_corrigivel": invalid_corrigivel,
     }
 
 
@@ -203,6 +217,22 @@ def print_summary(rules: list[Rule]) -> None:
     print("  Por severidade:")
     for sev, count in sorted(report["by_severity"].items()):
         print(f"    {sev:<12s} {count:>3}")
+
+    # Governanca: corrigivel
+    missing_c = report.get("missing_corrigivel", [])
+    invalid_c = report.get("invalid_corrigivel", [])
+    has_corrigivel = report["total"] - len(missing_c)
+    print(f"\n  Governanca (corrigivel): {has_corrigivel}/{report['total']} regras com campo declarado")
+    if missing_c:
+        print(f"  ATENCAO: {len(missing_c)} regra(s) sem campo 'corrigivel':")
+        for r in missing_c[:10]:
+            print(f"    - {r.id}")
+        if len(missing_c) > 10:
+            print(f"    ... e mais {len(missing_c) - 10}")
+    if invalid_c:
+        print(f"  ERRO: {len(invalid_c)} regra(s) com valor invalido de 'corrigivel':")
+        for r in invalid_c:
+            print(f"    - {r.id}: '{r.corrigivel}'")
 
     if report["missing_error_types"]:
         print(f"\n  ATENCAO: {len(report['missing_error_types'])} regra(s) com error_type nao encontrado no codigo:")
@@ -324,7 +354,12 @@ def main() -> None:
         report = check_rules(rules)
         if report["pending"] > 0:
             print_pending(rules)
-        sys.exit(1 if report["missing_error_types"] else 0)
+        has_errors = bool(
+            report["missing_error_types"]
+            or report.get("missing_corrigivel")
+            or report.get("invalid_corrigivel")
+        )
+        sys.exit(1 if has_errors else 0)
     else:
         print_summary(rules)
 

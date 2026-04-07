@@ -431,6 +431,32 @@ def _severity_for(error_type: str) -> str:
     return "error"
 
 
+def _calc_materialidade(err: ValidationError) -> float:
+    """Calcula materialidade financeira (R$) de um erro de validação.
+
+    Para erros matemáticos com value e expected_value numéricos,
+    retorna abs(value - expected_value). Caso contrário retorna 0.
+    """
+    val = err.value
+    exp = err.expected_value
+    if not val or not exp:
+        return 0.0
+    try:
+        # Normalizar separadores: aceitar "1.234,56" -> "1234.56"
+        def _parse(s: str) -> float:
+            s = s.strip().replace(" ", "")
+            # Se tem vírgula como decimal (ex: "1234,56" ou "1.234,56")
+            if "," in s:
+                s = s.replace(".", "").replace(",", ".")
+            return float(s)
+
+        v = _parse(val)
+        e = _parse(exp)
+        return abs(v - e)
+    except (ValueError, TypeError):
+        return 0.0
+
+
 def _persist_errors(db: sqlite3.Connection, file_id: int, errors: list[ValidationError]) -> None:
     """Persiste erros de validação no banco."""
     # Limpar correções e erros anteriores (corrections referencia validation_errors)
@@ -456,16 +482,19 @@ def _persist_errors(db: sqlite3.Connection, file_id: int, errors: list[Validatio
             # Defaults — try to enrich from rules.yaml
             ci = ci_map.get(err.error_type, ("objetivo", "relevante"))
             certeza, impacto = ci
+        materialidade = _calc_materialidade(err)
         db.execute(
             """INSERT INTO validation_errors
                (file_id, record_id, line_number, register, field_no, field_name, value,
-                error_type, severity, message, expected_value, categoria, certeza, impacto)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                error_type, severity, message, expected_value, categoria, certeza, impacto,
+                materialidade)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 file_id, record_id, err.line_number, err.register, err.field_no,
                 err.field_name, err.value, err.error_type,
                 _severity_for(err.error_type), err.message,
                 err.expected_value, err.categoria, certeza, impacto,
+                materialidade,
             ),
         )
     db.commit()

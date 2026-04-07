@@ -174,6 +174,9 @@ _MIGRATIONS: dict[int, list[str]] = {
         )""",
         "CREATE INDEX IF NOT EXISTS idx_finding_res_file ON finding_resolutions(file_id)",
     ],
+    10: [
+        "ALTER TABLE validation_errors ADD COLUMN materialidade REAL DEFAULT 0",
+    ],
 }
 
 
