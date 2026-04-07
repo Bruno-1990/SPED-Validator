@@ -1,23 +1,30 @@
 # PRD - Motor de Regras de Validacao SPED EFD
 
-**Versao:** 3.0
+**Versao:** 4.0
 **Data:** 2026-04-06
 **Autor:** Bruno
-**Status:** Concluido
+**Status:** Concluido v4
 
 ---
 
 ## 1. Visao Geral
 
-O motor de validacao SPED EFD conta com **186 regras** definidas no `rules.yaml`, **todas implementadas** em 22 blocos de validacao. O catalogo completo cobre cenarios de formato, cruzamento, recalculo, semantica fiscal, auditoria de beneficios, aliquotas, DIFAL/FCP, base de calculo, destinatario, devolucoes, parametrizacao, governanca e **Simples Nacional**.
+O motor de validacao SPED EFD conta com **186 regras** definidas no `rules.yaml`, **todas implementadas** em 22 blocos de validacao, com campo `corrigivel` obrigatorio em todas as regras (automatico|proposta|investigar|impossivel). O catalogo completo cobre cenarios de formato, cruzamento, recalculo, semantica fiscal, auditoria de beneficios, aliquotas, DIFAL/FCP, base de calculo, destinatario, devolucoes, parametrizacao, governanca e **Simples Nacional**.
 
-**Estado atual:** 186 regras implementadas | 1473 testes automatizados | 0 pendentes.
+**Novidades v4:**
+- Campo `corrigivel` em 100% das regras, com governanca de correcoes no `correction_service.py`
+- Workflow de resolucao de apontamentos (accepted/rejected/deferred/noted) via tabela `finding_resolutions`
+- Materialidade financeira estimada (R$) por apontamento
+- Filtros UI no frontend: severidade, registro, certeza, ordenacao
+- Vigencia de regras enforced no engine (regras de 2024 nao aplicam a arquivo de 2022)
+
+**Estado atual:** 186 regras implementadas | 1472 testes automatizados | campo corrigivel em 100% das regras
 
 ---
 
 ## 2. Situacao Atual
 
-### 2.1 Regras Implementadas (175)
+### 2.1 Regras Implementadas (186)
 
 | Bloco | Qtd | Modulo |
 |---|---|---|
@@ -585,5 +592,41 @@ Requer construcao de tabelas de referencia externas:
 - **Cobertura atual:** 186/186 regras implementadas (100%)
 - **Falsos positivos:** < 5% em arquivo de referencia (regras analiticas rebaixadas para warning)
 - **Performance:** Validacao completa < 30s para arquivo de 15k registros
-- **Testes:** 1473 testes automatizados passando
+- **Testes:** 1472 testes automatizados passando
 - **Regressao:** Zero regras existentes quebradas
+
+---
+
+## 10. Melhorias PRD v4 (2026-04-06)
+
+### Governanca de Correcoes
+- Campo `corrigivel` obrigatorio em todas as 186 regras
+  - `automatico`: correcao inequivoca (formato, contagem bloco 9)
+  - `proposta`: correcao com impacto fiscal, requer justificativa (min 10 chars)
+  - `investigar`: anomalia detectada, correcao bloqueada — requer analise externa
+  - `impossivel`: dados externos necessarios, sem acao possivel
+- `correction_service.py` enforce governanca antes de aplicar correcao
+- `python -m src.rules --check` valida presenca de corrigivel
+
+### Correcoes Fiscais
+- SN_003: teto corrigido para 3.95% (LC 155/2016 Anexos I-V)
+- SN_012: threshold uniformidade aumentado para 1.0pp, severity rebaixado para info
+- REF_COD_PART_D100 desativado (duplicava D_001 em bloco_d_validator)
+- Vigencia de regras enforced no pipeline (regras de 2024 nao aplicam a arquivo de 2022)
+
+### Workflow de Resolucao
+- Tabela `finding_resolutions` no audit.db
+- Status: open | accepted | rejected | deferred | noted
+- Endpoint `POST /api/findings/{id}/resolve`
+- Rejeicao exige justificativa (min 20 chars)
+
+### Frontend
+- Filtros dropdown: severidade, registro, certeza, ordenacao
+- Contador "X de Y apontamentos"
+- Materialidade financeira (R$) como badge por apontamento
+- Graficos de distribuicao (ErrorChart.tsx — Recharts)
+- Painel de escopo (AuditScopePanel)
+
+### Embedding
+- config.py: EMBEDDING_MODEL_NOTES documentado
+- python -m src.embeddings --info

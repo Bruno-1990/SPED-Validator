@@ -12,7 +12,7 @@ Este sistema resolve isso automatizando:
 
 1. **Conversao** de PDFs/DOCX/TXT da documentacao oficial para Markdown estruturado
 2. **Indexacao** com Full-Text Search (FTS5) + embeddings vetoriais para busca semantica
-3. **Validacao** em 22 camadas dos arquivos SPED (estrutural, semantica fiscal, monofasicos, auditoria de beneficios, aliquotas, C190, DIFAL/FCP, base de calculo, destinatario, parametrizacao, governanca, **Simples Nacional**) com 186 regras implementadas
+3. **Validacao** em 22 camadas dos arquivos SPED (estrutural, semantica fiscal, monofasicos, auditoria de beneficios, aliquotas, C190, DIFAL/FCP, base de calculo, destinatario, parametrizacao, governanca, **Simples Nacional**) com 186 regras implementadas, governanca de correcoes (4 niveis: automatico/proposta/investigar/impossivel), materialidade financeira estimada e workflow de resolucao de apontamentos
 4. **Busca automatica** da documentacao relevante para cada erro encontrado
 5. **API REST** (FastAPI) com endpoints para upload, validacao, correcao e exportacao
 6. **Frontend React** com interface para upload, visualizacao de erros e relatorios
@@ -152,7 +152,7 @@ Execute `git-push.bat` no Windows — pede a mensagem do commit, faz rebase na m
 ```
 SPED/
 |-- README.md                       # Este arquivo
-|-- rules.yaml                      # Catalogo de 186 regras de validacao (YAML)
+|-- rules.yaml                      # Catalogo de 186 regras com corrigivel obrigatorio (automatico|proposta|investigar|impossivel)
 |-- pyproject.toml                  # Dependencias e metadados (v0.1.0)
 |-- config.py                       # Caminhos, modelo embedding, parametros
 |-- start.bat                       # Inicia API + Frontend (Windows)
@@ -170,7 +170,7 @@ SPED/
 |   |-- embeddings.py               # Wrapper do modelo sentence-transformers
 |   |-- validator.py                # Validacao campo a campo
 |   |-- searcher.py                 # Busca hibrida (FTS5 + vetorial + RRF)
-|   |-- rules.py                    # Loader/CLI do rules.yaml (--check, --pending, --block)
+|   |-- rules.py                    # Loader/CLI do rules.yaml (--check valida corrigivel, --pending, --block)
 |   |-- validators/
 |   |   |-- __init__.py
 |   |   |-- format_validator.py     # CNPJ, CPF, datas, CEP, CFOP, NCM, chave NFe
@@ -205,13 +205,13 @@ SPED/
 |   |-- services/
 |   |   |-- reference_loader.py          # Carrega tabelas YAML de referencia (lazy loading)
 |   |   |-- __init__.py
-|   |   |-- database.py                 # Schema SQLite de auditoria (6 tabelas)
+|   |   |-- database.py                 # Schema SQLite de auditoria (8 tabelas, 10 migracoes)
 |   |   |-- file_service.py             # Upload, hash, parse, metadados, CRUD, clear_audit
 |   |   |-- validation_service.py       # Orquestrador de validacao (7 camadas, 4 severidades)
 |   |   |-- pipeline.py                 # Pipeline estagiado com SSE (progresso em tempo real)
 |   |   |-- error_messages.py           # 30+ tipos de erro com mensagens amigaveis e orientacao
 |   |   |-- auto_correction_service.py  # Correcoes automaticas deterministicas
-|   |   |-- correction_service.py       # Aplicar/desfazer correcoes manuais
+|   |   |-- correction_service.py       # Aplicar/desfazer correcoes com governanca (automatico/proposta/investigar/impossivel)
 |   |   |-- export_service.py           # Exportar SPED, relatorio MD/CSV/JSON
 |
 |-- api/
@@ -400,6 +400,11 @@ Wrapper fino sobre `sentence-transformers`.
 | `embed_single(text)` | Encoding de texto unico -> vetor (384,) |
 | `embedding_to_blob(emb)` | numpy -> bytes (para SQLite) |
 | `blob_to_embedding(blob)` | bytes -> numpy (do SQLite) |
+| `info()` | Retorna nome do modelo, dimensao e notas |
+
+**CLI:** `python -m src.embeddings --info` exibe modelo carregado em tempo de execucao.
+
+**Notas:** Modelo multilingue leve (384 dims). Pode nao distinguir nuances fiscais como "credito presumido" vs "credito outorgado". Configurado em `config.py` com `EMBEDDING_MODEL_NOTES`.
 
 ### 6. Buscador (`src/searcher.py`)
 
@@ -442,7 +447,7 @@ FastAPI com 5 routers e banco SQLite de auditoria.
 | Router | Endpoints | Funcao |
 |--------|-----------|--------|
 | `files.py` | `POST /api/files/upload`, `GET /api/files`, `GET /api/files/{id}`, `DELETE /api/files/{id}`, `DELETE /api/files/{id}/audit` | Upload, listagem, detalhe, exclusao e limpeza de audit |
-| `validation.py` | `POST /api/files/{id}/validate`, `GET /api/files/{id}/errors`, `GET /api/files/{id}/summary` | Validacao completa, listagem de erros, resumo por tipo |
+| `validation.py` | `POST /api/files/{id}/validate`, `GET /api/files/{id}/errors`, `GET /api/files/{id}/summary`, `POST /api/findings/{id}/resolve` | Validacao, erros, resumo, workflow de resolucao |
 | `records.py` | `GET /api/files/{id}/records`, `PATCH /api/records/{id}` | Listagem de registros, correcao de campos |
 | `report.py` | `GET /api/files/{id}/report` | Relatorio em MD/CSV/JSON, download do SPED corrigido |
 | `search.py` | `GET /api/search` | Busca na documentacao oficial |
@@ -452,12 +457,14 @@ FastAPI com 5 routers e banco SQLite de auditoria.
 
 | Tabela | Funcao |
 |--------|--------|
-| `sped_files` | Metadados dos arquivos (hash, periodo, empresa, CNPJ, status) |
+| `sped_files` | Metadados dos arquivos (hash, periodo, empresa, CNPJ, status, regime_override) |
 | `sped_records` | Registros parseados (line_number, register, fields_json) |
-| `validation_errors` | Erros encontrados (tipo, severidade, mensagem, sugestao) |
+| `validation_errors` | Erros encontrados (tipo, severidade, mensagem, sugestao, materialidade R$) |
 | `cross_validations` | Cruzamentos entre blocos (expected vs actual, diferenca) |
 | `corrections` | Historico de correcoes aplicadas (old/new value, audit trail) |
 | `audit_log` | Log de acoes (upload, validacao, correcao) |
+| `finding_resolutions` | Workflow de resolucao (accepted/rejected/deferred/noted + justificativa) |
+| `retificacoes` | Vinculos entre arquivos originais e retificadores |
 
 **Configuracao:** SQLite com `check_same_thread=False` para compatibilidade com FastAPI (endpoints rodam em threads diferentes).
 
@@ -469,7 +476,7 @@ Interface web em React 18 + TypeScript + TailwindCSS + Vite.
 |--------|--------|
 | `UploadPage` | Upload de arquivos SPED via drag-and-drop |
 | `FilesPage` | Listagem de arquivos processados com status |
-| `FileDetailPage` | Detalhe do arquivo: erros por tipo, resumo, relatorio |
+| `FileDetailPage` | Detalhe: erros com filtros (severidade/registro/certeza), graficos, materialidade R$, editor inline, workflow de resolucao |
 | `RulesPage` | Criador de regras: texto livre, geracao automatica com base legal, implementacao no YAML |
 
 **Stack:** React 18, React Router 6, Vite 5, TailwindCSS 3, TypeScript 5.
@@ -516,6 +523,7 @@ DB_PATH = ROOT_DIR / "db" / "sped.db"
 # Modelo de embeddings
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"    # 384 dimensoes, ~80MB
 EMBEDDING_BATCH_SIZE = 64
+EMBEDDING_MODEL_NOTES = "Modelo multilingue leve. Pode nao distinguir nuances fiscais."
 
 # Busca
 SEARCH_TOP_K = 5
@@ -611,6 +619,7 @@ CREATE TABLE validation_errors (
     field_no INTEGER, field_name TEXT, value TEXT,
     error_type TEXT NOT NULL, severity TEXT DEFAULT 'error',
     message TEXT NOT NULL, doc_suggestion TEXT,
+    materialidade REAL DEFAULT 0,       -- impacto financeiro estimado (R$)
     FOREIGN KEY (file_id) REFERENCES sped_files(id)
 );
 
@@ -622,6 +631,20 @@ CREATE TABLE corrections (
     old_value TEXT, new_value TEXT,
     applied_by TEXT DEFAULT 'user',
     applied_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Resolucoes de apontamentos (workflow analitico)
+CREATE TABLE finding_resolutions (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id       TEXT NOT NULL,
+    finding_id    TEXT NOT NULL,
+    rule_id       TEXT NOT NULL,
+    status        TEXT NOT NULL CHECK(status IN ('open','accepted','rejected','deferred','noted')),
+    user_id       TEXT,
+    justificativa TEXT,
+    prazo_revisao DATE,
+    resolved_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(file_id, finding_id)
 );
 ```
 
