@@ -1,4 +1,4 @@
-import type { AuditScope, CorrectionSuggestion, CrossValidationItem, ErrorSummary, FileInfo, GeneratedRule, PipelineEvent, RecordInfo, RuleSummary, SearchResult, StructuredReport, ValidationError, ValidationResponse } from '../types/sped'
+import type { AuditScope, AuditScopeRaw, CorrectionSuggestion, CrossValidationItem, ErrorSummary, FileInfo, GeneratedRule, PipelineEvent, RecordInfo, RuleSummary, SearchResult, StructuredReport, ValidationError, ValidationResponse } from '../types/sped'
 
 const BASE = '/api'
 
@@ -13,10 +13,11 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   // Files
-  uploadFile: async (file: File): Promise<{ file_id: number; total_records: number; status: string }> => {
+  uploadFile: async (file: File, regime?: string): Promise<{ file_id: number; total_records: number; status: string }> => {
     const form = new FormData()
     form.append('file', file)
-    return request('/files/upload', { method: 'POST', body: form })
+    const qs = regime ? `?regime=${regime}` : ''
+    return request(`/files/upload${qs}`, { method: 'POST', body: form })
   },
   listFiles: () => request<FileInfo[]>('/files'),
   getFile: (id: number) => request<FileInfo>(`/files/${id}`),
@@ -51,9 +52,10 @@ export const api = {
     return es
   },
 
-  getErrors: (fileId: number, params?: Record<string, string>) => {
+  getErrors: async (fileId: number, params?: Record<string, string>): Promise<ValidationError[]> => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-    return request<ValidationError[]>(`/files/${fileId}/errors${qs}`)
+    const res = await request<{ total: number; page: number; page_size: number; has_next: boolean; data: ValidationError[] }>(`/files/${fileId}/errors${qs}`)
+    return res.data
   },
   getSummary: (fileId: number) => request<ErrorSummary>(`/files/${fileId}/summary`),
 
@@ -64,10 +66,13 @@ export const api = {
     request<{ dismissed: number; total_errors: number }>(`/files/${fileId}/errors`, { method: 'DELETE' }),
 
   // Records
-  getRecords: (fileId: number, params?: Record<string, string>) => {
+  getRecords: async (fileId: number, params?: Record<string, string>): Promise<RecordInfo[]> => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-    return request<RecordInfo[]>(`/files/${fileId}/records${qs}`)
+    const res = await request<{ total: number; data: RecordInfo[] }>(`/files/${fileId}/records${qs}`)
+    return res.data
   },
+  getRecord: (fileId: number, recordId: number) =>
+    request<RecordInfo>(`/files/${fileId}/records/${recordId}`),
   updateRecord: (fileId: number, recordId: number, data: { field_no: number; field_name: string; new_value: string; error_id?: number; justificativa?: string; correction_type?: string; rule_id?: string }) =>
     request<{ corrected: boolean }>(`/files/${fileId}/records/${recordId}`, {
       method: 'PUT',
@@ -104,16 +109,42 @@ export const api = {
     body: JSON.stringify({ rule }),
   }),
 
+  // Finding resolutions (workflow aceitar/rejeitar/postergar)
+  resolveFinding: (fileId: number, findingId: number, body: { status: string; rule_id: string; justificativa?: string; user_id?: string; prazo_revisao?: string }) =>
+    request<{ resolved: boolean; finding_id: number; status: string }>(`/files/${fileId}/findings/${findingId}/resolve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  getResolutions: (fileId: number) =>
+    request<Array<{ id: number; file_id: string; finding_id: string; rule_id: string; status: string; justificativa: string | null; prazo_revisao: string | null; resolved_at: string }>>(`/files/${fileId}/findings/resolutions`),
+
   // Cross-validation errors
-  getCrossValidation: (fileId: number, tipo?: string) => {
+  getCrossValidation: async (fileId: number, tipo?: string): Promise<CrossValidationItem[]> => {
     const params: Record<string, string> = { categoria: 'cruzamento' }
     if (tipo) params.tipo = tipo
-    return request<CrossValidationItem[]>(`/files/${fileId}/errors?${new URLSearchParams(params)}`)
+    const res = await request<{ total: number; data: CrossValidationItem[] }>(`/files/${fileId}/errors?${new URLSearchParams(params)}`)
+    return res.data
   },
 
   // Audit scope
-  getAuditScope: (fileId: number) =>
-    request<AuditScope>(`/files/${fileId}/audit-scope`),
+  getAuditScope: async (fileId: number): Promise<AuditScope> => {
+    const raw = await request<AuditScopeRaw>(`/files/${fileId}/audit-scope`)
+    const statusMap: Record<string, 'ok' | 'partial' | 'not_run' | 'not_applicable'> = {
+      ok: 'ok', parcial: 'partial', nao_executado: 'not_run', nao_aplicavel: 'not_applicable',
+    }
+    return {
+      coverage_pct: raw.cobertura_estimada_pct,
+      checks: raw.checks_executados.map(c => ({
+        name: c.id.replace(/_/g, ' '),
+        status: statusMap[c.status] || 'not_run',
+        detail: c.motivo_parcial,
+      })),
+      missing_tables: Object.entries(raw.tabelas_externas)
+        .filter(([, v]) => v === 'indisponivel')
+        .map(([k]) => k),
+    }
+  },
 
   // Search
   searchDocs: (query: string, fieldName?: string, register?: string, topK: number = 5) => {

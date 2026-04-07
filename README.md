@@ -969,7 +969,7 @@ Camada 3 do motor — vai alem da consistencia numerica e verifica se o tratamen
 
 Catalogo centralizado de todas as regras de validacao em formato YAML. Permite rastrear, adicionar e auditar regras sem precisar ler o codigo.
 
-**Arquivo `rules.yaml`:** 175 regras em 21 blocos (todas implementadas):
+**Arquivo `rules.yaml`:** 186 regras em 22 blocos (todas implementadas):
 
 | Bloco | Regras | Descricao |
 |-------|--------|-----------|
@@ -1170,7 +1170,7 @@ Correcoes de lint aplicadas:
 |--------|-----------|
 | `database.py` | Schema SQLite com 6 tabelas: sped_files (metadados), sped_records (registros parseados), validation_errors (erros com severidade), cross_validations (cruzamentos), corrections (historico de correcoes), audit_log (rastreabilidade) |
 | `file_service.py` | Upload com hash SHA-256 (detecta duplicata), parse, extracao de metadados do 0000 (empresa, CNPJ, periodo), persistencia dos registros, delete cascade, listagem |
-| `validation_service.py` | Orquestrador: executa 21 camadas de validacao (175 regras) em sequencia, classifica severidade (critical/error/warning/info), persiste erros, permite revalidacao sem duplicar |
+| `validation_service.py` | Orquestrador: executa 22 camadas de validacao (186 regras) em sequencia, classifica severidade (critical/error/warning/info), persiste erros, permite revalidacao sem duplicar |
 | `fiscal_semantics.py` | Validacao semantica: CST x CFOP (3 regras), classificador aliquota zero (7 cenarios), monofasicos PIS/COFINS x NCM (5 regras, 100+ NCMs) |
 | `pipeline.py` | Pipeline estagiado com progresso em tempo real via SSE: 4 estagios (estrutural, cruzamento+semantica, enriquecimento, auto-correcao) com detalhes por sub-passo |
 | `error_messages.py` | 71 tipos de erro com template amigavel, orientacao de correcao e icone. Cobre monofasicos, CST x CFOP, aliquota zero, auditoria de beneficios, DIFAL, C190 |
@@ -1271,7 +1271,7 @@ docker-compose up --build
 |---------|-------|
 | **Testes** | 1473 (unitarios + integracao + API + E2E) |
 | **Cobertura** | 97% |
-| **Regras de validacao** | 175 em 21 blocos (todas implementadas) |
+| **Regras de validacao** | 186 em 22 blocos (todas implementadas) |
 | **Lint** | 0 ruff, 0 mypy, 0 bandit |
 | **Modulos validadores** | 28 arquivos em `src/validators/` |
 | **Modulos Python** | 40+ arquivos em `src/` + `api/` |
@@ -1321,7 +1321,7 @@ O motor de validacao utiliza tabelas YAML em `data/` para regras que dependem de
 | Aliquotas internas por UF | `aliquotas_internas_uf.yaml` | DIFAL_004, validacao aliquota interna |
 | FCP por UF | `fcp_por_uf.yaml` | DIFAL_006, percentual FCP |
 | NCMs monofasicos | `monofasicos_ncm.yaml` | Regras monofasicos PIS/COFINS |
-| Regras de validacao | `rules.yaml` | Catalogo central de 175 regras |
+| Regras de validacao | `rules.yaml` | Catalogo central de 186 regras |
 
 **Como adicionar uma regra ao `rules.yaml`:**
 

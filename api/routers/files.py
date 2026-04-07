@@ -18,8 +18,16 @@ MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
 
 
 @router.post("/upload", response_model=FileUploadResponse)
-def upload(file: UploadFile, db: sqlite3.Connection = Depends(get_db)) -> FileUploadResponse:
-    """Upload de arquivo SPED EFD com limite de 100 MB e leitura streaming."""
+def upload(
+    file: UploadFile,
+    regime: str | None = None,
+    db: sqlite3.Connection = Depends(get_db),
+) -> FileUploadResponse:
+    """Upload de arquivo SPED EFD com limite de 100 MB e leitura streaming.
+
+    Query params:
+        regime: 'normal' | 'simples_nacional' | None (auto-detectar via IND_PERFIL)
+    """
     # Leitura streaming em chunks de 1 MB
     chunk_size = 1024 * 1024
     total_read = 0
@@ -41,6 +49,15 @@ def upload(file: UploadFile, db: sqlite3.Connection = Depends(get_db)) -> FileUp
 
     try:
         file_id = upload_file(db, tmp_path)
+
+        # Salvar regime informado pelo usuario (override)
+        if regime in ("normal", "simples_nacional"):
+            db.execute(
+                "UPDATE sped_files SET regime_override = ? WHERE id = ?",
+                (regime, file_id),
+            )
+            db.commit()
+
         info = get_file(db, file_id)
         if not info:
             raise HTTPException(status_code=500, detail="Erro ao processar arquivo")

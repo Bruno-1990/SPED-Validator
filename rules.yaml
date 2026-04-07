@@ -432,12 +432,13 @@ cruzamento:
   severity: warning
   description: COD_PART do D100 deve existir no cadastro 0150
   condition: COD_PART nao encontrado em nenhum registro 0150
-  implemented: true
+  implemented: false
+  deprecation_note: 'Duplica D_001 em bloco_d_validator.py. Desativado em 2026-04-06.'
   module: cross_block_validator.py
   vigencia_de: '2000-01-01'
   vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-05'
+  version: '1.1'
+  last_updated: '2026-04-06'
   certeza: objetivo
   impacto: relevante
 - id: E110_VS_C190_DEBITOS
@@ -3314,22 +3315,46 @@ simples_nacional:
   categoria: simples_nacional
 - id: SN_003
   register: C170
-  fields: [ALIQ_ICMS, VL_ICMS]
-  error_type: SN_CREDITO_ZERADO
-  severity: error
+  fields: [CST_ICMS, ALIQ_ICMS, VL_ICMS]
+  error_type: SN_CREDITO_ZERADO_OU_FORA_RANGE
+  severity: warning
   description: >
-    CSOSN 101/201 permite credito ICMS mas ALIQ_ICMS zerada, ou acima do teto maximo
-    de pCredSN (~4%). Validacao inteligente por range sem necessidade de RBT12.
-  condition: CSOSN in {101,201} AND (ALIQ==0 OR ALIQ > 4.01%)
+    CSOSN 101/201 com aliquota de credito zerada (erro provavel) ou acima de 3.95%
+    (acima do teto maximo da LC 123, Anexo I-V, todas as faixas, LC 155/2016).
+    Sem o RBT12 no arquivo SPED nao e possivel determinar a faixa exata — portanto
+    o sistema sinaliza como indicio, nao como erro objetivo.
+  condition: >
+    CSOSN in {101,201}
+    AND (
+      (ALIQ_ICMS == 0 AND VL_ICMS != 0) OR
+      (ALIQ_ICMS == 0 AND VL_BC_ICMS > 0) OR
+      (ALIQ_ICMS > 3.95)
+    )
+  certeza: indicio
+  impacto: relevante
   implemented: true
   module: simples_validator.py
-  legislation: 'LC 123/2006 art. 23 + LC 155/2016'
+  legislation: 'LC 123/2006 art. 23 + LC 155/2016 — Tabelas Anexos I-V'
+  mensagem_padrao: >
+    CSOSN {CSOSN}: aliquota de credito ({ALIQ_ICMS}%) fora do range esperado para
+    o Simples Nacional (max 3.95% conforme LC 155/2016, Anexos I-V).
+    Verificar faixa de RBT12 e Anexo aplicavel ao contribuinte.
+  acao_recomendada: >
+    Consultar o DAS do periodo para verificar o Anexo e a faixa de RBT12.
+    O pCredSN correto esta no proprio documento de apuracao do Simples Nacional.
+  corrigivel: investigar
+  depende_externo: true
+  fontes_externas: [DAS, PGDAS-D]
+  notas_tecnicas: >
+    Teto de 3.95% derivado de: Anexo I faixa 6 (3.95%), Anexo II faixa 6 (3.30%),
+    Anexo III faixa 6 (3.50%), Anexo IV sem credito, Anexo V faixa 6 (3.02%).
+    O teto absoluto de qualquer faixa de qualquer Anexo e 3.95%.
+    Aliquota zero + VL_BC preenchido = erro provavel (credito nao exercido ou
+    empresa optou por nao segregar — requer confirmacao).
   vigencia_de: '2018-01-01'
   vigencia_ate: null
-  version: '2.0'
+  version: '3.0'
   last_updated: '2026-04-06'
-  certeza: objetivo
-  impacto: relevante
   categoria: simples_nacional
 - id: SN_004
   register: C170
@@ -3454,18 +3479,32 @@ simples_nacional:
   register: C170
   fields: [ALIQ_ICMS]
   error_type: SN_CREDITO_INCONSISTENTE
-  severity: warning
+  severity: info
   description: >
-    Aliquota de credito ICMS varia entre itens. No SN a aliquota efetiva
-    (pCredSN) depende da faixa de RBT12 e deveria ser uniforme.
-  condition: max(ALIQ_ICMS) - min(ALIQ_ICMS) > 0.01 para CSOSN 101/201
+    Aliquotas de credito ICMS variam significativamente entre itens (delta > 1pp)
+    para CSOSN 101/201. Isso pode indicar: mistura de Anexos diferentes (correto mas
+    raro), mudanca de faixa de RBT12 durante o periodo (improvavel), ou parametrizacao
+    inconsistente no ERP (provavel erro).
+  condition: >
+    CSOSN in {101,201}
+    AND count(distinct ALIQ_ICMS) > 1
+    AND (max(ALIQ_ICMS) - min(ALIQ_ICMS)) > 1.0
+  certeza: indicio
+  impacto: relevante
   implemented: true
   module: simples_validator.py
   legislation: 'LC 123/2006 art. 23'
+  mensagem_padrao: >
+    Aliquotas de credito ICMS variam entre itens (min={min}%, max={max}%).
+    Pode ser correto (multiplos Anexos) ou erro de parametrizacao do ERP.
+  acao_recomendada: >
+    Verificar se a empresa opera em mais de um Anexo da LC 123.
+    Se nao, corrigir a parametrizacao do ERP para aliquota unica.
+  corrigivel: investigar
+  depende_externo: true
+  fontes_externas: [DAS, PGDAS-D]
   vigencia_de: '2018-01-01'
   vigencia_ate: null
-  version: '2.0'
+  version: '3.0'
   last_updated: '2026-04-06'
-  certeza: indicio
-  impacto: relevante
   categoria: simples_nacional

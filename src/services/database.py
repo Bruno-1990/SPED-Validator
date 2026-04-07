@@ -156,6 +156,24 @@ _MIGRATIONS: dict[int, list[str]] = {
             FOREIGN KEY (retificador_file_id) REFERENCES sped_files(id)
         )""",
     ],
+    8: [
+        "ALTER TABLE sped_files ADD COLUMN regime_override TEXT",
+    ],
+    9: [
+        """CREATE TABLE IF NOT EXISTS finding_resolutions (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_id       TEXT NOT NULL,
+            finding_id    TEXT NOT NULL,
+            rule_id       TEXT NOT NULL,
+            status        TEXT NOT NULL CHECK(status IN ('open','accepted','rejected','deferred','noted')),
+            user_id       TEXT,
+            justificativa TEXT,
+            prazo_revisao DATE,
+            resolved_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(file_id, finding_id)
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_finding_res_file ON finding_resolutions(file_id)",
+    ],
 }
 
 

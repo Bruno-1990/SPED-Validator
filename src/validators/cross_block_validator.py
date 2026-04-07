@@ -98,16 +98,8 @@ def validate_cadastro_refs(groups: dict[str, list[SpedRecord]]) -> list[Validati
                 value=cod_item,
             ))
 
-    # Verificar referencias em D100 (COD_PART no campo 3)
-    for rec in groups.get("D100", []):
-        cod_part = get_field(rec, "COD_PART")
-        if cod_part and cod_parts and cod_part not in cod_parts:
-            errors.append(_error(
-                "D100", rec.line_number, "REF_INEXISTENTE",
-                f"COD_PART '{cod_part}' referenciado no D100 nao existe no 0150.",
-                field_name="COD_PART",
-                value=cod_part,
-            ))
+    # D100 COD_PART — desativado: duplica D_001 em bloco_d_validator.py
+    # (REF_COD_PART_D100 marcado implemented: false no rules.yaml em 2026-04-06)
 
     # MOD-17: Verificar referencias em C500 (COD_PART)
     for rec in groups.get("C500", []):

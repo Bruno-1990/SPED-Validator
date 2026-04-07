@@ -50,7 +50,23 @@
       "Skill(update-config)",
       "Bash(chmod +x:*)",
       "Bash(.venv/bin/pip list:*)",
-      "Bash(xargs -I{} basename {})"
+      "Bash(xargs -I{} basename {})",
+      "Read(//home/bruno/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2/**)",
+      "Read(//mnt/c/Users/bmb19/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2/**)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(npx tsc:*)",
+      "Bash(bash:*)",
+      "Bash(PYTHONPATH=/mnt/c/Users/bmb19/OneDrive/Documentos/work/SPED .venv/bin/python:*)",
+      "Bash(PYTHONPATH=. .venv/bin/python -m uvicorn api.main:app --host 127.0.0.1 --port 8000)",
+      "Bash(curl -s http://127.0.0.1:8000/api/health)",
+      "Bash(kill %1)",
+      "Bash(PYTHONPATH=. .venv/bin/python -m uvicorn api.main:app --host 127.0.0.1 --port 8001)",
+      "Bash(PYTHONPATH=. .venv-win/Scripts/python.exe:*)",
+      "Bash(.venv-win/Scripts/pip.exe list:*)",
+      "Bash(.venv-linux/bin/python -m pytest tests/ -x -q --tb=short)",
+      "Bash(git add:*)"
     ]
   }
 }

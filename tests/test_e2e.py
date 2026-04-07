@@ -93,7 +93,10 @@ class TestEndToEnd:
         ).fetchone()
         if first_record:
             record_id = first_record[0]
-            result = apply_correction(db, file_id, record_id, 2, "IND_OPER", "0")
+            result = apply_correction(
+                db, file_id, record_id, 2, "IND_OPER", "0",
+                justificativa="Correcao de teste e2e automatizado",
+            )
             assert result is True
 
             # Verificar que registro foi marcado como corrigido

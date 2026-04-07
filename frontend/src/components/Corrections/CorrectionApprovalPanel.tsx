@@ -43,7 +43,6 @@ export default function CorrectionApprovalPanel({ fileId, errors, onReload }: Pr
   const [suggestions, setSuggestions] = useState<CorrectionSuggestion[]>([])
   const [decisions, setDecisions] = useState<Record<number, 'approved' | 'rejected' | 'skipped'>>({})
   const [modalOpen, setModalOpen] = useState<number | null>(null)
-  const [justificativa, setJustificativa] = useState('')
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState('')
 
@@ -62,24 +61,18 @@ export default function CorrectionApprovalPanel({ fileId, errors, onReload }: Pr
     const suggestion = suggestions.find(s => s.error_id === errorId)
     if (!suggestion) return
 
-    if (justificativa.trim().length < 20) {
-      setError('Justificativa deve ter no minimo 20 caracteres')
-      return
-    }
-
     setProcessing(true)
     setError('')
     try {
-      await api.approveCorrection(fileId, suggestion, justificativa.trim())
+      await api.approveCorrection(fileId, suggestion, 'Aprovado pelo analista')
       setDecisions(prev => ({ ...prev, [errorId]: 'approved' }))
       setModalOpen(null)
-      setJustificativa('')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao aprovar correcao')
     } finally {
       setProcessing(false)
     }
-  }, [fileId, suggestions, justificativa])
+  }, [fileId, suggestions])
 
   const handleReject = useCallback(async (errorId: number) => {
     setProcessing(true)
@@ -223,7 +216,7 @@ export default function CorrectionApprovalPanel({ fileId, errors, onReload }: Pr
               {!decision && (
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => { setModalOpen(s.error_id); setJustificativa(''); setError('') }}
+                    onClick={() => { setModalOpen(s.error_id); setError('') }}
                     disabled={processing}
                     className="bg-green-600 text-white text-sm px-3 py-1.5 rounded hover:bg-green-700 disabled:opacity-50"
                   >
@@ -270,19 +263,6 @@ export default function CorrectionApprovalPanel({ fileId, errors, onReload }: Pr
               )
             })()}
 
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Justificativa (minimo 20 caracteres)
-            </label>
-            <textarea
-              value={justificativa}
-              onChange={(e) => setJustificativa(e.target.value)}
-              className="w-full border rounded p-2 text-sm h-24 resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Descreva o motivo da aprovacao desta correcao..."
-            />
-            <p className={`text-xs mt-1 ${justificativa.trim().length >= 20 ? 'text-green-600' : 'text-gray-400'}`}>
-              {justificativa.trim().length}/20 caracteres
-            </p>
-
             {error && (
               <p className="text-red-600 text-sm mt-2">{error}</p>
             )}
@@ -296,7 +276,7 @@ export default function CorrectionApprovalPanel({ fileId, errors, onReload }: Pr
               </button>
               <button
                 onClick={() => handleApprove(modalOpen)}
-                disabled={processing || justificativa.trim().length < 20}
+                disabled={processing}
                 className="text-sm px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {processing ? 'Salvando...' : 'Confirmar Aprovacao'}

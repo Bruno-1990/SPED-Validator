@@ -118,6 +118,18 @@ def build_context(file_id: int, db: sqlite3.Connection) -> ValidationContext:
         ctx.ind_perfil = f.get("IND_PERFIL", "")
         ctx.regime = _determine_regime(ctx.ind_perfil)
 
+    # Verificar se o usuario informou regime_override no upload
+    row_override = db.execute(
+        "SELECT regime_override FROM sped_files WHERE id = ?",
+        (file_id,),
+    ).fetchone()
+    if row_override:
+        override = row_override[0] if isinstance(row_override, tuple) else row_override["regime_override"]
+        if override == "simples_nacional":
+            ctx.regime = TaxRegime.SIMPLES_NACIONAL
+        elif override == "normal":
+            ctx.regime = TaxRegime.NORMAL
+
     # -- Participantes (0150) --
     rows_0150 = db.execute(
         "SELECT fields_json FROM sped_records WHERE file_id = ? AND register = '0150'",

@@ -8,7 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from api.deps import get_db
 from api.schemas.models import CorrectionRequest, PaginatedResponse, RecordInfo
-from src.services.correction_service import apply_correction
+from src.services.correction_service import (
+    CorrectionNotAllowed,
+    MissingJustificativa,
+    apply_correction,
+)
 
 router = APIRouter(prefix="/api/files/{file_id}/records", tags=["records"])
 
@@ -87,16 +91,21 @@ def update_record(
             ),
         )
 
-    success = apply_correction(
-        db, file_id, record_id,
-        field_no=update.field_no,
-        field_name=update.field_name,
-        new_value=update.new_value,
-        error_id=update.error_id,
-        justificativa=update.justificativa,
-        correction_type=update.correction_type,
-        rule_id=update.rule_id,
-    )
+    try:
+        success = apply_correction(
+            db, file_id, record_id,
+            field_no=update.field_no,
+            field_name=update.field_name,
+            new_value=update.new_value,
+            error_id=update.error_id,
+            justificativa=update.justificativa,
+            correction_type=update.correction_type,
+            rule_id=update.rule_id,
+        )
+    except CorrectionNotAllowed as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except MissingJustificativa as e:
+        raise HTTPException(status_code=422, detail=str(e))
     if not success:
         raise HTTPException(status_code=400, detail="Não foi possível aplicar a correção")
     return {"corrected": True, "record_id": record_id}

@@ -214,7 +214,10 @@ class TestCorrectionService:
         ).fetchone()
         record_id = rec[0]
 
-        result = apply_correction(audit_db, file_id, record_id, 2, "COD_VER", "018")
+        result = apply_correction(
+            audit_db, file_id, record_id, 2, "COD_VER", "018",
+            justificativa="Correcao de teste automatizado",
+        )
         assert result is True
 
         # Verificar que o campo foi atualizado
@@ -226,7 +229,10 @@ class TestCorrectionService:
         assert updated[1] == "corrected"
 
     def test_apply_correction_invalid_record(self, audit_db: sqlite3.Connection) -> None:
-        assert apply_correction(audit_db, 999, 999, 1, "X", "Y") is False
+        assert apply_correction(
+            audit_db, 999, 999, 1, "X", "Y",
+            justificativa="Teste de registro inexistente",
+        ) is False
 
     def test_apply_correction_invalid_field_no(
         self, audit_db: sqlite3.Connection, sped_minimal_path: Path
@@ -235,14 +241,20 @@ class TestCorrectionService:
         rec = audit_db.execute(
             "SELECT id FROM sped_records WHERE file_id = ? LIMIT 1", (file_id,)
         ).fetchone()
-        assert apply_correction(audit_db, file_id, rec[0], 999, "X", "Y") is False
+        assert apply_correction(
+            audit_db, file_id, rec[0], 999, "X", "Y",
+            justificativa="Teste de field_no invalido",
+        ) is False
 
     def test_get_corrections(self, audit_db: sqlite3.Connection, sped_valid_path: Path) -> None:
         file_id = upload_file(audit_db, sped_valid_path)
         rec = audit_db.execute(
             "SELECT id FROM sped_records WHERE file_id = ? LIMIT 1", (file_id,)
         ).fetchone()
-        apply_correction(audit_db, file_id, rec[0], 2, "FIELD", "NEW")
+        apply_correction(
+            audit_db, file_id, rec[0], 2, "FIELD", "NEW",
+            justificativa="Teste get_corrections",
+        )
 
         corrections = get_corrections(audit_db, file_id)
         assert len(corrections) >= 1
@@ -255,7 +267,10 @@ class TestCorrectionService:
         record_id = rec[0]
         original_fields = json.loads(rec[1])
 
-        apply_correction(audit_db, file_id, record_id, 2, "FIELD", "CHANGED")
+        apply_correction(
+            audit_db, file_id, record_id, 2, "FIELD", "CHANGED",
+            justificativa="Teste de undo correction",
+        )
 
         # Pegar correction_id
         corr = audit_db.execute(

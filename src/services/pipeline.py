@@ -29,6 +29,8 @@ from ..validators.ipi_validator import validate_ipi
 from ..validators.ncm_validator import validate_ncm
 from ..validators.parametrizacao_validator import validate_parametrizacao
 from ..validators.pendentes_validator import validate_pendentes
+from ..validators.simples_validator import validate_simples
+from ..validators.st_validator import validate_st, validate_st_mva
 from ..validators.tax_recalc import recalculate_taxes
 from .context_builder import build_context
 from .error_messages import format_friendly_message, get_guidance
@@ -108,12 +110,14 @@ def run_pipeline(
         context = build_context(file_id, db)
 
         # Carregar apenas regras vigentes para o período do arquivo
+        active_error_types: set[str] | None = None
         if context.periodo_ini and context.periodo_fim:
             loader = RuleLoader()
             active_rules = loader.load_rules_for_period(
                 context.periodo_ini, context.periodo_fim
             )
             context.active_rules = [r["id"] for r in active_rules]
+            active_error_types = {r["error_type"] for r in active_rules if r.get("error_type")}
 
         records = _load_records(db, file_id)
 
@@ -132,6 +136,7 @@ def run_pipeline(
         structural_errors.extend(validate_intra_register(records, context=context))
         progress.stage_progress = 100
 
+        structural_errors = _filter_by_vigencia(structural_errors, active_error_types)
         _persist_stage_errors(db, file_id, structural_errors)
         progress.errors_by_stage["estrutural"] = len(structural_errors)
         progress.total_errors = len(structural_errors)
@@ -208,6 +213,15 @@ def run_pipeline(
 
         progress.detail = "CFOP: interestadual x interno, DIFAL"
         cross_errors.extend(validate_cfop(records, context=context))
+        progress.stage_progress = 95
+
+        progress.detail = "ICMS-ST: apuracao, CST 60, MVA"
+        cross_errors.extend(validate_st(records, context=context))
+        cross_errors.extend(validate_st_mva(records, context=context))
+        progress.stage_progress = 97
+
+        progress.detail = "Simples Nacional: CSOSN, credito, PIS/COFINS"
+        cross_errors.extend(validate_simples(records, context=context))
         progress.stage_progress = 98
 
         progress.detail = "Hipoteses de correcao inteligente (aliquota e CST)"
@@ -217,6 +231,7 @@ def run_pipeline(
 
         # Deduplicar: hipoteses inteligentes supersede erros genericos
         cross_errors = _deduplicate_errors(cross_errors)
+        cross_errors = _filter_by_vigencia(cross_errors, active_error_types)
 
         _persist_stage_errors(db, file_id, cross_errors)
         progress.errors_by_stage["cruzamento"] = len(cross_errors)
@@ -279,6 +294,16 @@ def run_pipeline(
 # ──────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────
+
+def _filter_by_vigencia(
+    errors: list[ValidationError],
+    active_error_types: set[str] | None,
+) -> list[ValidationError]:
+    """Remove erros de regras fora da vigencia do periodo do arquivo."""
+    if active_error_types is None:
+        return errors
+    return [e for e in errors if e.error_type in active_error_types]
+
 
 def _deduplicate_errors(errors: list[ValidationError]) -> list[ValidationError]:
     """Remove erros duplicados e genericos quando outro erro ja cobre o mesmo item.

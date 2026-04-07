@@ -199,7 +199,7 @@ export default function FileDetailPage() {
           <p className="text-2xl font-bold text-yellow-600">{openAlerts.length}</p>
         </div>
         <div className="bg-white p-4 rounded shadow">
-          <p className="text-sm text-gray-500">Conformidade</p>
+          <p className="text-sm text-gray-500" title="Escopo: validacoes internas do arquivo SPED">Conformidade verificavel</p>
           <p className={`text-2xl font-bold ${Number(conformidade) >= 95 ? 'text-green-600' : 'text-orange-600'}`}>{conformidade}%</p>
         </div>
       </div>
@@ -394,7 +394,33 @@ interface ListProps {
 function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileId, onReload }: ListProps) {
   const openItems = items.filter(e => e.status === 'open')
   const [showCorrected, setShowCorrected] = useState(false)
-  const displayItems = showCorrected ? items : openItems
+  const [filterSeverity, setFilterSeverity] = useState<string>('')
+  const [filterRegister, setFilterRegister] = useState<string>('')
+  const [filterCerteza, setFilterCerteza] = useState<string>('')
+  const [sortBy, setSortBy] = useState<string>('severity')
+
+  // Compute unique values for filters
+  const allRegisters = [...new Set(items.map(e => e.register))].sort()
+
+  // Apply filters
+  const baseItems = showCorrected ? items : openItems
+  const filteredItems = baseItems.filter(e => {
+    if (filterSeverity && e.severity !== filterSeverity) return false
+    if (filterRegister && e.register !== filterRegister) return false
+    if (filterCerteza && (e.certeza || '') !== filterCerteza) return false
+    return true
+  })
+
+  // Sort
+  const severityOrder: Record<string, number> = { critical: 0, error: 1, warning: 2, info: 3 }
+  const displayItems = [...filteredItems].sort((a, b) => {
+    if (sortBy === 'severity') return (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9)
+    if (sortBy === 'register') return a.register.localeCompare(b.register)
+    if (sortBy === 'type') return a.error_type.localeCompare(b.error_type)
+    if (sortBy === 'line') return a.line_number - b.line_number
+    return 0
+  })
+
   const autoCorrectableCount = openItems.filter(e => e.auto_correctable && e.expected_value).length
   const correctedCount = items.filter(e => e.status === 'corrected').length
 
@@ -415,13 +441,11 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
     setEditingField(null)
     setLoadingRecord(error.record_id)
     try {
-      const records = await api.getRecords(fileId, { record_id: String(error.record_id) })
-      if (records.length > 0) {
-        setSelectedRecord(records[0])
-        // Gather all errors for this record
-        const recordErrors = items.filter(e => e.record_id === error.record_id)
-        setSelectedRecordErrors(recordErrors)
-      }
+      const record = await api.getRecord(fileId, error.record_id!)
+      setSelectedRecord(record)
+      // Gather all errors for this record
+      const recordErrors = items.filter(e => e.record_id === error.record_id)
+      setSelectedRecordErrors(recordErrors)
     } catch { /* */ }
     setLoadingRecord(null)
   }
@@ -430,7 +454,7 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
     setEditingField({ fieldName, error })
   }
 
-  const handleFieldSave = async (newValue: string, _justification: string) => {
+  const handleFieldSave = async (newValue: string) => {
     if (!editingField || !selectedRecord) return
     await api.updateRecord(fileId, selectedRecord.id, {
       field_no: editingField.error.field_no || 0,
@@ -657,6 +681,7 @@ function ErrorCard({
             <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{error.register}</span>
             {error.field_name && <span className="text-xs text-gray-500">{error.field_name}</span>}
             <SeverityBadge severity={error.severity} />
+            {error.certeza === 'indicio' && <span className="px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700">Indicio</span>}
             {isCorrected && <span className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">Corrigido</span>}
           </div>
           <p className="text-sm text-gray-800">{displayMessage}</p>
@@ -864,7 +889,7 @@ function ReportTab({ fileId }: { fileId: number }) {
             <p className={`text-2xl font-bold ${summary.compliance_pct >= 95 ? 'text-green-600' : 'text-orange-600'}`}>
               {summary.compliance_pct}%
             </p>
-            <p className="text-xs text-gray-500">Conformidade</p>
+            <p className="text-xs text-gray-500" title="Escopo: validacoes internas do arquivo SPED">Conformidade verificavel</p>
           </div>
           <div className="text-center p-3 bg-blue-50 rounded">
             <p className="text-2xl font-bold text-blue-600">{summary.pending_suggestions}</p>

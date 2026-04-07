@@ -5,7 +5,7 @@ cd /d "%~dp0"
 
 echo ============================================
 echo   SPED EFD Audit System v3.0
-echo   175 regras | 21 blocos | 1473 testes
+echo   175 regras / 21 blocos / 1473 testes
 echo ============================================
 echo.
 
@@ -38,7 +38,7 @@ if not exist ".venv-win\Scripts\activate.bat" (
 
 REM --- Ativar venv ---
 call ".venv-win\Scripts\activate.bat"
-set PYTHONPATH=%CD%
+set "PYTHONPATH=%CD%"
 
 REM --- Instalar deps Python somente se necessario ---
 pip show fastapi >nul 2>&1
@@ -87,31 +87,50 @@ if not exist "data\reference\aliquotas_internas_uf.yaml" (
 )
 
 echo.
-echo   Iniciando API (porta 8000)...
+echo   Iniciando API na porta 8000...
 
-REM --- Criar script temporario API ---
-echo @echo off > "%~dp0_run_api.bat"
-echo title SPED-API (porta 8000) >> "%~dp0_run_api.bat"
-echo cd /d "%~dp0" >> "%~dp0_run_api.bat"
-echo call ".venv-win\Scripts\activate.bat" >> "%~dp0_run_api.bat"
-echo set PYTHONPATH=%~dp0 >> "%~dp0_run_api.bat"
-echo python -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8000 >> "%~dp0_run_api.bat"
-echo pause >> "%~dp0_run_api.bat"
+REM --- Salvar caminho atual para os scripts ---
+set "PROJECT_DIR=%CD%"
+
+REM --- Criar script temporario API usando redirecionamento seguro ---
+> "_run_api.bat" (
+    echo @echo off
+    echo chcp 65001 ^>nul 2^>^&1
+    echo title SPED-API
+    echo cd /d "%PROJECT_DIR%"
+    echo call ".venv-win\Scripts\activate.bat"
+    echo set "PYTHONPATH=%PROJECT_DIR%"
+    echo echo.
+    echo echo   [API] Iniciando uvicorn na porta 8000...
+    echo echo.
+    echo python -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
+    echo echo.
+    echo echo   [API] Processo encerrado. Verifique erros acima.
+    echo pause
+)
 
 REM --- Criar script temporario Frontend ---
-echo @echo off > "%~dp0_run_frontend.bat"
-echo title SPED-Frontend (porta 3000) >> "%~dp0_run_frontend.bat"
-echo cd /d "%~dp0frontend" >> "%~dp0_run_frontend.bat"
-echo call npm run dev >> "%~dp0_run_frontend.bat"
-echo pause >> "%~dp0_run_frontend.bat"
+> "_run_frontend.bat" (
+    echo @echo off
+    echo chcp 65001 ^>nul 2^>^&1
+    echo title SPED-Frontend
+    echo cd /d "%PROJECT_DIR%\frontend"
+    echo echo.
+    echo echo   [FRONTEND] Iniciando Vite na porta 3000...
+    echo echo.
+    echo call npm run dev
+    echo echo.
+    echo echo   [FRONTEND] Processo encerrado. Verifique erros acima.
+    echo pause
+)
 
-start "" /min "%~dp0_run_api.bat"
+start "SPED-API" /min "_run_api.bat"
 
 echo   Aguardando API (8s)...
 timeout /t 8 /nobreak >nul
 
-echo   Iniciando Frontend (porta 3000)...
-start "" /min "%~dp0_run_frontend.bat"
+echo   Iniciando Frontend na porta 3000...
+start "SPED-Frontend" /min "_run_frontend.bat"
 
 echo   Aguardando Frontend (5s)...
 timeout /t 5 /nobreak >nul
@@ -135,7 +154,7 @@ echo   Encerrando processos...
 taskkill /fi "WINDOWTITLE eq SPED-API*" /f >nul 2>&1
 taskkill /fi "WINDOWTITLE eq SPED-Frontend*" /f >nul 2>&1
 
-del /q "%~dp0_run_api.bat" >nul 2>&1
-del /q "%~dp0_run_frontend.bat" >nul 2>&1
+del /q "_run_api.bat" >nul 2>&1
+del /q "_run_frontend.bat" >nul 2>&1
 
 echo   Encerrado.

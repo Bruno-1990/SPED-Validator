@@ -402,6 +402,8 @@ def _severity_for(error_type: str) -> str:
         "ST_MISTURA_DIFAL",
         # Retificadores — warning
         "RET_002",
+        # Simples Nacional — warning (indicios, sem RBT12)
+        "SN_CREDITO_ZERADO_OU_FORA_RANGE",
     }
     info = {
         "CST_ALIQ_ZERO_MODERADO", "CST_ALIQ_ZERO_INFO",
@@ -416,6 +418,8 @@ def _severity_for(error_type: str) -> str:
         "DIFAL_CONSUMO_FINAL_SEM_MARCADOR",
         # Pendentes — info
         "ANOMALIA_HISTORICA",
+        # Simples Nacional — info (deteccao de anomalia, nao erro)
+        "SN_CREDITO_INCONSISTENTE",
     }
     # MONOFASICO_ALIQ_INVALIDA e MONOFASICO_VALOR_INDEVIDO caem no default "error"
     if error_type in critical:

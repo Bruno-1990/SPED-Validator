@@ -7,9 +7,10 @@ interface Props {
 }
 
 const STATUS_ICONS: Record<string, { icon: string; color: string }> = {
-  ok:      { icon: '\u2713', color: 'text-green-600' },
-  partial: { icon: '\u26A0', color: 'text-yellow-600' },
-  not_run: { icon: '\u2717', color: 'text-red-500' },
+  ok:             { icon: '\u2713', color: 'text-green-600' },
+  partial:        { icon: '\u26A0', color: 'text-yellow-600' },
+  not_run:        { icon: '\u2717', color: 'text-red-500' },
+  not_applicable: { icon: '\u2014', color: 'text-gray-400' },
 }
 
 export default function AuditScopePanel({ fileId }: Props) {
@@ -76,7 +77,7 @@ export default function AuditScopePanel({ fileId }: Props) {
 
       {/* Missing tables */}
       {scope.missing_tables.length > 0 && (
-        <div>
+        <div className="mb-3">
           <h4 className="text-xs font-semibold uppercase tracking-wide mb-1 opacity-70">Tabelas externas ausentes</h4>
           <div className="flex flex-wrap gap-1">
             {scope.missing_tables.map((t) => (
@@ -87,6 +88,21 @@ export default function AuditScopePanel({ fileId }: Props) {
           </div>
         </div>
       )}
+
+      {/* Scope limitations — collapsible */}
+      <details className="mt-2">
+        <summary className="text-xs font-semibold cursor-pointer opacity-70 hover:opacity-100">
+          O que este sistema NAO valida
+        </summary>
+        <ul className="mt-2 text-xs text-gray-700 space-y-1 ml-4 list-disc">
+          <li>Legitimidade de beneficios fiscais (requer ato concessivo/convenio)</li>
+          <li>Cruzamento com XML das NF-e (requer documentos externos)</li>
+          <li>Cruzamento com EFD-Contribuicoes (arquivo separado)</li>
+          <li>Protocolo ICMS-ST por par de UF/NCM (tabela de protocolos)</li>
+          <li>Bloco K — Livro de Controle de Producao e Estoque</li>
+          <li>Escrituracoes anteriores ou posteriores (periodo unico)</li>
+        </ul>
+      </details>
     </div>
   )
 }

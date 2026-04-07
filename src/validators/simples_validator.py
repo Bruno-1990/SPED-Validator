@@ -3,7 +3,7 @@
 Regras implementadas:
 - SN_001: CST Tabela A usado em contribuinte Simples Nacional (deve usar CSOSN)
 - SN_002: CSOSN invalido (fora da tabela B)
-- SN_003: CSOSN 101/201 com credito ICMS zerado, acima do teto, ou inconsistente
+- SN_003: CSOSN 101/201 com credito ICMS zerado ou acima de 3.95% (teto LC 155/2016)
 - SN_004: CSOSN 201/202/203 sem ST preenchida
 - SN_005: CSOSN 300 (imune) com BC ou ICMS preenchido
 - SN_006: CSOSN 400 (nao tributada) com BC ou ICMS preenchido
@@ -148,13 +148,6 @@ def validate_simples(
     csosn_validos, csosn_credito, csosn_st = _get_csosn_sets(context)
     cst_pis_cofins_validos = _get_cst_pis_cofins_sn(context)
 
-    # Limites de pCredSN para validação inteligente SN_003
-    loader = context.reference_loader if context else None
-    if loader and hasattr(loader, "get_sn_credito_icms_range"):
-        pcredsn_max, _pcredsn_tipico = loader.get_sn_credito_icms_range()
-    else:
-        pcredsn_max, _pcredsn_tipico = 0.0401, 0.0200
-
     groups = group_by_register(records)
     errors: list[ValidationError] = []
 
@@ -224,39 +217,51 @@ def validate_simples(
             ))
             continue
 
-        # SN_003: CSOSN com credito — validacao inteligente por range
-        # No SPED Fiscal nao temos RBT12, entao validamos:
-        #   a) aliq == 0 => erro (credito nao preenchido)
-        #   b) aliq > teto_maximo => erro (usando aliquota cheia, nao pCredSN)
-        #   c) aliq > tipico_max => alerta (valor alto, verificar)
+        # SN_003: CSOSN 101/201 com credito — validacao por range (LC 155/2016)
+        # Teto absoluto de qualquer Anexo/faixa: 3.95% (Anexo I faixa 6)
+        # Sem RBT12 no SPED, sinaliza como indicio, nao erro objetivo.
         if cst_raw in csosn_credito:
-            if aliq == 0 and vl_icms == 0:
+            if aliq == 0 and (vl_icms != 0 or vl_bc > 0):
+                # Aliquota zerada mas tem BC ou ICMS preenchido — erro provavel
                 desc = _get_csosn_descricao(context, cst_raw)
                 errors.append(make_error(
-                    rec, "ALIQ_ICMS", "SN_CREDITO_ZERADO",
-                    f"SN_003: CSOSN {cst_raw} ({desc}) permite aproveitamento de "
-                    f"credito ICMS, mas ALIQ_ICMS e VL_ICMS estao zerados. "
-                    f"Preencher com a aliquota efetiva de ICMS do Simples "
-                    f"(pCredSN). Faixa tipica: 1,36% a 4,00%.",
+                    rec, "ALIQ_ICMS", "SN_CREDITO_ZERADO_OU_FORA_RANGE",
+                    f"SN_003: CSOSN {cst_raw} ({desc}) com ALIQ_ICMS=0% mas "
+                    f"VL_BC_ICMS={vl_bc:.2f} ou VL_ICMS={vl_icms:.2f} preenchido. "
+                    f"Credito nao exercido ou empresa optou por nao segregar — "
+                    f"requer confirmacao. Consultar DAS/PGDAS-D do periodo.",
                     field_no=14,
                     value="0",
                 ))
-            elif aliq > pcredsn_max * 100:
-                # aliq esta em % (ex: 18.0), pcredsn_max em decimal (ex: 0.0401)
+            elif aliq == 0 and vl_icms == 0 and vl_bc == 0:
+                # Tudo zerado — credito nao preenchido
                 desc = _get_csosn_descricao(context, cst_raw)
                 errors.append(make_error(
-                    rec, "ALIQ_ICMS", "SN_CREDITO_ACIMA_TETO",
+                    rec, "ALIQ_ICMS", "SN_CREDITO_ZERADO_OU_FORA_RANGE",
+                    f"SN_003: CSOSN {cst_raw} ({desc}) permite aproveitamento de "
+                    f"credito ICMS, mas ALIQ_ICMS, VL_BC_ICMS e VL_ICMS estao "
+                    f"zerados. Preencher com a aliquota efetiva de ICMS do "
+                    f"Simples (pCredSN conforme LC 155/2016). "
+                    f"Faixa possivel: 0,40% a 3,95%.",
+                    field_no=14,
+                    value="0",
+                ))
+            elif aliq > 3.95:
+                # Acima do teto maximo de qualquer Anexo/faixa (3.95%)
+                desc = _get_csosn_descricao(context, cst_raw)
+                errors.append(make_error(
+                    rec, "ALIQ_ICMS", "SN_CREDITO_ZERADO_OU_FORA_RANGE",
                     f"SN_003: CSOSN {cst_raw} ({desc}) com ALIQ_ICMS={aliq:.2f}%, "
-                    f"que excede o teto de {pcredsn_max * 100:.2f}% para credito "
-                    f"ICMS no Simples Nacional. Provavel uso da aliquota cheia "
-                    f"(regime normal) ao inves da aliquota efetiva do SN (pCredSN). "
-                    f"Faixa tipica: 1,36% a 4,00%.",
+                    f"acima do teto maximo de 3,95% para credito ICMS no Simples "
+                    f"Nacional (LC 155/2016, Anexos I-V, todas as faixas). "
+                    f"Verificar faixa de RBT12 e Anexo aplicavel. "
+                    f"Consultar DAS/PGDAS-D do periodo.",
                     field_no=14,
                     value=f"{aliq:.2f}",
-                    expected_value=f"<= {pcredsn_max * 100:.2f}",
+                    expected_value="<= 3.95",
                 ))
             elif aliq > 0:
-                # Aliquota valida — coletar para consistencia (SN_012)
+                # Aliquota dentro do range valido — coletar para consistencia (SN_012)
                 aliq_credito_valores.append(aliq)
 
         # SN_004: CSOSN com ST sem valores preenchidos
@@ -335,13 +340,15 @@ def validate_simples(
                     value=cst_pis_norm,
                 ))
 
-    # SN_012: Consistencia de aliquota de credito entre itens
-    # No SN, a aliquota efetiva de ICMS (pCredSN) depende da faixa de RBT12
-    # e nao muda por item. Se ha variacao > 0.01pp entre itens, e suspeito.
+    # SN_012: Deteccao de anomalia em aliquotas de credito entre itens
+    # Variacao > 1.0pp pode indicar: mistura de Anexos (correto mas raro),
+    # mudanca de faixa RBT12 no periodo (improvavel), ou erro de ERP (provavel).
+    # Threshold de 1.0pp evita falsos positivos por arredondamento.
     if len(aliq_credito_valores) >= 2:
         aliq_min = min(aliq_credito_valores)
         aliq_max = max(aliq_credito_valores)
-        if aliq_max - aliq_min > 0.01:
+        distinct_count = len(set(round(v, 4) for v in aliq_credito_valores))
+        if distinct_count > 1 and (aliq_max - aliq_min) > 1.0:
             errors.append(ValidationError(
                 line_number=0,
                 register="C170",
@@ -350,12 +357,13 @@ def validate_simples(
                 value=f"min={aliq_min:.4f} max={aliq_max:.4f}",
                 error_type="SN_CREDITO_INCONSISTENTE",
                 message=(
-                    f"SN_012: Aliquota de credito ICMS varia entre itens "
-                    f"(min={aliq_min:.4f}%, max={aliq_max:.4f}%). "
-                    f"No Simples Nacional, a aliquota efetiva de ICMS (pCredSN) "
-                    f"e calculada sobre a faixa de receita bruta e deveria ser "
-                    f"uniforme para todos os itens do periodo. "
-                    f"Verifique se a aliquota esta correta."
+                    f"SN_012: Aliquotas de credito ICMS variam significativamente "
+                    f"entre itens (min={aliq_min:.4f}%, max={aliq_max:.4f}%, "
+                    f"delta={aliq_max - aliq_min:.4f}pp, {distinct_count} valores "
+                    f"distintos). Isso pode indicar: mistura de Anexos diferentes "
+                    f"(correto mas raro), mudanca de faixa de RBT12 durante o "
+                    f"periodo (improvavel), ou parametrizacao inconsistente no "
+                    f"ERP (provavel erro). Verificar com DAS/PGDAS-D."
                 ),
             ))
 

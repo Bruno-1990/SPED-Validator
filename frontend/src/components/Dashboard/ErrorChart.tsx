@@ -29,6 +29,8 @@ export default function ErrorChart({ fileId }: Props) {
   const [blockData, setBlockData] = useState<{ block: string; count: number }[]>([])
   const [severityData, setSeverityData] = useState<{ name: string; value: number }[]>([])
   const [certezaData, setCertezaData] = useState<{ name: string; count: number }[]>([])
+  const [topErrorTypes, setTopErrorTypes] = useState<{ name: string; count: number }[]>([])
+  const [registerData, setRegisterData] = useState<{ name: string; count: number }[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -60,6 +62,26 @@ export default function ErrorChart({ fileId }: Props) {
         })
         setCertezaData(
           ['objetivo', 'provavel', 'indicio'].filter(c => certs[c]).map(c => ({ name: certezaLabel(c), count: certs[c] }))
+        )
+
+        // Top 10 error types
+        const types: Record<string, number> = {}
+        errors.forEach((e) => { types[e.error_type] = (types[e.error_type] || 0) + 1 })
+        setTopErrorTypes(
+          Object.entries(types)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 10)
+            .map(([name, count]) => ({ name, count }))
+        )
+
+        // By register
+        const regs: Record<string, number> = {}
+        errors.forEach((e) => { regs[e.register] = (regs[e.register] || 0) + 1 })
+        setRegisterData(
+          Object.entries(regs)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 10)
+            .map(([name, count]) => ({ name, count }))
         )
       })
       .catch(() => { /* */ })
@@ -135,6 +157,38 @@ export default function ErrorChart({ fileId }: Props) {
                   <Cell key={entry.name} fill={CERTEZA_COLORS[reverseCertezaLabel(entry.name)] || '#94a3b8'} />
                 ))}
               </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Horizontal bar chart: Top 10 tipos de erro */}
+      {topErrorTypes.length > 0 && (
+        <div className="bg-white rounded shadow p-4 lg:col-span-2">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Top 10 Tipos de Erro</h4>
+          <ResponsiveContainer width="100%" height={Math.max(220, topErrorTypes.length * 28)}>
+            <BarChart data={topErrorTypes} layout="vertical" margin={{ left: 120 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" tick={{ fontSize: 11 }} />
+              <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={120} />
+              <Tooltip />
+              <Bar dataKey="count" fill="#6366f1" radius={[0, 4, 4, 0]} name="Erros" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Bar chart: apontamentos por registro */}
+      {registerData.length > 0 && (
+        <div className="bg-white rounded shadow p-4">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Por Registro</h4>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={registerData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip />
+              <Bar dataKey="count" fill="#0891b2" radius={[4, 4, 0, 0]} name="Erros" />
             </BarChart>
           </ResponsiveContainer>
         </div>

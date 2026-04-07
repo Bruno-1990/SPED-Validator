@@ -195,12 +195,13 @@ def audit_scope(
     tabelas_externas = {
         "aliquotas_internas_uf": "disponivel" if "aliquotas_internas_uf" in available else "indisponivel",
         "fcp_por_uf": "disponivel" if "fcp_por_uf" in available else "indisponivel",
-        "ncm_tipi": "indisponivel",
-        "mva_por_ncm_uf": "indisponivel",
-        "codigos_ajuste_uf": "indisponivel",
+        "ncm_tipi": "disponivel" if "ncm_tipi_categorias" in available else "indisponivel",
+        "mva_por_ncm_uf": "disponivel" if "mva_por_ncm_uf" in available else "indisponivel",
+        "codigos_ajuste_uf": "disponivel" if "codigos_ajuste_uf" in available else "indisponivel",
     }
 
     has_aliq_tables = tabelas_externas["aliquotas_internas_uf"] == "disponivel"
+    has_mva_tables = tabelas_externas["mva_por_ncm_uf"] == "disponivel"
     is_simples = context.regime == TaxRegime.SIMPLES_NACIONAL
 
     # Definir checks executados
@@ -232,9 +233,12 @@ def audit_scope(
         ),
         AuditCheckInfo(
             id="st_com_mva",
-            status="nao_executado",
-            regras=4,
-            motivo_parcial="Tabelas MVA/pauta fiscal nao disponiveis",
+            status="ok" if has_mva_tables else "nao_executado",
+            regras=8,
+            motivo_parcial=(
+                "Tabelas MVA/pauta fiscal nao disponiveis"
+                if not has_mva_tables else None
+            ),
         ),
         AuditCheckInfo(
             id="simples_nacional_cst",
@@ -284,6 +288,47 @@ def audit_scope(
         cobertura_estimada_pct=cobertura,
         aviso=aviso,
     )
+
+
+@router.post("/findings/{finding_id}/resolve")
+def resolve_finding(
+    file_id: int,
+    finding_id: int,
+    body: dict,
+    db: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    """Registra resolucao de um apontamento (aceitar/rejeitar/postergar/ciencia)."""
+    from src.services.correction_service import resolve_finding as _resolve
+
+    status = body.get("status", "")
+    rule_id = body.get("rule_id", "")
+    justificativa = body.get("justificativa")
+    user_id = body.get("user_id")
+    prazo_revisao = body.get("prazo_revisao")
+
+    ok = _resolve(
+        db, file_id, finding_id, rule_id,
+        status=status, user_id=user_id,
+        justificativa=justificativa,
+        prazo_revisao=prazo_revisao,
+    )
+    if not ok:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail="Status invalido ou justificativa insuficiente para rejeicao (min 20 chars).",
+        )
+    return {"resolved": True, "finding_id": finding_id, "status": status}
+
+
+@router.get("/findings/resolutions")
+def list_finding_resolutions(
+    file_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+) -> list[dict]:
+    """Lista resolucoes de apontamentos do arquivo."""
+    from src.services.correction_service import get_finding_resolutions
+    return get_finding_resolutions(db, file_id)
 
 
 @router.delete("/errors/{error_id}")

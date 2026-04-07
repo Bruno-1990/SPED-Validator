@@ -21,27 +21,25 @@ interface Props {
   record: RecordInfo
   fieldName: string
   error: ValidationError
-  onSave: (newValue: string, justification: string) => void
+  onSave: (newValue: string) => void
   onCancel: () => void
 }
 
 export default function FieldEditor({ record, fieldName, error, onSave, onCancel }: Props) {
   const [newValue, setNewValue] = useState(error.expected_value || error.value || '')
-  const [justification, setJustification] = useState('')
   const [saving, setSaving] = useState(false)
 
   const isProhibited = PROHIBITED_FIELDS.includes(fieldName)
   const validValues = KNOWN_VALID_VALUES[fieldName]
   const hasValidValues = !!validValues
 
-  const justificationValid = justification.trim().length >= 20
-  const canSubmit = !isProhibited && newValue.trim() !== '' && justificationValid && !saving
+  const canSubmit = !isProhibited && newValue.trim() !== '' && !saving
 
   const handleSave = async () => {
     if (!canSubmit) return
     setSaving(true)
     try {
-      await onSave(newValue, justification)
+      await onSave(newValue)
     } finally {
       setSaving(false)
     }
@@ -122,29 +120,6 @@ export default function FieldEditor({ record, fieldName, error, onSave, onCancel
         {error.expected_value && !isProhibited && (
           <p className="text-xs text-gray-400 mt-1">
             Valor sugerido: <span className="font-mono text-green-600">{error.expected_value}</span>
-          </p>
-        )}
-      </div>
-
-      {/* Justification */}
-      <div className="mb-4">
-        <label className="block text-xs text-gray-500 mb-1">
-          Justificativa <span className="text-red-500">*</span>
-          <span className="text-gray-400 ml-1">(minimo 20 caracteres)</span>
-        </label>
-        <textarea
-          value={justification}
-          onChange={(e) => setJustification(e.target.value)}
-          disabled={isProhibited}
-          rows={3}
-          className={`w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-500 resize-none ${
-            isProhibited ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''
-          } ${justification.length > 0 && !justificationValid ? 'border-red-300' : ''}`}
-          placeholder="Descreva o motivo da correcao..."
-        />
-        {justification.length > 0 && !justificationValid && (
-          <p className="text-xs text-red-500 mt-0.5">
-            {20 - justification.trim().length} caractere(s) restante(s)
           </p>
         )}
       </div>

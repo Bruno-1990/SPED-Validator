@@ -52,14 +52,15 @@ class TestValidateCadastroRefs:
         errors = validate_cadastro_refs(groups)
         assert any(e.error_type == "REF_INEXISTENTE" and "COD_ITEM" in e.field_name for e in errors)
 
-    def test_d100_missing_cod_part(self) -> None:
+    def test_d100_cod_part_not_checked_here(self) -> None:
+        """D100 COD_PART desativado aqui — duplica D_001 em bloco_d_validator."""
         records = [
             rec("0150", ["0150", "FORN001", "Forn"], line=1),
             rec("D100", ["D100", "0", "0", "TRANS_INEXISTENTE"], line=2),
         ]
         groups = group_by_register(records)
         errors = validate_cadastro_refs(groups)
-        assert any(e.register == "D100" for e in errors)
+        assert not any(e.register == "D100" for e in errors)
 
     def test_no_cadastros_no_errors(self) -> None:
         """Sem registros 0150/0200, não é possível validar referências."""

@@ -2,24 +2,28 @@ import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 
+type RegimeTributario = 'auto' | 'normal' | 'simples_nacional'
+
 export default function UploadPage() {
   const [dragging, setDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
+  const [regime, setRegime] = useState<RegimeTributario>('auto')
   const navigate = useNavigate()
 
   const handleFile = useCallback(async (file: File) => {
     setUploading(true)
     setError('')
     try {
-      const result = await api.uploadFile(file)
+      const regimeParam = regime === 'auto' ? '' : regime
+      const result = await api.uploadFile(file, regimeParam)
       navigate(`/files/${result.file_id}?validate=1`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao fazer upload')
     } finally {
       setUploading(false)
     }
-  }, [navigate])
+  }, [navigate, regime])
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -58,6 +62,28 @@ export default function UploadPage() {
             </label>
           </>
         )}
+      </div>
+
+      <div className="mt-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Regime Tributario
+        </label>
+        <select
+          value={regime}
+          onChange={(e) => setRegime(e.target.value as RegimeTributario)}
+          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="auto">Detectar automaticamente (IND_PERFIL)</option>
+          <option value="normal">Regime Normal (Lucro Real / Presumido)</option>
+          <option value="simples_nacional">Simples Nacional</option>
+        </select>
+        <p className="mt-1 text-xs text-gray-500">
+          {regime === 'auto'
+            ? 'O sistema detecta o regime pelo campo IND_PERFIL do registro 0000.'
+            : regime === 'simples_nacional'
+            ? 'Ativa validacoes CSOSN, CST PIS/COFINS e credito ICMS do Simples.'
+            : 'Ativa validacoes CST Tabela A, aliquotas interestaduais e DIFAL.'}
+        </p>
       </div>
 
       {error && (

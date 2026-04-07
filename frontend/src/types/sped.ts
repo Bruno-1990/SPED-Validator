@@ -162,7 +162,7 @@ export interface CrossValidationItem {
 
 export interface AuditScopeCheck {
   name: string
-  status: 'ok' | 'partial' | 'not_run'
+  status: 'ok' | 'partial' | 'not_run' | 'not_applicable'
   detail: string | null
 }
 
@@ -170,6 +170,16 @@ export interface AuditScope {
   coverage_pct: number
   checks: AuditScopeCheck[]
   missing_tables: string[]
+}
+
+// Raw shape from API — mapped in client.ts
+export interface AuditScopeRaw {
+  regime_identificado: string
+  periodo: string
+  checks_executados: Array<{ id: string; status: string; regras: number; motivo_parcial: string | null }>
+  tabelas_externas: Record<string, string>
+  cobertura_estimada_pct: number
+  aviso: string | null
 }
 
 export interface CorrectionSuggestion {
@@ -187,6 +197,18 @@ export interface CorrectionSuggestion {
   message: string
   friendly_message: string | null
   decision?: 'approved' | 'rejected' | 'skipped'
+}
+
+export interface FindingResolution {
+  id: number
+  file_id: string
+  finding_id: string
+  rule_id: string
+  status: 'open' | 'accepted' | 'rejected' | 'deferred' | 'noted'
+  user_id: string | null
+  justificativa: string | null
+  prazo_revisao: string | null
+  resolved_at: string
 }
 
 export interface PipelineEvent {
