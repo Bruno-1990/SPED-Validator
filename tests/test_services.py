@@ -9,8 +9,12 @@ from pathlib import Path
 import pytest
 
 from src.services.correction_service import (
+    CorrectionNotAllowed,
+    MissingJustificativa,
+    _enforce_corrigivel,
     apply_correction,
     get_corrections,
+    resolve_finding,
     undo_correction,
 )
 from src.services.database import get_connection, init_audit_db
@@ -26,7 +30,9 @@ from src.services.file_service import (
     list_files,
     upload_file,
 )
+from src.models import ValidationError
 from src.services.validation_service import (
+    _calc_materialidade,
     _severity_for,
     get_error_summary,
     get_errors,
@@ -344,3 +350,201 @@ class TestExportService:
         # Header + optional footer rows (empty row + rodapé legal)
         assert len(lines) >= 1
         assert "linha,registro" in lines[0] or "linha" in lines[0]
+
+
+# ──────────────────────────────────────────────
+# correction_service.py — governanca
+# ──────────────────────────────────────────────
+
+class TestCorrectionGovernance:
+    """Testes da governanca de correcoes (corrigivel)."""
+
+    def _patch_cache(self, monkeypatch, rule_id: str, corrigivel: str) -> None:
+        """Helper: injeta valor no _corrigivel_cache para o rule_id dado."""
+        import src.services.correction_service as cs
+        monkeypatch.setattr(cs, "_corrigivel_cache", {rule_id: corrigivel})
+
+    def test_enforce_impossivel_raises(self, monkeypatch) -> None:
+        """Regra impossivel bloqueia correcao."""
+        self._patch_cache(monkeypatch, "R001", "impossivel")
+        with pytest.raises(CorrectionNotAllowed, match="nao permite correcao"):
+            _enforce_corrigivel("R001", "qualquer justificativa")
+
+    def test_enforce_investigar_raises(self, monkeypatch) -> None:
+        """Regra investigar bloqueia correcao."""
+        self._patch_cache(monkeypatch, "R002", "investigar")
+        with pytest.raises(CorrectionNotAllowed, match="investigacao"):
+            _enforce_corrigivel("R002", "qualquer justificativa")
+
+    def test_enforce_proposta_requires_justificativa(self, monkeypatch) -> None:
+        """Regra proposta sem justificativa levanta MissingJustificativa."""
+        self._patch_cache(monkeypatch, "R003", "proposta")
+        with pytest.raises(MissingJustificativa, match="justificativa"):
+            _enforce_corrigivel("R003", None)
+
+    def test_enforce_proposta_short_justificativa_raises(self, monkeypatch) -> None:
+        """Justificativa < 10 chars levanta MissingJustificativa."""
+        self._patch_cache(monkeypatch, "R004", "proposta")
+        with pytest.raises(MissingJustificativa):
+            _enforce_corrigivel("R004", "curto")
+
+    def test_enforce_proposta_valid_justificativa_passes(self, monkeypatch) -> None:
+        """Justificativa >= 10 chars nao levanta excecao."""
+        self._patch_cache(monkeypatch, "R005", "proposta")
+        _enforce_corrigivel("R005", "justificativa valida e longa")  # nao deve levantar
+
+    def test_enforce_automatico_no_justificativa_passes(self, monkeypatch) -> None:
+        """Regra automatico nao exige justificativa."""
+        self._patch_cache(monkeypatch, "R006", "automatico")
+        _enforce_corrigivel("R006", None)  # nao deve levantar
+
+
+# ──────────────────────────────────────────────
+# correction_service.py — resolve_finding
+# ──────────────────────────────────────────────
+
+class TestResolveFinding:
+    """Testes do workflow de resolucao de apontamentos."""
+
+    @staticmethod
+    def _insert_dummy_file(db: sqlite3.Connection) -> int:
+        """Insere registro minimo em sped_files para satisfazer FK do audit_log."""
+        db.execute(
+            "INSERT INTO sped_files (filename, hash_sha256) VALUES ('test.txt', 'abc123')"
+        )
+        db.commit()
+        return db.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+    def test_resolve_accepted(self, audit_db: sqlite3.Connection) -> None:
+        """Status accepted registrado com sucesso."""
+        fid = self._insert_dummy_file(audit_db)
+        result = resolve_finding(audit_db, fid, 100, "R001", "accepted")
+        assert result is True
+
+    def test_resolve_rejected_with_justificativa(self, audit_db: sqlite3.Connection) -> None:
+        """Rejeicao com justificativa >= 20 chars aceita."""
+        fid = self._insert_dummy_file(audit_db)
+        result = resolve_finding(
+            audit_db, fid, 101, "R001", "rejected",
+            justificativa="Justificativa longa o suficiente para rejeitar",
+        )
+        assert result is True
+
+    def test_resolve_rejected_short_justificativa(self, audit_db: sqlite3.Connection) -> None:
+        """Rejeicao com justificativa < 20 chars retorna False."""
+        result = resolve_finding(
+            audit_db, 1, 102, "R001", "rejected",
+            justificativa="curta",
+        )
+        assert result is False
+
+    def test_resolve_rejected_no_justificativa(self, audit_db: sqlite3.Connection) -> None:
+        """Rejeicao sem justificativa retorna False."""
+        result = resolve_finding(audit_db, 1, 103, "R001", "rejected")
+        assert result is False
+
+    def test_resolve_deferred(self, audit_db: sqlite3.Connection) -> None:
+        """Status deferred com prazo registrado."""
+        fid = self._insert_dummy_file(audit_db)
+        result = resolve_finding(
+            audit_db, fid, 104, "R001", "deferred",
+            prazo_revisao="2026-06-30",
+        )
+        assert result is True
+        row = audit_db.execute(
+            "SELECT prazo_revisao FROM finding_resolutions WHERE finding_id = '104'"
+        ).fetchone()
+        assert row is not None
+        assert row[0] == "2026-06-30"
+
+    def test_resolve_noted(self, audit_db: sqlite3.Connection) -> None:
+        """Status noted registrado."""
+        fid = self._insert_dummy_file(audit_db)
+        result = resolve_finding(audit_db, fid, 105, "R001", "noted")
+        assert result is True
+
+    def test_resolve_invalid_status(self, audit_db: sqlite3.Connection) -> None:
+        """Status invalido retorna False."""
+        result = resolve_finding(audit_db, 1, 106, "R001", "invalido")
+        assert result is False
+
+    def test_resolve_persists_to_db(self, audit_db: sqlite3.Connection) -> None:
+        """Resolucao salva na tabela finding_resolutions."""
+        fid = self._insert_dummy_file(audit_db)
+        resolve_finding(
+            audit_db, fid, 200, "R010", "accepted",
+            user_id="analista1",
+        )
+        row = audit_db.execute(
+            "SELECT status, user_id, rule_id FROM finding_resolutions "
+            "WHERE finding_id = '200'"
+        ).fetchone()
+        assert row is not None
+        assert row[0] == "accepted"
+        assert row[1] == "analista1"
+        assert row[2] == "R010"
+
+    def test_resolve_upsert(self, audit_db: sqlite3.Connection) -> None:
+        """Segunda resolucao atualiza a existente (UPSERT)."""
+        fid = self._insert_dummy_file(audit_db)
+        resolve_finding(audit_db, fid, 300, "R020", "accepted")
+        resolve_finding(
+            audit_db, fid, 300, "R020", "rejected",
+            justificativa="Motivo detalhado para rejeitar o apontamento",
+        )
+        rows = audit_db.execute(
+            "SELECT status FROM finding_resolutions "
+            "WHERE file_id = ? AND finding_id = '300'",
+            (str(fid),),
+        ).fetchall()
+        assert len(rows) == 1
+        assert rows[0][0] == "rejected"
+
+
+# ──────────────────────────────────────────────
+# _calc_materialidade
+# ──────────────────────────────────────────────
+
+def _make_error(**overrides) -> ValidationError:
+    """Create a ValidationError with sensible defaults, overridden as needed."""
+    defaults = dict(
+        line_number=1,
+        register="C100",
+        field_no=2,
+        field_name="VL_MERC",
+        value="100.00",
+        error_type="SOMA_DIVERGENTE",
+        message="erro de teste",
+        expected_value=None,
+    )
+    defaults.update(overrides)
+    return ValidationError(**defaults)
+
+
+class TestMaterialidade:
+    """Testes do calculo de materialidade financeira."""
+
+    def test_calc_simple_numeric_difference(self):
+        """Diferenca simples entre value e expected_value."""
+        err = _make_error(value="1000.00", expected_value="900.00")
+        assert _calc_materialidade(err) == pytest.approx(100.0)
+
+    def test_calc_no_expected_returns_zero(self):
+        """Sem expected_value retorna 0."""
+        err = _make_error(value="1000.00", expected_value=None)
+        assert _calc_materialidade(err) == 0.0
+
+    def test_calc_no_value_returns_zero(self):
+        """Sem value retorna 0."""
+        err = _make_error(value="", expected_value="500.00")
+        assert _calc_materialidade(err) == 0.0
+
+    def test_calc_non_numeric_returns_zero(self):
+        """Valores nao-numericos retornam 0."""
+        err = _make_error(value="ABC", expected_value="DEF")
+        assert _calc_materialidade(err) == 0.0
+
+    def test_calc_negative_difference_is_absolute(self):
+        """Diferenca negativa retorna valor absoluto."""
+        err = _make_error(value="100.00", expected_value="500.00")
+        assert _calc_materialidade(err) == pytest.approx(400.0)

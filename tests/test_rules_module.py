@@ -556,3 +556,50 @@ class TestMain:
         main()
         out = capsys.readouterr().out
         assert "REGRAS VIGENTES PARA 2024-06" in out
+
+
+# ---------------------------------------------------------------------------
+# check_rules — corrigivel validation
+# ---------------------------------------------------------------------------
+
+class TestCheckCorrigivel:
+    """Testes da validacao de corrigivel no --check."""
+
+    def test_missing_corrigivel_detected(self):
+        """Regra sem corrigivel aparece em missing_corrigivel."""
+        rules = [_make_rule(id="R1", corrigivel=None)]
+        report = check_rules(rules)
+        assert len(report["missing_corrigivel"]) == 1
+
+    def test_invalid_corrigivel_detected(self):
+        """Regra com corrigivel invalido aparece em invalid_corrigivel."""
+        rules = [_make_rule(id="R1", corrigivel="invalido")]
+        report = check_rules(rules)
+        assert len(report["invalid_corrigivel"]) == 1
+
+    def test_valid_corrigivel_passes(self):
+        """Regra com corrigivel valido nao gera erro."""
+        for val in ["automatico", "proposta", "investigar", "impossivel"]:
+            rules = [_make_rule(id="R1", corrigivel=val)]
+            report = check_rules(rules)
+            assert len(report["missing_corrigivel"]) == 0
+            assert len(report["invalid_corrigivel"]) == 0
+
+    def test_check_exits_1_if_missing_corrigivel(self, monkeypatch, tmp_path):
+        """--check retorna exit code 1 se corrigivel ausente."""
+        data = {"blk": [{"id": "M1", "implemented": True, "module": "x",
+                         "error_type": "FORMATO_INVALIDO"}]}
+        path = _write_yaml(tmp_path, data)
+        monkeypatch.setattr("sys.argv", ["rules", "--rules-file", str(path), "--check"])
+        from src.rules import main
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+
+    def test_summary_shows_corrigivel_count(self, capsys):
+        """print_summary mostra contagem de governanca."""
+        rules = [_make_rule(id="R1", corrigivel="proposta")]
+        print_summary(rules)
+        out = capsys.readouterr().out
+        assert "Governanca" in out
+        assert "1/1" in out
