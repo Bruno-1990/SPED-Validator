@@ -849,13 +849,7 @@ function ErrorCard({
               )}
             </div>
 
-            {/* Detalhe tecnico — colapsavel dentro do card */}
-            {error.message && error.message !== error.friendly_message && (
-              <details className="text-xs text-gray-500 pt-1 border-t border-blue-100">
-                <summary className="cursor-pointer font-semibold hover:text-gray-700 py-1">Detalhe tecnico</summary>
-                <p className="mt-1 pl-3 border-l-2 border-blue-200 text-gray-600 whitespace-pre-line">{error.message}</p>
-              </details>
-            )}
+            {/* Detalhe tecnico removido — conteudo agora esta no "Como corrigir" */}
           </div>
 
           {/* Base legal — referencia modesta */}

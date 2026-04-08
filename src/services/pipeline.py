@@ -522,7 +522,9 @@ def _enrich_errors(
             if error_type in ("CALCULO_DIVERGENTE", "SOMA_DIVERGENTE") and not entry["expected_value"]:
                 entry_auto = 0
 
-            doc_suggestion = f"{friendly}\n\n**Como corrigir:** {guidance}"
+            # Usar a mensagem tecnica original como "Como corrigir"
+            # (mais especifica que o guidance generico)
+            doc_suggestion = f"{entry_friendly}\n\n**Como corrigir:** {entry['message']}"
 
             db.execute(
                 """UPDATE validation_errors

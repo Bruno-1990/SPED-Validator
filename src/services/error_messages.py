@@ -7,8 +7,7 @@ from __future__ import annotations
 # {expected}, {valid_values}, {difference}
 #
 # REGRA: guidance deve ser breve e direto (1-2 frases curtas).
-# Sempre terminar com referencia ao detalhe tecnico.
-_DETALHE = "Veja Detalhe tecnico para mais informacoes."
+_DETALHE = ""
 
 ERROR_MESSAGES: dict[str, dict[str, str]] = {
     "MISSING_REQUIRED": {
