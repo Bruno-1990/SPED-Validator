@@ -84,17 +84,29 @@ def validate_cst_and_exemptions(
         from ..services.context_builder import TaxRegime
         is_simples = context.regime == TaxRegime.SIMPLES_NACIONAL
 
+    # Resolver sets de CSTs válidos via banco (fallback hardcoded)
+    loader = context.reference_loader if context else None
+    cst_icms_validos = _CST_ICMS_TRIBUTACAO
+    if loader and loader.has_cst_vigente_table():
+        db_set = loader.get_csts_validos("CST_ICMS")
+        if db_set:
+            cst_icms_validos = db_set
+
     # Validar CSTs nos C170
     for rec in groups.get("C170", []):
         if not is_simples:
             # Regras de CST Tabela A — só se aplicam ao Regime Normal
-            errors.extend(_validate_cst_c170(rec))
+            errors.extend(_validate_cst_c170(rec, cst_icms_validos))
             errors.extend(_validate_exemptions_c170(rec))
             errors.extend(_validate_cst020_reducao(rec))
             errors.extend(_validate_cst_tributado_aliq_zero(rec))
             errors.extend(_validate_cst020_aliq_reduzida(rec))
             errors.extend(_validate_diferimento_debito(rec))
+            errors.extend(_validate_cst_efeitos(rec, loader))
         errors.extend(_validate_ipi_cst_campos(rec))
+
+    # CST_008: Incompatibilidades CST por item
+    errors.extend(_validate_cst_incompatibilidades(groups, loader))
 
     # Validar Bloco H (estoque) vs cadastro
     errors.extend(_validate_bloco_h(groups))
@@ -106,7 +118,10 @@ def validate_cst_and_exemptions(
 # Validacao de CST nos C170
 # ──────────────────────────────────────────────
 
-def _validate_cst_c170(record: SpedRecord) -> list[ValidationError]:
+def _validate_cst_c170(
+    record: SpedRecord,
+    cst_validos: set[str] | None = None,
+) -> list[ValidationError]:
     """Valida se CST_ICMS do C170 e um codigo valido.
 
     Campos C170 (0-based): 9:CST_ICMS
@@ -117,6 +132,8 @@ def _validate_cst_c170(record: SpedRecord) -> list[ValidationError]:
 
     if not cst_icms:
         return errors
+
+    valid_set = cst_validos or _CST_ICMS_TRIBUTACAO
 
     # CST pode ser 3 digitos (origem + tributacao) ou 2 digitos (so tributacao)
     if len(cst_icms) == 3:
@@ -131,13 +148,13 @@ def _validate_cst_c170(record: SpedRecord) -> list[ValidationError]:
                 record, "CST_ICMS", "CST_INVALIDO",
                 f"Origem do CST ICMS '{origem}' invalida (deve ser 0-8).",
             ))
-        if tributacao not in _CST_ICMS_TRIBUTACAO:
+        if tributacao not in valid_set:
             errors.append(make_error(
                 record, "CST_ICMS", "CST_INVALIDO",
                 f"Tributacao do CST ICMS '{tributacao}' invalida.",
             ))
     elif len(cst_icms) == 2:
-        if cst_icms not in _CST_ICMS_TRIBUTACAO:
+        if cst_icms not in valid_set:
             errors.append(make_error(
                 record, "CST_ICMS", "CST_INVALIDO",
                 f"CST ICMS '{cst_icms}' nao e um codigo valido.",
@@ -398,6 +415,73 @@ def _validate_ipi_cst_campos(record: SpedRecord) -> list[ValidationError]:
 
 
 # ──────────────────────────────────────────────
+# CST_008: CSTs incompativeis no mesmo item
+# ──────────────────────────────────────────────
+
+def _validate_cst_incompatibilidades(
+    groups: dict[str, list[SpedRecord]],
+    loader=None,
+) -> list[ValidationError]:
+    """CST_008: Detecta CSTs incompativeis usados para o mesmo COD_ITEM."""
+    if not loader or not loader.has_cst_vigente_table():
+        return []
+
+    errors: list[ValidationError] = []
+
+    # Coletar CSTs por COD_ITEM: {cod_item -> {cst_trib -> record}}
+    item_csts: dict[str, dict[str, SpedRecord]] = {}
+    for rec in groups.get("C170", []):
+        cod_item = get_field(rec, "COD_ITEM")
+        cst = get_field(rec, "CST_ICMS")
+        if not cod_item or not cst:
+            continue
+        t = trib(cst)
+        item_csts.setdefault(cod_item, {})[t] = rec
+
+    # Verificar incompatibilidades
+    pares_alertados: set[tuple[str, str, str]] = set()
+    for cod_item, cst_map in item_csts.items():
+        if len(cst_map) < 2:
+            continue
+        csts = list(cst_map.keys())
+        for cst_a in csts:
+            incomp = loader.get_cst_incompativeis("CST_ICMS", cst_a)
+            if not incomp:
+                continue
+            # incomp contém IDs como "CST_ICMS_TRIBUTACAO_60"
+            incomp_codigos = set()
+            for inc_id in incomp:
+                # Extrair codigo do ID: CST_ICMS_TRIBUTACAO_60 -> 60
+                parts = inc_id.rsplit("_", 1)
+                if len(parts) == 2:
+                    incomp_codigos.add(parts[1])
+
+            for cst_b in csts:
+                if cst_b == cst_a or cst_b not in incomp_codigos:
+                    continue
+                key = (cod_item, min(cst_a, cst_b), max(cst_a, cst_b))
+                if key in pares_alertados:
+                    continue
+                pares_alertados.add(key)
+
+                rec = cst_map[cst_a]
+                desc_a = loader.get_cst_descricao("CST_ICMS", cst_a)
+                desc_b = loader.get_cst_descricao("CST_ICMS", cst_b)
+                errors.append(make_error(
+                    rec, "CST_ICMS", "CST_INCOMPATIVEL_COEXISTENTE",
+                    (
+                        f"Item {cod_item} usa CST {cst_a} ({desc_a}) e "
+                        f"CST {cst_b} ({desc_b}) no mesmo arquivo. "
+                        f"Esses CSTs sao incompativeis conforme tabela oficial. "
+                        f"Verifique se o tratamento tributario esta correto."
+                    ),
+                    value=f"COD_ITEM={cod_item} CST_A={cst_a} CST_B={cst_b}",
+                ))
+
+    return errors
+
+
+# ──────────────────────────────────────────────
 # Bloco H - Estoque vs Cadastro
 # ──────────────────────────────────────────────
 
@@ -448,6 +532,76 @@ def _validate_bloco_h(groups: dict[str, list[SpedRecord]]) -> list[ValidationErr
             errors.append(make_error(
                 rec, "VL_ITEM", "VALOR_NEGATIVO",
                 f"Valor negativo no inventario: {vl_item}.",
+            ))
+
+    return errors
+
+
+# ──────────────────────────────────────────────
+# CST_007: Efeitos do CST inconsistentes com campos
+# ──────────────────────────────────────────────
+
+def _validate_cst_efeitos(record: SpedRecord, loader=None) -> list[ValidationError]:
+    """CST_007: Cruza efeitos do CST (cst_vigente) com valores dos campos.
+
+    - debito_proprio + VL_ICMS == 0 e VL_BC_ICMS > 0 -> inconsistente
+    - sem_debito_proprio + VL_ICMS > 0 -> inconsistente
+    - tem_st_subsequente + VL_BC_ICMS_ST == 0 -> ST faltante
+    """
+    if not loader or not loader.has_cst_vigente_table():
+        return []
+
+    cst_icms = get_field(record, "CST_ICMS")
+    if not cst_icms:
+        return []
+
+    t = trib(cst_icms)
+    efeitos = loader.get_cst_efeitos("CST_ICMS", t)
+    if not efeitos:
+        return []
+
+    errors: list[ValidationError] = []
+
+    vl_bc = to_float(get_field(record, "VL_BC_ICMS"))
+    vl_icms = to_float(get_field(record, "VL_ICMS"))
+
+    # debito_proprio com BC > 0 mas sem ICMS
+    if "debito_proprio" in efeitos and vl_bc > 0 and vl_icms == 0:
+        errors.append(make_error(
+            record, "VL_ICMS", "CST_EFEITO_INCONSISTENTE",
+            (
+                f"CST {cst_icms} indica debito proprio (efeito: debito_proprio), "
+                f"BC_ICMS={vl_bc:.2f} mas VL_ICMS=0. Se ha base de calculo, "
+                f"o imposto deveria estar preenchido."
+            ),
+            value=f"CST={cst_icms} BC={vl_bc:.2f} ICMS={vl_icms:.2f}",
+        ))
+
+    # sem_debito_proprio mas com ICMS > 0
+    if "sem_debito_proprio" in efeitos and vl_icms > 0:
+        errors.append(make_error(
+            record, "VL_ICMS", "CST_EFEITO_INCONSISTENTE",
+            (
+                f"CST {cst_icms} indica ausencia de debito proprio "
+                f"(efeito: sem_debito_proprio), mas VL_ICMS={vl_icms:.2f}. "
+                f"Verifique se o CST esta correto ou se o valor deveria ser zero."
+            ),
+            value=f"CST={cst_icms} ICMS={vl_icms:.2f}",
+        ))
+
+    # ST subsequente sem BC_ST
+    if "tem_st_subsequente" in efeitos:
+        vl_bc_st = to_float(get_field(record, "VL_BC_ICMS_ST"))
+        if vl_bc_st == 0 and vl_bc > 0:
+            errors.append(make_error(
+                record, "VL_BC_ICMS_ST", "CST_EFEITO_INCONSISTENTE",
+                (
+                    f"CST {cst_icms} indica ST subsequente "
+                    f"(efeito: tem_st_subsequente), mas VL_BC_ICMS_ST=0. "
+                    f"Operacoes com ST subsequente devem informar a base "
+                    f"de calculo da substituicao tributaria."
+                ),
+                value=f"CST={cst_icms} BC_ST=0",
             ))
 
     return errors

@@ -4,6 +4,7 @@ NCM_001 — NCM com tratamento tributario incompativel (TIPI vs CST)
 NCM_002 — NCM generico com reflexo fiscal relevante (termina em 0000)
 NCM_003 — NCM inexistente na tabela oficial vigente
 NCM_004 — NCM fora de vigencia no periodo do arquivo
+NCM_005 — CST ICMS monofasico sem NCM combustivel (LC 192/2022)
 """
 
 from __future__ import annotations
@@ -55,6 +56,7 @@ def validate_ncm(
     errors.extend(_check_ncm_002(groups, item_ncm))
     errors.extend(_check_ncm_003(groups, item_ncm, context))
     errors.extend(_check_ncm_004(groups, item_ncm, context))
+    errors.extend(_check_ncm_005(groups, item_ncm, context))
 
     return errors
 
@@ -272,6 +274,65 @@ def _check_ncm_004(
                 ),
                 field_no=6,
                 value=f"NCM={ncm} COD_ITEM={cod_item}",
+            ))
+
+    return errors
+
+
+# ──────────────────────────────────────────────
+# NCM_005: CST ICMS monofasico sem NCM combustivel
+# ──────────────────────────────────────────────
+
+_NCM_COMBUSTIVEIS_PREFIXOS = {
+    "2207", "2710", "2711",
+}
+_CST_MONOFASICO_ICMS = {"02", "15", "53", "61"}
+
+
+def _check_ncm_005(
+    groups: dict[str, list[SpedRecord]],
+    item_ncm: dict[str, str],
+    context: ValidationContext | None = None,
+) -> list[ValidationError]:
+    """NCM_005: CST ICMS monofasico usado em NCM que nao e combustivel."""
+    errors: list[ValidationError] = []
+
+    if not context or not context.reference_loader:
+        return errors
+
+    ncm_verificado: set[str] = set()
+
+    for r in groups.get("C170", []):
+        cst = get_field(r, F_C170_CST_ICMS)
+        if not cst:
+            continue
+        t = cst[-2:] if len(cst) >= 2 else cst
+        if t not in _CST_MONOFASICO_ICMS:
+            continue
+
+        cod_item = get_field(r, F_C170_COD_ITEM)
+        ncm = item_ncm.get(cod_item, "")
+        if not ncm or ncm in ncm_verificado:
+            continue
+        ncm_verificado.add(ncm)
+
+        eh_combustivel = any(ncm.startswith(p) for p in _NCM_COMBUSTIVEIS_PREFIXOS)
+        if not eh_combustivel:
+            tributacao_tipi = context.reference_loader.get_ncm_tributacao(ncm)
+            if tributacao_tipi == "monofasico":
+                eh_combustivel = True
+
+        if not eh_combustivel:
+            errors.append(make_error(
+                r, "CST_ICMS", "NCM_MONOFASICO_CST_ICMS",
+                (
+                    f"CST ICMS {cst} indica regime monofasico (LC 192/2022), "
+                    f"mas NCM {ncm} do item {cod_item} nao e de combustivel. "
+                    f"CSTs 02, 15, 53 e 61 sao exclusivos para operacoes "
+                    f"com combustiveis sujeitos ao regime monofasico."
+                ),
+                field_no=10,
+                value=f"CST={cst} NCM={ncm} COD_ITEM={cod_item}",
             ))
 
     return errors

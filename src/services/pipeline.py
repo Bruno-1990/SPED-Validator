@@ -28,6 +28,7 @@ from ..validators.intra_register_validator import validate_intra_register
 from ..validators.ipi_validator import validate_ipi
 from ..validators.ncm_validator import validate_ncm
 from ..validators.parametrizacao_validator import validate_parametrizacao
+from ..validators.pis_cofins_validator import validate_pis_cofins
 from ..validators.pendentes_validator import validate_pendentes
 from ..validators.simples_validator import validate_simples
 from ..validators.st_validator import validate_st, validate_st_mva
@@ -166,6 +167,10 @@ def run_pipeline(
 
         progress.detail = "Analise semantica: CST x CFOP, aliquota zero, monofasicos"
         cross_errors.extend(validate_fiscal_semantics(records, context=context))
+        progress.stage_progress = 83
+
+        progress.detail = "PIS/COFINS: direcao, consistencia CST x campos"
+        cross_errors.extend(validate_pis_cofins(records, context=context))
         progress.stage_progress = 85
 
         progress.detail = "Auditoria fiscal: CFOP x UF, parametrizacao, remessas, inventario"
