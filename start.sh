@@ -1,11 +1,11 @@
 #!/bin/bash
-# SPED EFD Audit System v3.0 - Start Script (Linux/WSL)
+# SPED EFD Audit System v5.0 - Start Script (Linux/WSL)
 set -e
 cd "$(dirname "$0")"
 
 echo "============================================"
-echo "  SPED EFD Audit System v3.0"
-echo "  175 regras | 21 blocos | 1473 testes"
+echo "  SPED EFD Audit System v5.0"
+echo "  193 regras | 27 validadores | 1601 testes"
 echo "============================================"
 echo ""
 

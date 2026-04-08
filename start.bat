@@ -1,11 +1,11 @@
 @echo off
 chcp 65001 >nul 2>&1
-title SPED EFD Audit v3.0
+title SPED EFD Audit v5.0
 cd /d "%~dp0"
 
 echo ============================================
-echo   SPED EFD Audit System v3.0
-echo   175 regras / 21 blocos / 1473 testes
+echo   SPED EFD Audit System v5.0
+echo   193 regras / 27 validadores / 1601 testes
 echo ============================================
 echo.
 
