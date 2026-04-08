@@ -6,6 +6,7 @@ dist/
 build/
 .venv/
 .venv-win/
+.venv-linux/
 venv/
 
 # Node
@@ -13,6 +14,8 @@ node_modules/
 
 # Dados
 db/*.db
+db/*.db-shm
+db/*.db-wal
 data/pdfs/
 data/markdown/
 data/sped_files/
@@ -27,3 +30,12 @@ Thumbs.db
 
 # Coverage
 .coverage
+htmlcov/
+
+# Caches
+.mypy_cache/
+.ruff_cache/
+
+# Scripts gerados
+_run_api.bat
+_run_frontend.bat

@@ -1,0 +1,157 @@
+meta:
+  fonte: "Convenios ICMS/CONFAZ e Protocolos ICMS - MVA-ST por segmento"
+  ultima_revisao: "2026-04-06"
+  avisos:
+    - "MVA original (operacao interna). Para interestadual, aplicar MVA ajustado"
+    - "Formula MVA ajustado: [(1+MVA-ST original) x (1-ALQ inter)/(1-ALQ intra)] - 1"
+    - "Valores podem ser alterados por Convenios/Protocolos - consulte legislacao vigente"
+    - "Lista com segmentos mais comuns sujeitos a ST"
+
+# MVA por segmento e NCM
+# mva_pct = percentual MVA original (operacao interna)
+segmentos:
+  # ── Bebidas frias (Protocolo ICMS 11/91 e Conv. ICMS 92/15) ──
+  bebidas_frias:
+    descricao: "Refrigerantes, aguas, cervejas, energeticos"
+    ncms:
+      - ncm: "2201"
+        descricao: "Aguas minerais"
+        mva_pct: 140.0
+      - ncm: "2202"
+        descricao: "Refrigerantes e bebidas nao alcoolicas"
+        mva_pct: 140.0
+      - ncm: "2203"
+        descricao: "Cerveja de malte"
+        mva_pct: 140.0
+      - ncm: "2106"
+        descricao: "Preparacoes alimenticias (xaropes, refrescos em po)"
+        mva_pct: 140.0
+
+  # ── Materiais de construcao (Conv. ICMS 74/94) ──
+  materiais_construcao:
+    descricao: "Cimento, argamassa, tijolo, telha, tubos"
+    ncms:
+      - ncm: "2523"
+        descricao: "Cimento Portland"
+        mva_pct: 35.0
+      - ncm: "6901"
+        descricao: "Tijolos e blocos ceramicos"
+        mva_pct: 37.0
+      - ncm: "6905"
+        descricao: "Telhas ceramicas"
+        mva_pct: 40.0
+      - ncm: "3925"
+        descricao: "Tubos e conexoes de plastico"
+        mva_pct: 42.0
+      - ncm: "7307"
+        descricao: "Tubos e conexoes de ferro/aco"
+        mva_pct: 38.0
+      - ncm: "7008"
+        descricao: "Vidros de seguranca (temperados)"
+        mva_pct: 37.0
+
+  # ── Autopecas (Conv. ICMS 199/17) ──
+  autopecas:
+    descricao: "Pecas e acessorios automotivos"
+    ncms:
+      - ncm: "4011"
+        descricao: "Pneumaticos novos"
+        mva_pct: 45.19
+      - ncm: "4013"
+        descricao: "Camaras de ar"
+        mva_pct: 45.19
+      - ncm: "6813"
+        descricao: "Pastilhas e lonas de freio"
+        mva_pct: 36.56
+      - ncm: "8421"
+        descricao: "Filtros (oleo, ar, combustivel)"
+        mva_pct: 36.56
+      - ncm: "8507"
+        descricao: "Baterias automotivas"
+        mva_pct: 40.0
+      - ncm: "8511"
+        descricao: "Velas de ignicao, alternadores"
+        mva_pct: 36.56
+      - ncm: "8708"
+        descricao: "Partes e acessorios de veiculos"
+        mva_pct: 36.56
+
+  # ── Produtos farmaceuticos (Conv. ICMS 234/17) ──
+  farmaceuticos:
+    descricao: "Medicamentos e produtos de higiene pessoal"
+    ncms:
+      - ncm: "3003"
+        descricao: "Medicamentos nao acondicionados"
+        mva_pct: 33.05
+      - ncm: "3004"
+        descricao: "Medicamentos acondicionados para venda"
+        mva_pct: 33.05
+      - ncm: "3005"
+        descricao: "Algodao, gaze, curativos"
+        mva_pct: 38.24
+      - ncm: "3306"
+        descricao: "Produtos para higiene bucal (creme dental)"
+        mva_pct: 41.38
+      - ncm: "3401"
+        descricao: "Saboes e detergentes"
+        mva_pct: 38.90
+
+  # ── Produtos alimenticios (Conv. ICMS 92/15) ──
+  alimenticios:
+    descricao: "Alimentos industrializados com ST"
+    ncms:
+      - ncm: "1905"
+        descricao: "Produtos de padaria e biscoitos"
+        mva_pct: 30.0
+      - ncm: "1704"
+        descricao: "Chocolates e produtos de cacau"
+        mva_pct: 35.0
+      - ncm: "2103"
+        descricao: "Molhos e condimentos"
+        mva_pct: 35.0
+      - ncm: "1507"
+        descricao: "Oleo de soja"
+        mva_pct: 18.0
+
+  # ── Produtos de limpeza (Conv. ICMS 74/94) ──
+  limpeza:
+    descricao: "Detergentes, desinfetantes, alvejantes"
+    ncms:
+      - ncm: "3402"
+        descricao: "Detergentes e saboes liquidos"
+        mva_pct: 40.88
+      - ncm: "3808"
+        descricao: "Inseticidas e desinfetantes"
+        mva_pct: 49.87
+
+  # ── Produtos eletronicos e eletrodomesticos (Conv. ICMS 92/15) ──
+  eletroeletronicos:
+    descricao: "Eletrodomesticos e eletronicos"
+    ncms:
+      - ncm: "8418"
+        descricao: "Refrigeradores e congeladores"
+        mva_pct: 35.0
+      - ncm: "8450"
+        descricao: "Maquinas de lavar roupa"
+        mva_pct: 38.0
+      - ncm: "8516"
+        descricao: "Ferros eletricos, fornos, torradeiras"
+        mva_pct: 38.0
+
+  # ── Ferramentas (Conv. ICMS 92/15) ──
+  ferramentas:
+    descricao: "Ferramentas manuais e abrasivos"
+    ncms:
+      - ncm: "8201"
+        descricao: "Ferramentas manuais (pas, enxadas)"
+        mva_pct: 38.0
+      - ncm: "8202"
+        descricao: "Serras manuais"
+        mva_pct: 38.0
+      - ncm: "8203"
+        descricao: "Limas, alicates, chaves"
+        mva_pct: 38.0
+
+# Ajuste de MVA para operacao interestadual
+# Use esta formula para calcular MVA ajustado:
+# MVA_ajustado = ((1 + MVA_original/100) * (1 - ALQ_inter/100) / (1 - ALQ_intra/100) - 1) * 100
