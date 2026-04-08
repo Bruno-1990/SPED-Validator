@@ -118,6 +118,17 @@ REGISTER_FIELDS: dict[str, list[str]] = {
         "VL_SLD_CRED_ST_TRANSPORTAR", "DEB_ESP_ST",
     ],
     "E300": ["REG", "UF", "DT_INI", "DT_FIN"],
+    "E500": ["REG", "IND_APUR", "DT_INI", "DT_FIN"],
+    "E510": ["REG", "CFOP", "CST_IPI", "VL_CONT_IPI", "VL_BC_IPI", "VL_IPI"],
+    "E520": [
+        "REG", "VL_SD_ANT_IPI", "VL_DEB_IPI", "VL_CRED_IPI",
+        "VL_OD_IPI", "VL_OC_IPI", "VL_SC_IPI", "VL_SD_IPI",
+    ],
+    "E530": ["REG", "IND_AJ", "VL_AJ", "COD_AJ", "NUM_DOC", "DESCR_AJ"],
+    "E531": [
+        "REG", "COD_PART", "CNPJ", "CPF", "COD_MOD",
+        "SER", "SUB", "NUM_DOC", "DT_DOC",
+    ],
     "E990": ["REG", "QTD_LIN_E"],
     "H001": ["REG", "IND_MOV"],
     "H010": [

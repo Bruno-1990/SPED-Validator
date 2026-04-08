@@ -43,8 +43,8 @@ export default function AuditScopePanel({ fileId }: Props) {
     <div className={`rounded-lg border p-4 mb-6 ${bannerColor}`}>
       {/* Coverage header */}
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-sm">Escopo da Auditoria</h3>
-        <span className="text-lg font-bold">{coverage.toFixed(0)}% de cobertura</span>
+        <h3 className="font-semibold text-base tracking-tight">Escopo da Auditoria</h3>
+        <span className="text-lg font-bold">{coverage.toFixed(0)}% coberto</span>
       </div>
 
       {/* Progress bar */}
@@ -55,7 +55,7 @@ export default function AuditScopePanel({ fileId }: Props) {
       {/* Checks */}
       {scope.checks.length > 0 && (
         <div className="mb-3">
-          <h4 className="text-xs font-semibold uppercase tracking-wide mb-2 opacity-70">Verificacoes</h4>
+          <h4 className="text-xs font-semibold tracking-wide mb-2 opacity-70">Verificações realizadas</h4>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
             {scope.checks.map((check, i) => {
               const cfg = STATUS_ICONS[check.status] || STATUS_ICONS.not_run
@@ -78,7 +78,7 @@ export default function AuditScopePanel({ fileId }: Props) {
       {/* Missing tables */}
       {scope.missing_tables.length > 0 && (
         <div className="mb-3">
-          <h4 className="text-xs font-semibold uppercase tracking-wide mb-1 opacity-70">Tabelas externas ausentes</h4>
+          <h4 className="text-xs font-semibold tracking-wide mb-1 opacity-70">Tabelas que ainda não foram carregadas</h4>
           <div className="flex flex-wrap gap-1">
             {scope.missing_tables.map((t) => (
               <span key={t} className="text-xs font-mono bg-white bg-opacity-60 px-2 py-0.5 rounded border border-current border-opacity-20">
@@ -92,15 +92,15 @@ export default function AuditScopePanel({ fileId }: Props) {
       {/* Scope limitations — collapsible */}
       <details className="mt-2">
         <summary className="text-xs font-semibold cursor-pointer opacity-70 hover:opacity-100">
-          O que este sistema NAO valida
+          O que ainda não é verificado
         </summary>
-        <ul className="mt-2 text-xs text-gray-700 space-y-1 ml-4 list-disc">
-          <li>Legitimidade de beneficios fiscais (requer ato concessivo/convenio)</li>
-          <li>Cruzamento com XML das NF-e (requer documentos externos)</li>
-          <li>Cruzamento com EFD-Contribuicoes (arquivo separado)</li>
-          <li>Protocolo ICMS-ST por par de UF/NCM (tabela de protocolos)</li>
-          <li>Bloco K — Livro de Controle de Producao e Estoque</li>
-          <li>Escrituracoes anteriores ou posteriores (periodo unico)</li>
+        <ul className="mt-2 text-xs text-gray-700 space-y-1.5 ml-4 list-disc">
+          <li>Benefícios fiscais — precisam de ato concessivo ou convênio para conferência</li>
+          <li>Cruzamento com XML das notas — necessário importar os documentos</li>
+          <li>Cruzamento com EFD-Contribuições — é um arquivo separado</li>
+          <li>Protocolos de ICMS-ST por estado e NCM — depende da tabela de protocolos</li>
+          <li>Bloco K — controle de produção e estoque</li>
+          <li>Escriturações de outros períodos — analisamos apenas o período atual</li>
         </ul>
       </details>
     </div>
