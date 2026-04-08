@@ -11,10 +11,11 @@ Cobre os criterios de aceitacao do PRD:
 from __future__ import annotations
 
 from datetime import date
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from src.models import SpedRecord
 from src.services.context_builder import TaxRegime, ValidationContext
+from src.services.reference_loader import ReferenceLoader
 from src.validators.difal_validator import validate_difal
 from src.validators.helpers import fields_to_dict
 
@@ -24,11 +25,23 @@ def rec(register: str, fields: list[str], line: int = 1) -> SpedRecord:
     return SpedRecord(line_number=line, register=register, fields=fields_to_dict(register, fields), raw_line=raw)
 
 
+def _make_loader() -> MagicMock:
+    """Cria ReferenceLoader mockado com aliquotas e FCP."""
+    loader = MagicMock(spec=ReferenceLoader)
+    _aliq = {"SP": 18.0, "RJ": 20.0, "MG": 18.0, "BA": 20.5, "PR": 19.5}
+    loader.get_aliquota_interna = lambda uf, dt=None: _aliq.get(uf.upper())
+    loader.get_fcp = lambda uf, dt=None: 2.0 if uf.upper() == "RJ" else 0.0
+    loader.get_matriz_aliquota = lambda o, d, dt=None: 7.0 if o in ("SP", "RJ", "MG", "ES", "PR", "SC", "RS") and d not in ("SP", "RJ", "MG", "ES", "PR", "SC", "RS") else 12.0
+    loader.has_difal_vigente_table.return_value = False
+    return loader
+
+
 def _ctx(
     periodo_ini: date | None = None,
     periodo_fim: date | None = None,
+    with_loader: bool = True,
 ) -> ValidationContext:
-    return ValidationContext(
+    ctx = ValidationContext(
         file_id=1,
         regime=TaxRegime.NORMAL,
         uf_contribuinte="SP",
@@ -38,6 +51,9 @@ def _ctx(
         cnpj="12345678000195",
         company_name="Empresa Teste Ltda",
     )
+    if with_loader:
+        ctx.reference_loader = _make_loader()
+    return ctx
 
 
 def _make_0000(uf: str = "SP") -> SpedRecord:
@@ -213,27 +229,11 @@ class TestDifalTabelaIndisponivel:
                 line=11,
             ),
         ]
-        ctx = _ctx()
+        ctx = _ctx(with_loader=False)
+        errors = validate_difal(records, context=ctx)
 
-        # Limpar cache global e forcar reload sem tabelas
-        import src.validators.difal_validator as dv
-        orig_aliq = dv._aliquotas_uf.copy()
-        orig_fcp = dv._fcp_uf.copy()
-        orig_ss = dv._sul_sudeste.copy()
-        try:
-            dv._aliquotas_uf.clear()
-            dv._fcp_uf.clear()
-            dv._sul_sudeste.clear()
-            # Patch _load_tables para nao recarregar
-            with patch.object(dv, "_load_tables", lambda: None):
-                errors = validate_difal(records, context=ctx)
-
-            incompleta = [e for e in errors if e.error_type == "DIFAL_VERIFICACAO_INCOMPLETA"]
-            assert len(incompleta) >= 1, (
-                f"Esperado warning DIFAL_VERIFICACAO_INCOMPLETA sem tabela de aliquotas. "
-                f"Erros: {[e.error_type for e in errors]}"
-            )
-        finally:
-            dv._aliquotas_uf.update(orig_aliq)
-            dv._fcp_uf.update(orig_fcp)
-            dv._sul_sudeste.update(orig_ss)
+        incompleta = [e for e in errors if e.error_type == "DIFAL_VERIFICACAO_INCOMPLETA"]
+        assert len(incompleta) >= 1, (
+            f"Esperado warning DIFAL_VERIFICACAO_INCOMPLETA sem tabela de aliquotas. "
+            f"Erros: {[e.error_type for e in errors]}"
+        )

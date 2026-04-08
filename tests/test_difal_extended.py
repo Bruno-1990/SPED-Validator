@@ -6,8 +6,10 @@ Targets: all 8 DIFAL rules, early exits, table loading, edge cases.
 from __future__ import annotations
 
 from datetime import date
+from unittest.mock import MagicMock
 
 from src.models import SpedRecord
+from src.services.reference_loader import ReferenceLoader
 from src.validators.difal_validator import (
     _build_parent_map,
     _check_difal_001,
@@ -20,6 +22,17 @@ from src.validators.difal_validator import (
     _check_difal_008,
     validate_difal,
 )
+
+def _mock_loader() -> MagicMock:
+    """Loader mockado com aliquotas para testes DIFAL."""
+    loader = MagicMock(spec=ReferenceLoader)
+    _aliq = {"SP": 18.0, "RJ": 20.0, "MG": 18.0, "BA": 20.5, "PR": 19.5}
+    loader.get_aliquota_interna = lambda uf, dt=None: _aliq.get(uf.upper(), 0.0)
+    loader.get_fcp = lambda uf, dt=None: 2.0 if uf.upper() == "RJ" else 0.0
+    loader.get_matriz_aliquota = lambda o, d, dt=None: 12.0
+    return loader
+
+_LOADER = _mock_loader()
 
 # ──────────────────────────────────────────────
 # Helpers
@@ -286,12 +299,12 @@ class TestDifal004:
 
     def test_no_error_no_cst(self) -> None:
         rec = _c170(cfop="6107", cst_icms="", aliq_icms="18.00")
-        errors = _check_difal_004(rec, "6107", "RJ", "SP")
+        errors = _check_difal_004(rec, "6107", "RJ", "SP", _LOADER)
         assert errors == []
 
     def test_no_error_cst_not_difal(self) -> None:
         rec = _c170(cfop="6107", cst_icms="040", aliq_icms="18.00")
-        errors = _check_difal_004(rec, "6107", "RJ", "SP")
+        errors = _check_difal_004(rec, "6107", "RJ", "SP", _LOADER)
         assert errors == []
 
 
@@ -309,20 +322,20 @@ class TestDifal005:
     def test_no_error_consistent_values(self) -> None:
         rec = _c170(cfop="6107", cst_icms="000", vl_item="1000", vl_bc_icms="1000",
                      aliq_icms="12.00", vl_icms="120.00")
-        errors = _check_difal_005(rec, "6107", "RJ", "SP")
+        errors = _check_difal_005(rec, "6107", "RJ", "SP", _LOADER)
         assert errors == []
 
     def test_error_inconsistent_base(self) -> None:
         """VL_ICMS deviates significantly from BC * ALIQ/100."""
         rec = _c170(cfop="6107", cst_icms="000", vl_item="1000", vl_bc_icms="1000",
                      aliq_icms="12.00", vl_icms="200.00")
-        errors = _check_difal_005(rec, "6107", "RJ", "SP")
+        errors = _check_difal_005(rec, "6107", "RJ", "SP", _LOADER)
         assert len(errors) == 1
         assert "DIFAL_BASE_INCONSISTENTE" in errors[0].error_type
 
     def test_no_error_zero_vl_item(self) -> None:
         rec = _c170(cfop="6107", cst_icms="000", vl_item="0", vl_bc_icms="0")
-        errors = _check_difal_005(rec, "6107", "RJ", "SP")
+        errors = _check_difal_005(rec, "6107", "RJ", "SP", _LOADER)
         assert errors == []
 
     def test_no_error_no_uf_dest(self) -> None:
@@ -348,12 +361,12 @@ class TestDifal006:
 
     def test_no_error_no_cst(self) -> None:
         rec = _c170(cfop="6107", cst_icms="")
-        errors = _check_difal_006(rec, "6107", "RJ")
+        errors = _check_difal_006(rec, "6107", "RJ", _LOADER)
         assert errors == []
 
     def test_no_error_cst_not_difal(self) -> None:
         rec = _c170(cfop="6107", cst_icms="040")
-        errors = _check_difal_006(rec, "6107", "RJ")
+        errors = _check_difal_006(rec, "6107", "RJ", _LOADER)
         assert errors == []
 
 

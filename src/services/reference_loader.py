@@ -40,6 +40,8 @@ class ReferenceLoader:
         self._ncm_vigente: dict[str, dict] | None = None
         self._cst_vigente: dict[str, dict] | None = None  # id -> row completa
         self._cst_por_tipo: dict[str, dict[str, dict]] | None = None  # tipo -> {codigo -> row}
+        self._difal_vigente: dict[str, dict] | None = None  # id -> row
+        self._difal_por_tipo: dict[str, list[dict]] | None = None  # tipo -> [rows]
 
     # ── Carregamento lazy ──
 
@@ -238,6 +240,56 @@ class ReferenceLoader:
             self._cst_por_tipo.setdefault(tipo, {})[codigo] = entry
         conn.close()
 
+    def _ensure_difal_vigente(self) -> None:
+        if self._difal_vigente is not None:
+            return
+        db_path = _DB_DIR / "sped.db"
+        if not db_path.exists():
+            self._difal_vigente = {}
+            self._difal_por_tipo = {}
+            return
+        conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        try:
+            rows = conn.execute(
+                "SELECT id, codigo, descricao, tipo, categoria_normativa, "
+                "tributo, regime, operacao_tipo, destinatario_tipo, "
+                "sujeito_passivo, perfil, formula_calculo, base_calculo, "
+                "efeitos, incompativel_com, tags, status_juridico "
+                "FROM difal_vigente"
+            ).fetchall()
+        except sqlite3.OperationalError:
+            self._difal_vigente = {}
+            self._difal_por_tipo = {}
+            conn.close()
+            return
+        self._difal_vigente = {}
+        self._difal_por_tipo = {}
+        for (row_id, codigo, descricao, tipo, cat, tributo, regime,
+             op_tipo, dest_tipo, suj_passivo, perfil, formula, base_calc,
+             efeitos, incompat, tags, status) in rows:
+            entry = {
+                "id": row_id,
+                "codigo": codigo,
+                "descricao": descricao,
+                "tipo": tipo,
+                "categoria_normativa": cat,
+                "tributo": json.loads(tributo) if tributo else [],
+                "regime": json.loads(regime) if regime else [],
+                "operacao_tipo": json.loads(op_tipo) if op_tipo else [],
+                "destinatario_tipo": dest_tipo or "",
+                "sujeito_passivo": suj_passivo or "",
+                "perfil": perfil or "",
+                "formula_calculo": formula or "",
+                "base_calculo": base_calc or "",
+                "efeitos": json.loads(efeitos) if efeitos else [],
+                "incompativel_com": json.loads(incompat) if incompat else [],
+                "tags": json.loads(tags) if tags else [],
+                "status_juridico": status or "vigente",
+            }
+            self._difal_vigente[row_id] = entry
+            self._difal_por_tipo.setdefault(tipo, []).append(entry)
+        conn.close()
+
     def _ensure_matriz(self) -> None:
         if self._matriz_data is not None:
             return
@@ -387,6 +439,95 @@ class ReferenceLoader:
         """Retorna descrição oficial do CST."""
         info = self.get_cst_info(tipo, codigo)
         return info["descricao"] if info else ""
+
+    # ── DIFAL Vigente (sped.db) ──
+
+    def has_difal_vigente_table(self) -> bool:
+        """Retorna True se a tabela difal_vigente está disponível."""
+        self._ensure_difal_vigente()
+        assert self._difal_vigente is not None
+        return len(self._difal_vigente) > 0
+
+    def get_difal_situacao(
+        self, regime: str, destinatario_tipo: str, operacao_tipo: str = "",
+    ) -> dict | None:
+        """Encontra a situação DIFAL aplicável com base no regime, tipo de destinatário e operação.
+
+        Retorna a primeira situação que casa com os critérios, ou None.
+        """
+        self._ensure_difal_vigente()
+        assert self._difal_por_tipo is not None
+        for sit in self._difal_por_tipo.get("DIFAL_SITUACAO", []):
+            # Filtrar por regime
+            if sit["regime"] and regime not in sit["regime"]:
+                continue
+            # Filtrar por destinatário
+            dt = sit["destinatario_tipo"]
+            if dt and dt != "ambos" and dt != destinatario_tipo:
+                continue
+            # Filtrar por operação
+            if operacao_tipo and sit["operacao_tipo"] and operacao_tipo not in sit["operacao_tipo"]:
+                continue
+            return sit
+        return None
+
+    def get_difal_formula(self, situacao_id: str) -> dict | None:
+        """Retorna a regra de cálculo mais adequada para a situação.
+
+        Analisa efeitos da situação para determinar se usa cálculo por dentro,
+        com FCP, com redução, etc.
+        """
+        self._ensure_difal_vigente()
+        assert self._difal_vigente is not None
+        assert self._difal_por_tipo is not None
+        sit = self._difal_vigente.get(situacao_id)
+        if not sit:
+            return None
+        efeitos = set(sit.get("efeitos", []))
+        regras = self._difal_por_tipo.get("DIFAL_REGRA_CALCULO", [])
+        # Priorizar regra com FCP se situação tem FCP
+        if "fundo_combate_pobreza" in efeitos:
+            for r in regras:
+                if "fundo_combate_pobreza" in r.get("efeitos", []):
+                    return r
+        # Por dentro se indicado
+        if "base_calculo_por_dentro" in efeitos:
+            for r in regras:
+                if "base_calculo_por_dentro" in r.get("efeitos", []):
+                    return r
+        # Padrão: primeira regra (cálculo simples)
+        return regras[0] if regras else None
+
+    def get_difal_aliquota_interestadual(self, origem_nacional: bool = True) -> list[dict]:
+        """Retorna regras de alíquotas interestaduais aplicáveis."""
+        self._ensure_difal_vigente()
+        assert self._difal_por_tipo is not None
+        return self._difal_por_tipo.get("DIFAL_ALIQUOTA_INTERESTADUAL", [])
+
+    def get_difal_partilha(self, ano: int) -> dict | None:
+        """Retorna regra de partilha aplicável ao ano informado."""
+        self._ensure_difal_vigente()
+        assert self._difal_por_tipo is not None
+        for p in self._difal_por_tipo.get("DIFAL_PARTILHA", []):
+            # Extrair ano do código (ex: DIFAL_PARTILHA_2019)
+            try:
+                ano_partilha = int(p["id"].split("_")[-1])
+            except (ValueError, IndexError):
+                continue
+            if ano >= ano_partilha:
+                return p  # a mais recente que cobre o ano
+        return None
+
+    def get_difal_info(self, difal_id: str) -> dict | None:
+        """Retorna info completa de um registro DIFAL pelo ID."""
+        self._ensure_difal_vigente()
+        assert self._difal_vigente is not None
+        return self._difal_vigente.get(difal_id)
+
+    def difal_is_controverso(self, difal_id: str) -> bool:
+        """Retorna True se a situação DIFAL é juridicamente controversa."""
+        info = self.get_difal_info(difal_id)
+        return info.get("status_juridico") == "controverso" if info else False
 
     def get_matriz_aliquota(self, uf_origem: str, uf_destino: str, dt: date | None = None) -> float | None:
         """Retorna alíquota interestadual entre UFs para a data informada.
@@ -610,6 +751,8 @@ class ReferenceLoader:
             tables.append("sn_sublimites_uf")
         if (_DB_DIR / "sped.db").exists():
             tables.append("ncm_vigente")
+            tables.append("cst_vigente")
+            tables.append("difal_vigente")
         # Vigências
         vig_dir = self._data_dir / "vigencias"
         if vig_dir.exists():
