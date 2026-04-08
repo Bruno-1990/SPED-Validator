@@ -52,9 +52,9 @@ def reg_0150(cod_part: str, uf: str, ie: str = "", cod_mun: str = "", line: int 
     return rec("0150", fields, line=line)
 
 
-def reg_0005(cep: str = "01310100", uf: str = "SP", line: int = 5) -> SpedRecord:
+def reg_0005(cep: str = "01310100", line: int = 5) -> SpedRecord:
     fields = [
-        "0005", "Fantasia", cep, "Av Paulista", "Centro", "3550308", uf,
+        "0005", "Fantasia", cep, "Av Paulista", "100", "", "Centro",
         "1133334444", "", "email@test.com",
     ]
     return rec("0005", fields, line=line)
@@ -207,16 +207,16 @@ class TestDEST002:
 
 class TestDEST003:
     def test_cep_uf_incompativel(self) -> None:
-        """CEP de SP mas UF = RJ no 0005."""
-        ctx = make_ctx()
-        records = [reg_0005(cep="01310100", uf="RJ", line=5)]
+        """CEP de SP mas UF contribuinte (0000) = RJ."""
+        ctx = make_ctx(uf="RJ")
+        records = [reg_0005(cep="01310100", line=5)]
         errors = validate_destinatario(records, context=ctx)
         assert any(e.error_type == "DEST_UF_CEP_INCOMPATIVEL" for e in errors)
 
     def test_cep_uf_compativel(self) -> None:
-        """CEP de SP e UF = SP."""
-        ctx = make_ctx()
-        records = [reg_0005(cep="01310100", uf="SP", line=5)]
+        """CEP de SP e UF contribuinte = SP."""
+        ctx = make_ctx(uf="SP")
+        records = [reg_0005(cep="01310100", line=5)]
         errors = validate_destinatario(records, context=ctx)
         assert not any(e.error_type == "DEST_UF_CEP_INCOMPATIVEL" for e in errors)
 

@@ -15,12 +15,12 @@ REGISTER_FIELDS: dict[str, list[str]] = {
     ],
     "0001": ["REG", "IND_MOV"],
     "0005": [
-        "REG", "NOME_FANTASIA", "CEP", "END", "BAIRRO", "COD_MUN", "UF",
+        "REG", "NOME_FANTASIA", "CEP", "END", "NUM", "COMPL", "BAIRRO",
         "FONE", "FAX", "EMAIL",
     ],
     "0100": [
-        "REG", "NOME", "CPF", "CRC", "CNPJ", "COD_MUN", "END", "BAIRRO",
-        "CEP", "UF", "FONE", "FAX", "EMAIL",
+        "REG", "NOME", "CPF", "CRC", "CNPJ", "CEP", "END", "NUM",
+        "COMPL", "BAIRRO", "FONE", "FAX", "EMAIL", "COD_MUN",
     ],
     "0150": [
         "REG", "COD_PART", "NOME", "COD_PAIS", "CNPJ", "CPF", "IE",

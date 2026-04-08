@@ -190,18 +190,27 @@ def validate_destinatario(
         pass
 
     # DEST_003: Validar CEP vs UF no registro 0005 (dados da empresa)
+    # Nota: 0005 nao tem campo UF — a UF do contribuinte esta no 0000
+    uf_contribuinte = ""
+    if context:
+        uf_contribuinte = context.uf_contribuinte
+    if not uf_contribuinte:
+        for rec_0000 in groups.get("0000", []):
+            uf_contribuinte = get_field(rec_0000, "UF").upper()
+            break
+
     for rec in groups.get("0005", []):
         cep = get_field(rec, "CEP")
-        uf_0005 = get_field(rec, "UF")
-        if not cep or not uf_0005:
+        if not cep or not uf_contribuinte:
             continue
 
         uf_esperada = _uf_from_cep(cep)
-        if uf_esperada and uf_esperada != uf_0005.upper():
+        if uf_esperada and uf_esperada != uf_contribuinte.upper():
             errors.append(make_error(
                 rec, "CEP", "DEST_UF_CEP_INCOMPATIVEL",
                 f"CEP {cep} pertence a faixa de {uf_esperada}, "
-                f"mas UF informada e {uf_0005}. Verificar endereco.",
+                f"mas UF do contribuinte (0000) e {uf_contribuinte}. "
+                f"Verificar endereco.",
                 field_no=2,
                 value=cep,
             ))
