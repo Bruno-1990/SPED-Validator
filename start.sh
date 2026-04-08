@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 
 echo "============================================"
 echo "  SPED EFD Audit System v5.0"
-echo "  193 regras | 27 validadores | 1601 testes"
+echo "  195 regras | 35 validadores | 1610 testes"
 echo "============================================"
 echo ""
 

@@ -9,6 +9,7 @@ Regras implementadas:
 - DIFAL_006: FCP ausente ou incoerente
 - DIFAL_007: Perfil destinatario incompativel com DIFAL
 - DIFAL_008: Consumo final sem marcadores consistentes
+- DIFAL_009: Partilha DIFAL incorreta (EC 87/2015, transicao 2016-2018)
 
 Tabelas de referencia (via ReferenceLoader / sped.db):
 - aliquotas_internas_uf.yaml
@@ -143,6 +144,9 @@ def validate_difal(
         if loader and loader.has_difal_vigente_table():
             situacao = loader.get_difal_situacao(regime, dest_tipo)
 
+        # Nota de controversia para todas as regras
+        controverso = situacao.get("status_juridico") == "controverso" if situacao else False
+
         errors.extend(_check_difal_001(rec, cfop, uf_declarante, uf_dest, ind_ie, loader, situacao))
         errors.extend(_check_difal_002(rec, cfop, ind_ie, situacao))
         errors.extend(_check_difal_003(rec, cfop, uf_declarante, uf_dest))
@@ -151,6 +155,10 @@ def validate_difal(
         errors.extend(_check_difal_006(rec, cfop, uf_dest, loader))
         errors.extend(_check_difal_007(rec, cfop, ind_ie, uf_dest))
         errors.extend(_check_difal_008(rec, cfop, ind_ie))
+
+    # DIFAL_009: validacao de partilha (nivel arquivo)
+    if context and context.periodo_ini and loader:
+        errors.extend(_check_difal_009(context.periodo_ini.year, loader))
 
     return errors
 
@@ -568,4 +576,39 @@ def _check_difal_008(
         ),
         field_no=11,
         value=f"IND_IE={ind_ie} CFOP={cfop}",
+    )]
+
+
+# ──────────────────────────────────────────────
+# DIFAL_009: Partilha DIFAL (EC 87/2015)
+# ──────────────────────────────────────────────
+
+def _check_difal_009(ano: int, loader) -> list[ValidationError]:
+    """DIFAL_009: Informa sobre a regra de partilha aplicavel ao periodo.
+
+    2016: 60% origem / 40% destino
+    2017: 40% origem / 60% destino
+    2018: 20% origem / 80% destino
+    2019+: 0% origem / 100% destino
+    """
+    if ano < 2016 or ano >= 2019:
+        return []
+
+    if not loader.has_difal_vigente_table():
+        return []
+
+    partilha = loader.get_difal_partilha(ano)
+    if not partilha:
+        return []
+
+    return [make_generic_error(
+        "DIFAL_PARTILHA_PERIODO_TRANSICAO",
+        (
+            f"Periodo {ano} esta na fase de transicao da partilha DIFAL "
+            f"(EC 87/2015). {partilha.get('descricao', '')}. "
+            f"Verifique se a apuracao E300/E310 reflete corretamente "
+            f"a partilha entre UF origem e UF destino."
+        ),
+        register="E300",
+        value=f"ANO={ano}",
     )]
