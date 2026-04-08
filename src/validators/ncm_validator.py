@@ -2,6 +2,8 @@
 
 NCM_001 — NCM com tratamento tributario incompativel (TIPI vs CST)
 NCM_002 — NCM generico com reflexo fiscal relevante (termina em 0000)
+NCM_003 — NCM inexistente na tabela oficial vigente
+NCM_004 — NCM fora de vigencia no periodo do arquivo
 """
 
 from __future__ import annotations
@@ -51,6 +53,8 @@ def validate_ncm(
     errors: list[ValidationError] = []
     errors.extend(_check_ncm_001(groups, item_ncm, context))
     errors.extend(_check_ncm_002(groups, item_ncm))
+    errors.extend(_check_ncm_003(groups, item_ncm, context))
+    errors.extend(_check_ncm_004(groups, item_ncm, context))
 
     return errors
 
@@ -177,6 +181,97 @@ def _check_ncm_002(
                 ),
                 field_no=3,
                 value=f"NCM={ncm} COD_ITEM={cod_item} VL_ITEM={vl_item:.2f}",
+            ))
+
+    return errors
+
+
+# ──────────────────────────────────────────────
+# NCM_003: NCM inexistente na tabela oficial vigente
+# ──────────────────────────────────────────────
+
+def _check_ncm_003(
+    groups: dict[str, list[SpedRecord]],
+    item_ncm: dict[str, str],
+    context: ValidationContext | None = None,
+) -> list[ValidationError]:
+    """NCM_003: NCM do cadastro 0200 nao existe na tabela oficial."""
+    errors: list[ValidationError] = []
+
+    if not context or not context.reference_loader:
+        return errors
+    loader = context.reference_loader
+    if not loader.has_ncm_vigente_table():
+        return errors
+
+    ncm_verificado: set[str] = set()
+
+    for r in groups.get("0200", []):
+        ncm = get_field(r, F_0200_NCM)
+        if not ncm or len(ncm) < 8 or ncm in ncm_verificado:
+            continue
+        ncm_verificado.add(ncm)
+
+        if not loader.ncm_existe(ncm):
+            cod_item = get_field(r, F_0200_COD_ITEM)
+            errors.append(make_error(
+                r, "COD_NCM", "NCM_INEXISTENTE",
+                (
+                    f"NCM {ncm} do item {cod_item} nao existe na tabela "
+                    f"oficial de NCMs vigentes. Verifique a classificacao "
+                    f"fiscal do produto."
+                ),
+                field_no=6,
+                value=f"NCM={ncm} COD_ITEM={cod_item}",
+            ))
+
+    return errors
+
+
+# ──────────────────────────────────────────────
+# NCM_004: NCM fora de vigencia no periodo do arquivo
+# ──────────────────────────────────────────────
+
+def _check_ncm_004(
+    groups: dict[str, list[SpedRecord]],
+    item_ncm: dict[str, str],
+    context: ValidationContext | None = None,
+) -> list[ValidationError]:
+    """NCM_004: NCM existe mas esta fora de vigencia no periodo do arquivo."""
+    errors: list[ValidationError] = []
+
+    if not context or not context.reference_loader:
+        return errors
+    if not context.periodo_ini or not context.periodo_fim:
+        return errors
+    loader = context.reference_loader
+    if not loader.has_ncm_vigente_table():
+        return errors
+
+    ncm_verificado: set[str] = set()
+
+    for r in groups.get("0200", []):
+        ncm = get_field(r, F_0200_NCM)
+        if not ncm or len(ncm) < 8 or ncm in ncm_verificado:
+            continue
+        ncm_verificado.add(ncm)
+
+        vigente = loader.ncm_vigente_no_periodo(
+            ncm, context.periodo_ini, context.periodo_fim,
+        )
+        if vigente is False:
+            cod_item = get_field(r, F_0200_COD_ITEM)
+            errors.append(make_error(
+                r, "COD_NCM", "NCM_FORA_VIGENCIA",
+                (
+                    f"NCM {ncm} do item {cod_item} estava fora de vigencia "
+                    f"no periodo do arquivo ({context.periodo_ini} a "
+                    f"{context.periodo_fim}). O NCM pode ter sido "
+                    f"desativado ou substituido. Consulte a tabela TIPI "
+                    f"atualizada."
+                ),
+                field_no=6,
+                value=f"NCM={ncm} COD_ITEM={cod_item}",
             ))
 
     return errors

@@ -6,12 +6,14 @@ externos parametrizáveis em data/reference/.
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import date
 from pathlib import Path
 
 import yaml
 
 _DATA_DIR = Path(__file__).parent.parent.parent / "data" / "reference"
+_DB_DIR = Path(__file__).parent.parent.parent / "db"
 
 
 class ReferenceLoader:
@@ -34,6 +36,7 @@ class ReferenceLoader:
         self._sn_anexos: dict | None = None
         self._sn_sublimites: dict[str, float] | None = None
         self._sn_limite_maximo: float | None = None
+        self._ncm_vigente: dict[str, dict] | None = None
 
     # ── Carregamento lazy ──
 
@@ -169,6 +172,31 @@ class ReferenceLoader:
             data = yaml.safe_load(f) or {}
         self._csosn_data = data.get("csosn", {})
 
+    def _ensure_ncm_vigente(self) -> None:
+        if self._ncm_vigente is not None:
+            return
+        db_path = _DB_DIR / "sped.db"
+        if not db_path.exists():
+            self._ncm_vigente = {}
+            return
+        conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        try:
+            rows = conn.execute(
+                "SELECT codigo, descricao, data_inicio, data_fim FROM ncm_vigente"
+            ).fetchall()
+        except sqlite3.OperationalError:
+            self._ncm_vigente = {}
+            conn.close()
+            return
+        self._ncm_vigente = {}
+        for codigo, descricao, dt_ini, dt_fim in rows:
+            self._ncm_vigente[codigo] = {
+                "descricao": descricao,
+                "data_inicio": dt_ini,
+                "data_fim": dt_fim,
+            }
+        conn.close()
+
     def _ensure_matriz(self) -> None:
         if self._matriz_data is not None:
             return
@@ -223,6 +251,45 @@ class ReferenceLoader:
         self._ensure_ncm()
         assert self._ncm_map is not None
         return self._ncm_map.get(ncm.strip())
+
+    def ncm_existe(self, ncm: str) -> bool:
+        """Retorna True se o NCM existe na tabela oficial vigente."""
+        self._ensure_ncm_vigente()
+        assert self._ncm_vigente is not None
+        if not self._ncm_vigente:
+            return True  # fallback permissivo se tabela indisponível
+        return ncm.strip() in self._ncm_vigente
+
+    def ncm_vigente_no_periodo(self, ncm: str, dt_ini: date, dt_fim: date) -> bool | None:
+        """Verifica se o NCM estava vigente no período informado.
+
+        Retorna True se vigente, False se expirado, None se NCM não encontrado.
+        """
+        self._ensure_ncm_vigente()
+        assert self._ncm_vigente is not None
+        info = self._ncm_vigente.get(ncm.strip())
+        if info is None:
+            return None
+        # Parsear datas DD/MM/YYYY
+        try:
+            d_ini = date(int(info["data_inicio"][6:10]), int(info["data_inicio"][3:5]), int(info["data_inicio"][0:2]))
+            d_fim = date(int(info["data_fim"][6:10]), int(info["data_fim"][3:5]), int(info["data_fim"][0:2]))
+        except (ValueError, IndexError):
+            return True  # se não conseguir parsear, assumir vigente
+        return d_ini <= dt_fim and d_fim >= dt_ini
+
+    def get_ncm_descricao(self, ncm: str) -> str:
+        """Retorna descrição oficial do NCM, ou string vazia se não encontrado."""
+        self._ensure_ncm_vigente()
+        assert self._ncm_vigente is not None
+        info = self._ncm_vigente.get(ncm.strip())
+        return info["descricao"] if info else ""
+
+    def has_ncm_vigente_table(self) -> bool:
+        """Retorna True se a tabela ncm_vigente está disponível e não vazia."""
+        self._ensure_ncm_vigente()
+        assert self._ncm_vigente is not None
+        return len(self._ncm_vigente) > 0
 
     def get_matriz_aliquota(self, uf_origem: str, uf_destino: str, dt: date | None = None) -> float | None:
         """Retorna alíquota interestadual entre UFs para a data informada.
@@ -444,6 +511,8 @@ class ReferenceLoader:
             tables.append("sn_anexos_aliquotas")
         if (self._data_dir / "sn_sublimites_uf.yaml").exists():
             tables.append("sn_sublimites_uf")
+        if (_DB_DIR / "sped.db").exists():
+            tables.append("ncm_vigente")
         # Vigências
         vig_dir = self._data_dir / "vigencias"
         if vig_dir.exists():

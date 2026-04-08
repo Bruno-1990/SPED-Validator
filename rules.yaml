@@ -460,9 +460,8 @@ cruzamento:
   corrigivel: proposta
   description: COD_PART do D100 deve existir no cadastro 0150
   condition: COD_PART nao encontrado em nenhum registro 0150
-  implemented: false
-  deprecation_note: 'Duplica D_001 em bloco_d_validator.py. Desativado em 2026-04-06.'
-  module: cross_block_validator.py
+  implemented: true
+  module: bloco_d_validator.py
   vigencia_de: '2000-01-01'
   vigencia_ate: null
   version: '1.1'
@@ -3357,6 +3356,46 @@ ncm:
   certeza: indicio
   impacto: relevante
   automatizavel: false
+- id: NCM_003
+  register: '0200'
+  fields:
+  - COD_NCM
+  error_type: NCM_INEXISTENTE
+  severity: error
+  corrigivel: proposta
+  description: NCM do cadastro 0200 nao existe na tabela oficial vigente
+  condition: NCM com 8 digitos nao encontrado na tabela ncm_vigente (sped.db)
+  implemented: true
+  module: ncm_validator.py
+  tipo_achado: risco_fiscal
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-07'
+  certeza: objetivo
+  impacto: critico
+  automatizavel: false
+  base_legal: IN RFB 2.003/2021
+- id: NCM_004
+  register: '0200'
+  fields:
+  - COD_NCM
+  error_type: NCM_FORA_VIGENCIA
+  severity: warning
+  corrigivel: proposta
+  description: NCM existe na tabela oficial mas esta fora de vigencia no periodo do arquivo
+  condition: Data_Fim do NCM anterior ao periodo do arquivo SPED
+  implemented: true
+  module: ncm_validator.py
+  tipo_achado: indicio_forte
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-07'
+  certeza: objetivo
+  impacto: relevante
+  automatizavel: false
+  base_legal: IN RFB 2.003/2021
 governanca:
 - id: GOV_001
   register: '*'

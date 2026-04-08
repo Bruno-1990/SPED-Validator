@@ -177,4 +177,6 @@ class TestAvailableTables:
 
     def test_diretorio_vazio(self, empty_loader: ReferenceLoader) -> None:
         tables = empty_loader.available_tables()
-        assert tables == []
+        # ncm_vigente vem do sped.db (independe do diretorio de YAMLs)
+        yaml_tables = [t for t in tables if t != "ncm_vigente"]
+        assert yaml_tables == []

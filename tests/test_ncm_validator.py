@@ -12,6 +12,8 @@ from src.validators.helpers import fields_to_dict
 from src.validators.ncm_validator import (
     _check_ncm_001,
     _check_ncm_002,
+    _check_ncm_003,
+    _check_ncm_004,
     validate_ncm,
 )
 
@@ -174,6 +176,139 @@ class TestNcm002:
         item_ncm = {"PROD001": "84710000", "PROD002": "84710000"}
         errors = _check_ncm_002(groups, item_ncm)
         assert len(errors) == 1  # Apenas 1 alerta por NCM
+
+
+# ──────────────────────────────────────────────
+# NCM_003: NCM inexistente na tabela oficial
+# ──────────────────────────────────────────────
+
+def _make_context_ncm_vigente(ncms_existentes: set[str], periodo: bool = True) -> ValidationContext:
+    """Cria contexto com ReferenceLoader mockado para ncm_vigente."""
+    from datetime import date
+
+    loader = MagicMock(spec=ReferenceLoader)
+    loader.has_ncm_vigente_table.return_value = True
+    loader.ncm_existe = lambda ncm: ncm.strip() in ncms_existentes
+    loader.ncm_vigente_no_periodo = lambda ncm, di, df: (
+        True if ncm.strip() in ncms_existentes else None
+    )
+    loader.get_ncm_tributacao = lambda ncm: None
+    ctx = ValidationContext(file_id=1, reference_loader=loader)
+    if periodo:
+        ctx.periodo_ini = date(2024, 1, 1)
+        ctx.periodo_fim = date(2024, 1, 31)
+    return ctx
+
+
+class TestNcm003:
+    def test_ncm_inexistente_alerta(self) -> None:
+        records = [make_0200("PROD001", ncm="99999999")]
+        groups = group_by_register(records)
+        ctx = _make_context_ncm_vigente({"94036000", "84713012"})
+        errors = _check_ncm_003(groups, {}, ctx)
+        assert len(errors) == 1
+        assert errors[0].error_type == "NCM_INEXISTENTE"
+        assert "99999999" in errors[0].message
+
+    def test_ncm_existente_ok(self) -> None:
+        records = [make_0200("PROD001", ncm="94036000")]
+        groups = group_by_register(records)
+        ctx = _make_context_ncm_vigente({"94036000"})
+        errors = _check_ncm_003(groups, {}, ctx)
+        assert errors == []
+
+    def test_ncm_curto_ignorado(self) -> None:
+        records = [make_0200("PROD001", ncm="9403")]
+        groups = group_by_register(records)
+        ctx = _make_context_ncm_vigente(set())
+        errors = _check_ncm_003(groups, {}, ctx)
+        assert errors == []
+
+    def test_sem_tabela_nao_valida(self) -> None:
+        loader = MagicMock(spec=ReferenceLoader)
+        loader.has_ncm_vigente_table.return_value = False
+        ctx = ValidationContext(file_id=1, reference_loader=loader)
+        records = [make_0200("PROD001", ncm="99999999")]
+        groups = group_by_register(records)
+        errors = _check_ncm_003(groups, {}, ctx)
+        assert errors == []
+
+    def test_deduplica_mesmo_ncm(self) -> None:
+        records = [
+            make_0200("PROD001", ncm="99999999", line=5),
+            make_0200("PROD002", ncm="99999999", line=6),
+        ]
+        groups = group_by_register(records)
+        ctx = _make_context_ncm_vigente(set())
+        errors = _check_ncm_003(groups, {}, ctx)
+        assert len(errors) == 1
+
+
+# ──────────────────────────────────────────────
+# NCM_004: NCM fora de vigencia
+# ──────────────────────────────────────────────
+
+class TestNcm004:
+    def test_ncm_fora_vigencia_alerta(self) -> None:
+        from datetime import date
+
+        loader = MagicMock(spec=ReferenceLoader)
+        loader.has_ncm_vigente_table.return_value = True
+        loader.ncm_vigente_no_periodo = lambda ncm, di, df: False
+        ctx = ValidationContext(
+            file_id=1,
+            reference_loader=loader,
+            periodo_ini=date(2024, 1, 1),
+            periodo_fim=date(2024, 1, 31),
+        )
+        records = [make_0200("PROD001", ncm="12345678")]
+        groups = group_by_register(records)
+        errors = _check_ncm_004(groups, {}, ctx)
+        assert len(errors) == 1
+        assert errors[0].error_type == "NCM_FORA_VIGENCIA"
+
+    def test_ncm_vigente_ok(self) -> None:
+        from datetime import date
+
+        loader = MagicMock(spec=ReferenceLoader)
+        loader.has_ncm_vigente_table.return_value = True
+        loader.ncm_vigente_no_periodo = lambda ncm, di, df: True
+        ctx = ValidationContext(
+            file_id=1,
+            reference_loader=loader,
+            periodo_ini=date(2024, 1, 1),
+            periodo_fim=date(2024, 1, 31),
+        )
+        records = [make_0200("PROD001", ncm="94036000")]
+        groups = group_by_register(records)
+        errors = _check_ncm_004(groups, {}, ctx)
+        assert errors == []
+
+    def test_ncm_nao_encontrado_ignora(self) -> None:
+        from datetime import date
+
+        loader = MagicMock(spec=ReferenceLoader)
+        loader.has_ncm_vigente_table.return_value = True
+        loader.ncm_vigente_no_periodo = lambda ncm, di, df: None
+        ctx = ValidationContext(
+            file_id=1,
+            reference_loader=loader,
+            periodo_ini=date(2024, 1, 1),
+            periodo_fim=date(2024, 1, 31),
+        )
+        records = [make_0200("PROD001", ncm="99999999")]
+        groups = group_by_register(records)
+        errors = _check_ncm_004(groups, {}, ctx)
+        assert errors == []
+
+    def test_sem_periodo_nao_valida(self) -> None:
+        loader = MagicMock(spec=ReferenceLoader)
+        loader.has_ncm_vigente_table.return_value = True
+        ctx = ValidationContext(file_id=1, reference_loader=loader)
+        records = [make_0200("PROD001", ncm="12345678")]
+        groups = group_by_register(records)
+        errors = _check_ncm_004(groups, {}, ctx)
+        assert errors == []
 
 
 # ──────────────────────────────────────────────
