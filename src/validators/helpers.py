@@ -221,17 +221,20 @@ def make_generic_error(
 # Constantes — CST
 # ──────────────────────────────────────────────
 
-# ICMS — CSTs que indicam tributacao
-CST_TRIBUTADO = {"00", "10", "20", "70", "90"}
+# ICMS — CSTs que indicam tributacao (debito proprio)
+CST_TRIBUTADO = {"00", "02", "10", "12", "13", "15", "20", "70", "90"}
 
 # ICMS — CSTs que indicam isencao/nao-tributacao/suspensao
-CST_ISENTO_NT = {"40", "41", "50", "60"}
+CST_ISENTO_NT = {"30", "40", "41", "50", "60", "61"}
 
 # ICMS — CST diferimento
-CST_DIFERIMENTO = {"51"}
+CST_DIFERIMENTO = {"51", "52", "53"}
 
-# CSTs de ST
-CST_ST = {"10", "30", "60", "70"}
+# CSTs de ST (substituicao tributaria)
+CST_ST = {"10", "12", "13", "15", "30", "60", "61", "70", "72", "74"}
+
+# CSTs monofasico combustiveis (LC 192/2022)
+CST_MONOFASICO = {"02", "15", "53", "61"}
 
 # Aliquotas interestaduais validas (Resolucao Senado 13/2012)
 ALIQ_INTERESTADUAIS = {4.0, 7.0, 12.0}

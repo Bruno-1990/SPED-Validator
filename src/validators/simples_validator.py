@@ -38,7 +38,10 @@ from .helpers import (
 )
 
 # CSTs Tabela A (Regime Normal) — nao devem aparecer em Simples
-_CST_TABELA_A = {"00", "10", "20", "30", "40", "41", "50", "51", "60", "70", "90"}
+_CST_TABELA_A = {
+    "00", "02", "10", "12", "13", "15", "20", "30", "40", "41",
+    "50", "51", "52", "53", "60", "61", "70", "72", "74", "90",
+}
 
 # CSOSN isentos/imunes/nao tributados — nao devem ter BC/ICMS
 _CSOSN_ZERO = {"300", "400"}

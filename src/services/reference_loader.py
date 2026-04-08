@@ -6,6 +6,7 @@ externos parametrizáveis em data/reference/.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import date
 from pathlib import Path
@@ -37,6 +38,8 @@ class ReferenceLoader:
         self._sn_sublimites: dict[str, float] | None = None
         self._sn_limite_maximo: float | None = None
         self._ncm_vigente: dict[str, dict] | None = None
+        self._cst_vigente: dict[str, dict] | None = None  # id -> row completa
+        self._cst_por_tipo: dict[str, dict[str, dict]] | None = None  # tipo -> {codigo -> row}
 
     # ── Carregamento lazy ──
 
@@ -197,6 +200,44 @@ class ReferenceLoader:
             }
         conn.close()
 
+    def _ensure_cst_vigente(self) -> None:
+        if self._cst_vigente is not None:
+            return
+        db_path = _DB_DIR / "sped.db"
+        if not db_path.exists():
+            self._cst_vigente = {}
+            self._cst_por_tipo = {}
+            return
+        conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        try:
+            rows = conn.execute(
+                "SELECT id, codigo, descricao, tipo, categoria_normativa, "
+                "tributo, regime, efeitos, incompativel_com, tags FROM cst_vigente"
+            ).fetchall()
+        except sqlite3.OperationalError:
+            self._cst_vigente = {}
+            self._cst_por_tipo = {}
+            conn.close()
+            return
+        self._cst_vigente = {}
+        self._cst_por_tipo = {}
+        for row_id, codigo, descricao, tipo, cat, tributo, regime, efeitos, incompat, tags in rows:
+            entry = {
+                "id": row_id,
+                "codigo": codigo,
+                "descricao": descricao,
+                "tipo": tipo,
+                "categoria_normativa": cat,
+                "tributo": json.loads(tributo) if tributo else [],
+                "regime": json.loads(regime) if regime else [],
+                "efeitos": json.loads(efeitos) if efeitos else [],
+                "incompativel_com": json.loads(incompat) if incompat else [],
+                "tags": json.loads(tags) if tags else [],
+            }
+            self._cst_vigente[row_id] = entry
+            self._cst_por_tipo.setdefault(tipo, {})[codigo] = entry
+        conn.close()
+
     def _ensure_matriz(self) -> None:
         if self._matriz_data is not None:
             return
@@ -290,6 +331,62 @@ class ReferenceLoader:
         self._ensure_ncm_vigente()
         assert self._ncm_vigente is not None
         return len(self._ncm_vigente) > 0
+
+    # ── CST Vigente (sped.db) ──
+
+    def has_cst_vigente_table(self) -> bool:
+        """Retorna True se a tabela cst_vigente está disponível e não vazia."""
+        self._ensure_cst_vigente()
+        assert self._cst_vigente is not None
+        return len(self._cst_vigente) > 0
+
+    def get_csts_validos(self, tipo: str) -> set[str]:
+        """Retorna conjunto de códigos válidos para um tipo (CST_ICMS, CSOSN, etc.).
+
+        Para CST_ICMS retorna apenas tabela_b_tributacao (códigos de 2 dígitos).
+        """
+        self._ensure_cst_vigente()
+        assert self._cst_por_tipo is not None
+        entries = self._cst_por_tipo.get(tipo, {})
+        return set(entries.keys())
+
+    def get_cst_info(self, tipo: str, codigo: str) -> dict | None:
+        """Retorna info completa de um CST (efeitos, incompatibilidades, etc.)."""
+        self._ensure_cst_vigente()
+        assert self._cst_por_tipo is not None
+        return self._cst_por_tipo.get(tipo, {}).get(codigo)
+
+    def get_cst_efeitos(self, tipo: str, codigo: str) -> list[str]:
+        """Retorna lista de efeitos do CST (ex: debito_proprio, monofasico)."""
+        info = self.get_cst_info(tipo, codigo)
+        return info["efeitos"] if info else []
+
+    def get_cst_incompativeis(self, tipo: str, codigo: str) -> list[str]:
+        """Retorna IDs de CSTs incompatíveis com este código."""
+        info = self.get_cst_info(tipo, codigo)
+        return info["incompativel_com"] if info else []
+
+    def cst_valido_para_regime(self, tipo: str, codigo: str, regime: str) -> bool | None:
+        """Verifica se o CST é válido para o regime informado.
+
+        Retorna True/False, ou None se CST não encontrado.
+        """
+        info = self.get_cst_info(tipo, codigo)
+        if info is None:
+            return None
+        regimes = info.get("regime", [])
+        if not regimes:
+            return True  # sem restrição de regime
+        return regime in regimes
+
+    def cst_tem_efeito(self, tipo: str, codigo: str, efeito: str) -> bool:
+        """Retorna True se o CST tem o efeito especificado."""
+        return efeito in self.get_cst_efeitos(tipo, codigo)
+
+    def get_cst_descricao(self, tipo: str, codigo: str) -> str:
+        """Retorna descrição oficial do CST."""
+        info = self.get_cst_info(tipo, codigo)
+        return info["descricao"] if info else ""
 
     def get_matriz_aliquota(self, uf_origem: str, uf_destino: str, dt: date | None = None) -> float | None:
         """Retorna alíquota interestadual entre UFs para a data informada.

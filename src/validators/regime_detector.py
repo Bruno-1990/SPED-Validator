@@ -41,7 +41,10 @@ class RegimeDetector:
     """
 
     CSOSN_VALUES = {"101", "102", "103", "201", "202", "203", "300", "400", "500", "900"}
-    CST_NORMAL_VALUES = {"00", "10", "20", "30", "40", "41", "50", "51", "60", "70", "90"}
+    CST_NORMAL_VALUES = {
+        "00", "02", "10", "12", "13", "15", "20", "30", "40", "41",
+        "50", "51", "52", "53", "60", "61", "70", "72", "74", "90",
+    }
 
     @classmethod
     def detect(cls, records: list[SpedRecord]) -> DetectionResult:

@@ -26,8 +26,11 @@ class TaxRegime(Enum):
     UNKNOWN = "unknown"
 
 
-# CSTs validos por regime
-CST_TABELA_A = {"00", "10", "20", "30", "40", "41", "50", "51", "60", "70", "90"}
+# CSTs validos por regime (atualizado conforme Tabela_CST_Vigente.json)
+CST_TABELA_A = {
+    "00", "02", "10", "12", "13", "15", "20", "30", "40", "41",
+    "50", "51", "52", "53", "60", "61", "70", "72", "74", "90",
+}
 CST_TABELA_B = {"101", "102", "103", "201", "202", "203", "300", "400", "500", "900"}
 
 
