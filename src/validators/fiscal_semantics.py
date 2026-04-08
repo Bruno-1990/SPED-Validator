@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 # IPI — CSTs que indicam tributacao efetiva (saida tributada / entrada com credito)
 # 49 (Outras Entradas) e 99 (Outras Saidas) sao residuais e nao exigem valores
-_CST_IPI_TRIBUTADO = {"00", "01", "50"}
+_CST_IPI_TRIBUTADO = {"00", "50"}
 
 # PIS/COFINS — CSTs que indicam operacao tributavel (aliquota normal)
 _CST_PIS_COFINS_TRIBUTAVEL = {"01", "02", "03", "49"}

@@ -14,7 +14,7 @@ from ..services.context_builder import ValidationContext
 from .helpers import get_field, make_error, to_float
 
 # CST IPI tributados — devem ter VL_IPI > 0 quando BC > 0
-_CST_IPI_TRIBUTADO = {"00", "49", "50"}
+_CST_IPI_TRIBUTADO = {"00", "50"}
 
 # CST IPI isentos/imunes — nao devem ter VL_IPI > 0
 _CST_IPI_ISENTO = {

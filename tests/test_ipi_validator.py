@@ -174,11 +174,11 @@ class TestIPI003:
         errors = validate_ipi(records)
         assert not any(e.error_type == "IPI_CST_MONETARIO_INCOMPATIVEL" for e in errors)
 
-    def test_cst_49_tributado(self) -> None:
-        """CST 49 (outros tributados) com BC e ALIQ mas sem valor."""
+    def test_cst_49_residual_nao_exige_valor(self) -> None:
+        """CST 49 (Outras Entradas) e residual — nao exige BC/aliq/valor."""
         records = [c170(cst_ipi="49", vl_bc_ipi="500,00", aliq_ipi="5,00", vl_ipi="0", line=1)]
         errors = validate_ipi(records)
-        assert any(e.error_type == "IPI_CST_MONETARIO_INCOMPATIVEL" for e in errors)
+        assert not any(e.error_type == "IPI_CST_MONETARIO_INCOMPATIVEL" for e in errors)
 
     def test_cst_00_tributado_ok(self) -> None:
         """CST 00 com tudo preenchido corretamente."""

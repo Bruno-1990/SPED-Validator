@@ -28,7 +28,8 @@ if TYPE_CHECKING:
 # ICMS - Tabela A (Origem) + Tabela B (Tributacao)
 # Origem: 0-8, Tributacao: 00,10,20,30,40,41,50,51,60,70,90
 _CST_ICMS_TRIBUTACAO = {
-    "00", "10", "20", "30", "40", "41", "50", "51", "60", "70", "90",
+    "00", "02", "10", "12", "13", "15", "20", "30", "40", "41",
+    "50", "51", "52", "53", "60", "61", "70", "72", "74", "90",
 }
 
 # ICMS Simples Nacional (CSOSN)
