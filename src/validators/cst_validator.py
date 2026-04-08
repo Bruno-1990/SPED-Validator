@@ -61,6 +61,16 @@ _CST_IPI_TRIBUTADO = {"00", "50"}
 # CSTs de IPI isentos/NT/imune/suspenso
 _CST_IPI_SEM_IMPOSTO = {"02", "03", "04", "05", "52", "53", "54", "55"}
 
+# CSTs ICMS que admitem BC/ALIQ/ICMS zerados conforme Guia Pratico EFD
+# (20=reducao, 51=diferimento, 90=outras — campos >= 0 admitido)
+_CST_ADMITE_ZERO = {"20", "51", "52", "53", "90"}
+
+# CFOPs de entrada para uso/consumo ou ativo (sem credito proprio tipicamente)
+_CFOP_USO_CONSUMO_ATIVO = {
+    "1407", "1556", "1557", "2407", "2556", "2557",
+    "1551", "1552", "1553", "1554", "2551", "2552", "2553", "2554",
+}
+
 
 # ──────────────────────────────────────────────
 # API publica
@@ -256,10 +266,12 @@ def _validate_cst020_reducao(record: SpedRecord) -> list[ValidationError]:
 # ──────────────────────────────────────────────
 
 def _validate_cst_tributado_aliq_zero(record: SpedRecord) -> list[ValidationError]:
-    """CST_001: CST tributado (00,10,20,70,90) com ALIQ_ICMS = 0 e VL_ITEM > 0.
+    """CST_001: CST tributado com ALIQ_ICMS = 0 e VL_ITEM > 0.
 
-    CST 020 com aliquota zero apos reducao de 100% deveria ser CST 40.
-    Exportacoes e remessas com aliquota zero sao ignoradas.
+    Conforme Guia Pratico EFD, CSTs 20, 51 e 90 admitem campos >= 0.
+    CST 90 (Outras) e coringa — usado em uso/consumo, ativo, operacoes
+    especiais. Nao e possivel afirmar que ALIQ=0 e erro nesses CSTs.
+    CFOPs de uso/consumo/ativo tambem nao exigem ALIQ > 0.
     """
     cst_icms = get_field(record, "CST_ICMS")
     if not cst_icms:
@@ -267,6 +279,10 @@ def _validate_cst_tributado_aliq_zero(record: SpedRecord) -> list[ValidationErro
 
     t = trib(cst_icms)
     if t not in CST_TRIBUTADO:
+        return []
+
+    # CSTs que admitem zero conforme Guia Pratico (20, 51, 90)
+    if t in ("20", "51", "90"):
         return []
 
     aliq = to_float(get_field(record, "ALIQ_ICMS"))
@@ -281,15 +297,18 @@ def _validate_cst_tributado_aliq_zero(record: SpedRecord) -> list[ValidationErro
     if cfop in CFOP_EXPORTACAO or cfop in CFOP_REMESSA_RETORNO:
         return []
 
-    suggestion = "CST 40 (isento)" if t == "20" else "CST 40/41/50/51"
+    # CFOPs de uso/consumo/ativo nao exigem aliquota
+    if cfop in _CFOP_USO_CONSUMO_ATIVO:
+        return []
+
     return [make_error(
         record, "ALIQ_ICMS", "CST_TRIBUTADO_ALIQ_ZERO",
         (
-            f"CST {cst_icms} indica tributacao, mas ALIQ_ICMS=0 com "
+            f"CST {cst_icms} indica tributacao integral, mas ALIQ_ICMS=0 com "
             f"VL_ITEM={vl_item:.2f}. Se a operacao for isenta ou nao "
-            f"tributada, considere alterar para {suggestion}."
+            f"tributada, considere alterar para CST 40/41/50/51."
         ),
-        value=f"CST={cst_icms} ALIQ=0 VL_ITEM={vl_item:.2f}",
+        value=f"CST={cst_icms} ALIQ=0 CFOP={cfop} VL_ITEM={vl_item:.2f}",
     )]
 
 
@@ -544,9 +563,11 @@ def _validate_bloco_h(groups: dict[str, list[SpedRecord]]) -> list[ValidationErr
 def _validate_cst_efeitos(record: SpedRecord, loader=None) -> list[ValidationError]:
     """CST_007: Cruza efeitos do CST (cst_vigente) com valores dos campos.
 
-    - debito_proprio + VL_ICMS == 0 e VL_BC_ICMS > 0 -> inconsistente
-    - sem_debito_proprio + VL_ICMS > 0 -> inconsistente
-    - tem_st_subsequente + VL_BC_ICMS_ST == 0 -> ST faltante
+    Regras contextuais (nao absolutas):
+    - debito_proprio + BC > 0 + ICMS == 0: flag APENAS se CST nao admite zero
+      e CFOP nao indica uso/consumo/ativo
+    - sem_debito_proprio + ICMS > 0: flag (este e mais objetivo)
+    - tem_st_subsequente + BC_ST == 0: flag apenas se BC > 0
     """
     if not loader or not loader.has_cst_vigente_table():
         return []
@@ -564,40 +585,46 @@ def _validate_cst_efeitos(record: SpedRecord, loader=None) -> list[ValidationErr
 
     vl_bc = to_float(get_field(record, "VL_BC_ICMS"))
     vl_icms = to_float(get_field(record, "VL_ICMS"))
+    cfop = get_field(record, "CFOP")
 
     # debito_proprio com BC > 0 mas sem ICMS
-    if "debito_proprio" in efeitos and vl_bc > 0 and vl_icms == 0:
+    # Excecoes: CST 20/51/90 admitem zero; CFOP uso/consumo/ativo nao exige
+    if ("debito_proprio" in efeitos
+            and vl_bc > 0 and vl_icms == 0
+            and t not in _CST_ADMITE_ZERO
+            and cfop not in _CFOP_USO_CONSUMO_ATIVO):
         errors.append(make_error(
             record, "VL_ICMS", "CST_EFEITO_INCONSISTENTE",
             (
-                f"CST {cst_icms} indica debito proprio (efeito: debito_proprio), "
-                f"BC_ICMS={vl_bc:.2f} mas VL_ICMS=0. Se ha base de calculo, "
-                f"o imposto deveria estar preenchido."
+                f"CST {cst_icms} indica debito proprio, "
+                f"BC_ICMS={vl_bc:.2f} mas VL_ICMS=0. "
+                f"Verifique se a aliquota/imposto deveria estar preenchido "
+                f"ou se o CST deveria ser outro (ex: 40, 41, 60)."
             ),
-            value=f"CST={cst_icms} BC={vl_bc:.2f} ICMS={vl_icms:.2f}",
+            value=f"CST={cst_icms} BC={vl_bc:.2f} ICMS=0 CFOP={cfop}",
         ))
 
-    # sem_debito_proprio mas com ICMS > 0
-    if "sem_debito_proprio" in efeitos and vl_icms > 0:
+    # sem_debito_proprio mas com ICMS > 0 (mais objetivo)
+    if "sem_debito_proprio" in efeitos and vl_icms > 0 and t not in _CST_ADMITE_ZERO:
         errors.append(make_error(
             record, "VL_ICMS", "CST_EFEITO_INCONSISTENTE",
             (
-                f"CST {cst_icms} indica ausencia de debito proprio "
-                f"(efeito: sem_debito_proprio), mas VL_ICMS={vl_icms:.2f}. "
+                f"CST {cst_icms} indica ausencia de debito proprio, "
+                f"mas VL_ICMS={vl_icms:.2f}. "
                 f"Verifique se o CST esta correto ou se o valor deveria ser zero."
             ),
             value=f"CST={cst_icms} ICMS={vl_icms:.2f}",
         ))
 
-    # ST subsequente sem BC_ST
+    # ST subsequente sem BC_ST (apenas quando ha operacao com BC propria)
     if "tem_st_subsequente" in efeitos:
         vl_bc_st = to_float(get_field(record, "VL_BC_ICMS_ST"))
-        if vl_bc_st == 0 and vl_bc > 0:
+        if vl_bc_st == 0 and vl_bc > 0 and t not in _CST_ADMITE_ZERO:
             errors.append(make_error(
                 record, "VL_BC_ICMS_ST", "CST_EFEITO_INCONSISTENTE",
                 (
-                    f"CST {cst_icms} indica ST subsequente "
-                    f"(efeito: tem_st_subsequente), mas VL_BC_ICMS_ST=0. "
+                    f"CST {cst_icms} indica ST subsequente, "
+                    f"mas VL_BC_ICMS_ST=0. "
                     f"Operacoes com ST subsequente devem informar a base "
                     f"de calculo da substituicao tributaria."
                 ),

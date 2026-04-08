@@ -52,21 +52,22 @@ class TestCst001TributadoAliqZero:
         assert len(errors) == 1
         assert errors[0].error_type == "CST_TRIBUTADO_ALIQ_ZERO"
 
-    def test_cst20_aliq_zero_sugere_cst40(self) -> None:
+    def test_cst20_aliq_zero_ok(self) -> None:
+        """CST 20 (reducao de base) admite ALIQ=0 conforme Guia Pratico."""
         r = c170(cst="020", aliq="0", vl_item="500,00")
         errors = _validate_cst_tributado_aliq_zero(r)
-        assert len(errors) == 1
-        assert "CST 40" in errors[0].message
+        assert len(errors) == 0
 
     def test_cst70_aliq_zero_erro(self) -> None:
         r = c170(cst="070", aliq="0", vl_item="1000,00")
         errors = _validate_cst_tributado_aliq_zero(r)
         assert len(errors) == 1
 
-    def test_cst90_aliq_zero_erro(self) -> None:
+    def test_cst90_aliq_zero_ok(self) -> None:
+        """CST 90 (Outras) admite ALIQ=0 conforme Guia Pratico EFD."""
         r = c170(cst="090", aliq="0", vl_item="1000,00")
         errors = _validate_cst_tributado_aliq_zero(r)
-        assert len(errors) == 1
+        assert len(errors) == 0
 
     def test_cst00_aliq_positiva_ok(self) -> None:
         r = c170(cst="000", aliq="18,00", vl_item="1000,00")
@@ -101,12 +102,19 @@ class TestCst001TributadoAliqZero:
         r = c170(cst="", aliq="0", vl_item="1000,00")
         assert _validate_cst_tributado_aliq_zero(r) == []
 
-    @pytest.mark.parametrize("cst", ["00", "10", "20", "70", "90"])
-    def test_todos_cst_tributados(self, cst: str) -> None:
-        """Todos os CSTs tributados com aliquota zero devem gerar erro."""
+    @pytest.mark.parametrize("cst", ["00", "10", "70"])
+    def test_cst_tributados_aliq_zero_erro(self, cst: str) -> None:
+        """CSTs tributados estritos (00,10,70) com aliquota zero geram erro."""
         r = c170(cst=cst, aliq="0", vl_item="100,00")
         errors = _validate_cst_tributado_aliq_zero(r)
         assert len(errors) == 1
+
+    @pytest.mark.parametrize("cst", ["20", "90"])
+    def test_cst_admite_zero_nao_gera_erro(self, cst: str) -> None:
+        """CSTs 20 (reducao) e 90 (outras) admitem ALIQ=0 conforme Guia Pratico."""
+        r = c170(cst=cst, aliq="0", vl_item="100,00")
+        errors = _validate_cst_tributado_aliq_zero(r)
+        assert len(errors) == 0
 
 
 # ──────────────────────────────────────────────
