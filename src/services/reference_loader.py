@@ -346,12 +346,27 @@ class ReferenceLoader:
         return self._ncm_map.get(ncm.strip())
 
     def ncm_existe(self, ncm: str) -> bool:
-        """Retorna True se o NCM existe na tabela oficial vigente."""
+        """Retorna True se o NCM existe na tabela oficial vigente.
+
+        Busca exata primeiro, depois por prefixos decrescentes (6, 5, 4 digitos)
+        pois a tabela oficial pode ter apenas o nivel hierarquico superior.
+        NCM '00000000' (placeholder) e ignorado.
+        """
         self._ensure_ncm_vigente()
         assert self._ncm_vigente is not None
         if not self._ncm_vigente:
             return True  # fallback permissivo se tabela indisponível
-        return ncm.strip() in self._ncm_vigente
+        ncm = ncm.strip()
+        if ncm == "00000000":
+            return True  # placeholder, nao validar
+        # Busca exata
+        if ncm in self._ncm_vigente:
+            return True
+        # Busca por prefixo (a tabela pode ter apenas o nivel hierarquico)
+        for length in (6, 5, 4):
+            if ncm[:length] in self._ncm_vigente:
+                return True
+        return False
 
     def ncm_vigente_no_periodo(self, ncm: str, dt_ini: date, dt_fim: date) -> bool | None:
         """Verifica se o NCM estava vigente no período informado.
