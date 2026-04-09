@@ -1,5 +1,7 @@
 # SPED EFD - Sistema de Conversao, Validacao e Busca na Documentacao
 
+![buddy](https://buddyboard.xyz/card/bruno)
+
 Sistema local com API REST + Frontend React para converter documentacao fiscal brasileira (PDFs, DOCX, TXT) em texto estruturado, indexar em banco de dados com busca hibrida (exata + semantica), e validar arquivos SPED EFD detectando erros com sugestoes automaticas de correcao baseadas na documentacao oficial (Guia Pratico EFD v3.2.2).
 
 ---
