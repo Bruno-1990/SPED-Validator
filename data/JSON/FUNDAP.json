@@ -1,0 +1,255 @@
+{
+  "codigo_beneficio": "FUNDAP",
+  "nome_beneficio": "FUNDAP",
+  "uf": "ES",
+  "status_juridico": "vigente",
+  "versao_modelo": "3.0",
+  "ultima_revisao": "2025-04-07",
+
+  "fonte_legal_primaria": [
+    "Lei ES 2.508/1970",
+    "RICMS/ES - Decreto 1.090-R/2002 e alterações — disposicoes sobre regime especial de importacao"
+  ],
+  "fonte_orientativa_secundaria": [
+    "Normas estaduais do FUNDAP",
+    "SEFAZ/ES - comunicados sobre recolhimento FUNDAP"
+  ],
+
+  "vigencia_convenio_confaz": {
+    "numero_convenio": null,
+    "validade": null,
+    "renovacao_automatica": false,
+    "observacao": "Regime especial vigente desde 1970, sem amparo direto em Convênio CONFAZ. Historicamente contestado em operações interestaduais. Monitorar posição do STF/STJ."
+  },
+
+  "ato_concessorio_cliente": {
+    "numero": "FUNDAP-2025-001",
+    "inicio_vigencia": "2025-01-01",
+    "fim_vigencia": null,
+    "segmento": null,
+    "modalidade": "importacao_portuaria",
+    "observacao_modalidade": "Regime exclusivo para importação desembarcada no ES via porto ou aeroporto habilitado. Habilitação ativa é pré-requisito absoluto."
+  },
+
+  "pre_requisitos_absolutos": [
+    {
+      "codigo": "PRE-FUN-01",
+      "descricao": "habilitacao_ativa_fundap",
+      "observacao": "Contribuinte deve estar habilitado e ativo no programa FUNDAP junto à SEFAZ-ES. Sem habilitação, nenhuma operação pode ser amparada.",
+      "bloqueia_se_ausente": true,
+      "prioridade": 1
+    },
+    {
+      "codigo": "PRE-FUN-02",
+      "descricao": "desembaraco_em_porto_ou_aeroporto_do_es",
+      "observacao": "O desembaraco da importacao deve ocorrer obrigatoriamente em porto ou aeroporto habilitado no Espirito Santo",
+      "bloqueia_se_ausente": true,
+      "prioridade": 2
+    },
+    {
+      "codigo": "PRE-FUN-03",
+      "descricao": "vinculo_di_due_existente",
+      "observacao": "Deve existir DI (Declaracao de Importacao) ou DUE vinculada como lastro documental da operacao",
+      "bloqueia_se_ausente": true,
+      "prioridade": 3
+    }
+  ],
+
+  "bloqueia_fruicao_se": [
+    "sem_habilitacao_ativa_fundap",
+    "desembaraco_fora_do_es",
+    "sem_vinculo_di_due",
+    "sem_cbenef_quando_obrigatorio",
+    "codigo_recolhimento_incompativel",
+    "apuracao_nao_segregada"
+  ],
+
+  "elegibilidade": {
+    "cnaes_permitidos": [
+      "importacao",
+      "trading",
+      "comercio_exterior"
+    ],
+    "cnaes_observacao": "Validar CNAEs autorizados no cadastro FUNDAP do contribuinte junto à SEFAZ-ES.",
+    "ufs_operacao_permitidas": ["ES", "interestadual", "importacao"],
+    "tipos_operacao_permitidas": [
+      "desembaraco_importacao",
+      "saida_subsequente"
+    ],
+    "condicoes_especiais": [
+      "desembaraco deve ocorrer em porto ou aeroporto habilitado no ES",
+      "saida subsequente deve ter vinculo rastreavel com importacao amparada"
+    ],
+    "vedacoes": [
+      "operacao sem lastro de importacao amparada pelo FUNDAP",
+      "uso do tratamento fora do fluxo FUNDAP",
+      "desembaraco em UF diferente do ES",
+      "contribuinte sem habilitacao ativa no programa"
+    ]
+  },
+
+  "impactos_fiscais": {
+    "tipo_beneficio": [
+      "tratamento_importacao",
+      "regime_especial"
+    ],
+    "exige_cbenef": true,
+    "cbenef_permitidos": [],
+    "cbenef_status": "pendente_parametrizacao",
+    "cbenef_observacao": "Confirmar código junto à SEFAZ-ES. Verificar se existe CBENEF distinto para desembaraço e saída subsequente. Não utilizar em produção sem preenchimento.",
+    "apuracao_em_separado": true,
+    "permite_compensar_com_saldo_credor_comum": false,
+    "exige_estorno_credito": false,
+    "exige_recolhimento_em_codigo_proprio": true,
+    "exige_memoria_calculo": true
+  },
+
+  "regras_estorno": {
+    "exige_estorno": false,
+    "criterio": null,
+    "registro_sped_estorno": null,
+    "observacao": "Não há regra de estorno de crédito prevista para o FUNDAP. Diferente do INVEST-ES. Revisar se houver alteração legislativa ou comunicado SEFAZ-ES."
+  },
+
+  "regras_habilitacao": {
+    "exige_habilitacao_fundap": true,
+    "verificacao_obrigatoria": "confirmar habilitacao ativa no cadastro FUNDAP/SEFAZ-ES antes de aplicar o regime",
+    "consequencia_sem_habilitacao": "vedada a fruicao do regime — operacao deve ser tratada como importacao normal",
+    "prioridade_validacao": 1,
+    "alerta_associado": "FUND-001"
+  },
+
+  "regras_importacao": {
+    "vinculo_di_due": true,
+    "documentos_obrigatorios": [
+      "DI (Declaracao de Importacao) ou DUE",
+      "Conhecimento de embarque (BL/AWB)",
+      "NF-e de entrada (importacao)"
+    ],
+    "prioridade_validacao": 2,
+    "observacao": "A DI/DUE é o lastro documental central do FUNDAP. Motor deve exigir vínculo entre o documento de importação e a NF-e de saída subsequente.",
+    "alerta_associado": "FUND-002"
+  },
+
+  "regras_sped": {
+    "registros_afetados": ["C100", "C170", "C190", "E110", "E111", "E116"],
+    "campos_criticos": [
+      "CFOP", "CST", "VL_ICMS", "VL_BC_ICMS", "cBenef", "ALIQ_ICMS"
+    ],
+    "validacoes": [
+      {
+        "codigo": "VAL-FUN-01",
+        "regra": "validar_habilitacao_ativa_do_contribuinte_no_fundap",
+        "prioridade_validacao": 1,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-FUN-02",
+        "regra": "validar_origem_importacao_fundap_com_lastro_di_due",
+        "prioridade_validacao": 2,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-FUN-03",
+        "regra": "validar_cbenef_em_desembaraco_e_saida_subsequente",
+        "prioridade_validacao": 3,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-FUN-04",
+        "regra": "validar_codigo_recolhimento_proprio",
+        "prioridade_validacao": 4,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-FUN-05",
+        "regra": "validar_coerencia_documental_da_importacao",
+        "prioridade_validacao": 5,
+        "severidade": "alto"
+      },
+      {
+        "codigo": "VAL-FUN-06",
+        "regra": "validar_vinculo_nfe_saida_x_documento_importacao",
+        "prioridade_validacao": 6,
+        "severidade": "alto"
+      },
+      {
+        "codigo": "VAL-FUN-07",
+        "regra": "validar_apuracao_separada",
+        "prioridade_validacao": 7,
+        "severidade": "critico"
+      }
+    ]
+  },
+
+  "regras_documentais": {
+    "cfops_comuns": ["3101", "3102", "6101", "6102"],
+    "csts_aceitos": ["20", "51", "90"],
+    "csosn_aceitos": [],
+    "aliquotas_referencia": ["interestadual_4", "interestadual_7", "interestadual_12"],
+    "observacoes_nf": [
+      "cBenef obrigatorio quando houver fruicao do regime FUNDAP",
+      "NF-e de saida subsequente deve ser coerente com o desembaraco de importacao",
+      "CFOP 3101/3102 para entrada de importacao; 6101/6102 para saida subsequente",
+      "manter rastreabilidade com o documento de desembaraco (DI/DUE)"
+    ]
+  },
+
+  "alertas_motor": [
+    {
+      "codigo": "FUND-001",
+      "descricao": "Contribuinte sem habilitacao ativa no programa FUNDAP aplicando o regime",
+      "severidade": "critico",
+      "prioridade_validacao": 1,
+      "acao_sugerida": "Verificar habilitacao junto a SEFAZ-ES. Suspender fruicao ate confirmacao."
+    },
+    {
+      "codigo": "FUND-002",
+      "descricao": "Operacao tratada como FUNDAP sem lastro de importacao (DI/DUE) identificavel",
+      "severidade": "critico",
+      "prioridade_validacao": 2,
+      "acao_sugerida": "Cruzar NF-e de saida com documento de desembaraco. Exigir DI/DUE vinculada."
+    },
+    {
+      "codigo": "FUND-003",
+      "descricao": "cBenef ausente quando exigido em operacao amparada",
+      "severidade": "critico",
+      "prioridade_validacao": 3,
+      "acao_sugerida": "Incluir cBenef correto na NF-e e no registro EFD"
+    },
+    {
+      "codigo": "FUND-004",
+      "descricao": "Codigo de recolhimento incompativel com o regime FUNDAP",
+      "severidade": "critico",
+      "prioridade_validacao": 4,
+      "acao_sugerida": "Corrigir codigo de recolhimento para o especifico do FUNDAP"
+    },
+    {
+      "codigo": "FUND-005",
+      "descricao": "Desembaraco fora do ES — operacao nao amparada pelo FUNDAP",
+      "severidade": "critico",
+      "prioridade_validacao": 5,
+      "acao_sugerida": "Remover tratamento FUNDAP e reprocessar como importacao normal"
+    },
+    {
+      "codigo": "FUND-006",
+      "descricao": "Apuracao FUNDAP misturada com apuracao comum sem segregacao",
+      "severidade": "alto",
+      "prioridade_validacao": 6,
+      "acao_sugerida": "Segregar apuracoes conforme exigencia SEFAZ-ES"
+    }
+  ],
+
+  "severidade_enum": ["critico", "alto", "medio", "baixo", "info"],
+
+  "anexos_contexto": {
+    "planilha_apuracao_obrigatoria": true,
+    "controle_interno_obrigatorio": true,
+    "exige_habilitacao_previa": true,
+    "vinculo_documento_importacao": true,
+    "vinculo_di_due": true,
+    "dependencias": ["IMPORTACAO", "HABILITACAO_FUNDAP", "VINCULO_DI_DUE", "APURACAO_SEPARADA"],
+    "modulos_motor_relacionados": ["IMPORTACAO", "FUNDAP"],
+    "observacoes": "Motor deve cruzar fluxo de importacao com documentos de desembaraco (DI/DUE). Habilitacao no programa FUNDAP e pre-requisito absoluto. Regime de longa data, mas com historico de questionamentos em operacoes interestaduais — monitorar."
+  }
+}

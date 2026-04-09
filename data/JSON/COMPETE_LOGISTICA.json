@@ -1,0 +1,245 @@
+{
+  "codigo_beneficio": "COMPETE_LOGISTICA",
+  "nome_beneficio": "COMPETE-ES Logística",
+  "uf": "ES",
+  "status_juridico": "vigente",
+  "versao_modelo": "3.0",
+  "ultima_revisao": "2025-04-07",
+
+  "fonte_legal_primaria": [
+    "Lei ES 10.568/2016",
+    "RICMS/ES - Decreto 1.090-R/2002 e alterações"
+  ],
+  "fonte_orientativa_secundaria": [
+    "Receita Orienta - COMPETE-ES/SEFAZ-ES"
+  ],
+
+  "vigencia_convenio_confaz": {
+    "numero_convenio": null,
+    "validade": null,
+    "renovacao_automatica": false,
+    "observacao": "Benefício de legislação estadual própria — sem amparo em Convênio CONFAZ. Sujeito a questionamento jurídico interestadual."
+  },
+
+  "ato_concessorio_cliente": {
+    "numero": "TERMO-ADESAO-2025-020",
+    "inicio_vigencia": "2025-01-01",
+    "fim_vigencia": null,
+    "segmento": "logistica",
+    "modalidade": null,
+    "observacao_modalidade": "Verificar se o Termo engloba armazenagem, distribuição, cross-docking ou transporte. Preencher conforme autorização."
+  },
+
+  "pre_requisitos_absolutos": [
+    {
+      "codigo": "PRE-LOG-01",
+      "descricao": "termo_adesao_vigente",
+      "observacao": "Contribuinte deve possuir Termo de Adesao ativo junto à SEFAZ-ES",
+      "bloqueia_se_ausente": true,
+      "prioridade": 1
+    },
+    {
+      "codigo": "PRE-LOG-02",
+      "descricao": "habilitacao_ativa_compete",
+      "observacao": "Habilitação no programa COMPETE-ES deve estar ativa no cadastro SEFAZ-ES",
+      "bloqueia_se_ausente": true,
+      "prioridade": 2
+    },
+    {
+      "codigo": "PRE-LOG-03",
+      "descricao": "cnae_logistico_habilitado",
+      "observacao": "CNAE do estabelecimento deve estar entre os autorizados no Termo para atividade logistica",
+      "bloqueia_se_ausente": true,
+      "prioridade": 3
+    }
+  ],
+
+  "bloqueia_fruicao_se": [
+    "sem_termo_adesao_vigente",
+    "sem_habilitacao_ativa_compete",
+    "sem_cbenef_quando_obrigatorio",
+    "operacao_fora_do_arranjo_logistico_permitido",
+    "apuracao_nao_segregada",
+    "sem_lastro_de_estoque_ou_documental"
+  ],
+
+  "elegibilidade": {
+    "cnaes_permitidos": [
+      "5250804",
+      "5211701",
+      "5211799"
+    ],
+    "cnaes_observacao": "CNAEs relacionados a armazenagem e atividades auxiliares dos transportes. Validar lista completa no Termo de Adesão.",
+    "ufs_operacao_permitidas": ["ES", "interestadual"],
+    "ufs_observacao": "Unica modalidade COMPETE que admite operacoes internas (ES). Intencional — reflete natureza logistica do estabelecimento.",
+    "tipos_operacao_permitidas": [
+      "armazenagem",
+      "saida_interestadual",
+      "operacao_logistica_amparada"
+    ],
+    "condicoes_especiais": [
+      "atividade de transporte no mesmo CNPJ somente quando expressamente autorizada no Termo",
+      "mistura de atividade nao abrangida vedada quando o Termo nao prever"
+    ],
+    "vedacoes": [
+      "uso do beneficio em operacao fora do arranjo logistico permitido",
+      "mistura de atividade nao abrangida no mesmo estabelecimento quando vedado",
+      "aproveitamento de credito fora do fluxo logistico beneficiado"
+    ]
+  },
+
+  "impactos_fiscais": {
+    "tipo_beneficio": [
+      "credito_presumido",
+      "reducao_base_calculo",
+      "diferimento"
+    ],
+    "exige_cbenef": true,
+    "cbenef_permitidos": [],
+    "cbenef_status": "pendente_parametrizacao",
+    "cbenef_observacao": "Confirmar código junto à SEFAZ-ES após habilitação. Não utilizar em produção sem preenchimento.",
+    "apuracao_em_separado": true,
+    "permite_compensar_com_saldo_credor_comum": false,
+    "exige_estorno_credito": false,
+    "exige_recolhimento_em_codigo_proprio": true,
+    "exige_memoria_calculo": true
+  },
+
+  "regras_estorno": {
+    "exige_estorno": false,
+    "criterio": null,
+    "registro_sped_estorno": null,
+    "observacao": "Não há regra de estorno de crédito para esta modalidade. Revisar se houver alteração legislativa."
+  },
+
+  "regras_cte": {
+    "emite_cte": null,
+    "observacao": "Avaliar se o estabelecimento emite CT-e no mesmo CNPJ. Se sim, registros D100 e D190 devem ser incluídos nos registros afetados e validados quanto ao cBenef e CFOP.",
+    "registros_adicionais_quando_aplicavel": ["D100", "D190"]
+  },
+
+  "regras_sped": {
+    "registros_afetados": [
+      "C100", "C170", "C190", "E110", "E111", "E116", "H005", "H010"
+    ],
+    "registros_condicionais": {
+      "D100_D190": "incluir quando o estabelecimento emitir CT-e no mesmo CNPJ"
+    },
+    "campos_criticos": [
+      "CFOP", "cBenef", "CST", "COD_ITEM", "VL_ICMS", "VL_BC_ICMS", "QTD", "UNID"
+    ],
+    "validacoes": [
+      {
+        "codigo": "VAL-LOG-01",
+        "regra": "validar_operacao_enquadrada_na_modalidade_logistica",
+        "prioridade_validacao": 1,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-LOG-02",
+        "regra": "validar_cbenef",
+        "prioridade_validacao": 2,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-LOG-03",
+        "regra": "validar_apuracao_separada",
+        "prioridade_validacao": 3,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-LOG-04",
+        "regra": "validar_coerencia_entre_H005_H010_e_movimentacao_documental",
+        "prioridade_validacao": 4,
+        "severidade": "alto"
+      },
+      {
+        "codigo": "VAL-LOG-05",
+        "regra": "validar_estoque_e_fluxo_fisico_quando_aplicavel",
+        "prioridade_validacao": 5,
+        "severidade": "alto"
+      },
+      {
+        "codigo": "VAL-LOG-06",
+        "regra": "validar_cfop_compativel_com_natureza_logistica",
+        "prioridade_validacao": 6,
+        "severidade": "alto"
+      },
+      {
+        "codigo": "VAL-LOG-07",
+        "regra": "validar_cte_quando_emitido_no_mesmo_cnpj",
+        "prioridade_validacao": 7,
+        "severidade": "medio"
+      }
+    ]
+  },
+
+  "regras_documentais": {
+    "cfops_comuns": ["5101", "6101", "6102", "5949", "6949"],
+    "csts_aceitos": ["20", "51", "90"],
+    "csosn_aceitos": [],
+    "aliquotas_referencia": ["interestadual_7", "interestadual_12"],
+    "observacoes_nf": [
+      "cBenef obrigatorio nas operacoes beneficiadas",
+      "CFOP deve refletir corretamente a natureza logistica da operacao",
+      "NF-e de saida subsequente deve ter coerencia com a entrada e o estoque"
+    ]
+  },
+
+  "alertas_motor": [
+    {
+      "codigo": "LOG-001",
+      "descricao": "Beneficio logistico aplicado em operacao sem lastro documental ou de estoque",
+      "severidade": "critico",
+      "prioridade_validacao": 1,
+      "acao_sugerida": "Cruzar operacao fiscal com movimentacao de estoque (H005/H010)"
+    },
+    {
+      "codigo": "LOG-002",
+      "descricao": "cBenef ausente em operacao beneficiada",
+      "severidade": "critico",
+      "prioridade_validacao": 2,
+      "acao_sugerida": "Incluir cBenef correto na NF-e e no registro EFD"
+    },
+    {
+      "codigo": "LOG-003",
+      "descricao": "Estoque e operacao documental sem coerencia",
+      "severidade": "alto",
+      "prioridade_validacao": 3,
+      "acao_sugerida": "Revisar fluxo fisico e documental do periodo"
+    },
+    {
+      "codigo": "LOG-004",
+      "descricao": "CFOP de natureza nao logistica utilizado em operacao amparada pelo beneficio",
+      "severidade": "alto",
+      "prioridade_validacao": 4,
+      "acao_sugerida": "Revisar CFOP e adequar a operacao logistica"
+    },
+    {
+      "codigo": "LOG-005",
+      "descricao": "CT-e emitido no mesmo CNPJ sem tratamento nos registros D100/D190",
+      "severidade": "medio",
+      "prioridade_validacao": 5,
+      "acao_sugerida": "Verificar emissao de CT-e e incluir registros do bloco D quando aplicavel"
+    },
+    {
+      "codigo": "LOG-006",
+      "descricao": "Atividade nao abrangida misturada no mesmo estabelecimento sem previsao no Termo",
+      "severidade": "alto",
+      "prioridade_validacao": 6,
+      "acao_sugerida": "Revisar enquadramento e consultar Termo de Adesao"
+    }
+  ],
+
+  "severidade_enum": ["critico", "alto", "medio", "baixo", "info"],
+
+  "anexos_contexto": {
+    "planilha_apuracao_obrigatoria": true,
+    "controle_interno_obrigatorio": true,
+    "exige_habilitacao_previa": true,
+    "vinculo_termo_adesao": true,
+    "dependencias": ["ESTOQUE", "APURACAO_SEPARADA", "MEMORIA_CALCULO"],
+    "modulos_motor_relacionados": ["ESTOQUE", "COMPETE_LOGISTICA"],
+    "observacoes": "Motor deve cruzar operacao fiscal com natureza economica do estabelecimento e com movimentacao de estoque. Unica modalidade COMPETE que pode ter operacoes internas (ES) — validar se o Termo cobre essa hipotese."
+  }
+}

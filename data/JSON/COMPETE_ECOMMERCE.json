@@ -1,0 +1,251 @@
+{
+  "codigo_beneficio": "COMPETE_ECOMMERCE",
+  "nome_beneficio": "COMPETE-ES E-commerce",
+  "uf": "ES",
+  "status_juridico": "vigente",
+  "versao_modelo": "3.0",
+  "ultima_revisao": "2025-04-07",
+
+  "fonte_legal_primaria": [
+    "Lei ES 10.568/2016",
+    "RICMS/ES - Decreto 1.090-R/2002 e alterações"
+  ],
+  "fonte_orientativa_secundaria": [
+    "Receita Orienta - COMPETE-ES/SEFAZ-ES"
+  ],
+
+  "vigencia_convenio_confaz": {
+    "numero_convenio": null,
+    "validade": null,
+    "renovacao_automatica": false,
+    "observacao": "Benefício de legislação estadual própria — sem amparo em Convênio CONFAZ. Sujeito a questionamento jurídico interestadual."
+  },
+
+  "ato_concessorio_cliente": {
+    "numero": "TERMO-ADESAO-2025-014",
+    "inicio_vigencia": "2025-01-01",
+    "fim_vigencia": null,
+    "segmento": "ecommerce",
+    "modalidade": null,
+    "observacao_modalidade": "Verificar se o Termo cobre marketplace próprio ou apenas loja própria. Preencher quando definido."
+  },
+
+  "pre_requisitos_absolutos": [
+    {
+      "codigo": "PRE-ECO-01",
+      "descricao": "termo_adesao_vigente",
+      "observacao": "Contribuinte deve possuir Termo de Adesao ativo junto à SEFAZ-ES",
+      "bloqueia_se_ausente": true,
+      "prioridade": 1
+    },
+    {
+      "codigo": "PRE-ECO-02",
+      "descricao": "habilitacao_ativa_compete",
+      "observacao": "Habilitação no programa COMPETE-ES deve estar ativa no cadastro SEFAZ-ES",
+      "bloqueia_se_ausente": true,
+      "prioridade": 2
+    },
+    {
+      "codigo": "PRE-ECO-03",
+      "descricao": "operacao_interestadual",
+      "observacao": "Beneficio restrito a operacoes interestaduais. Operacoes internas nao sao amparadas.",
+      "bloqueia_se_ausente": true,
+      "prioridade": 3
+    }
+  ],
+
+  "bloqueia_fruicao_se": [
+    "sem_termo_adesao_vigente",
+    "sem_habilitacao_ativa_compete",
+    "sem_cbenef_quando_obrigatorio",
+    "operacao_interna_sem_previsao",
+    "apuracao_nao_segregada",
+    "difal_nao_apurado_em_operacao_b2c"
+  ],
+
+  "elegibilidade": {
+    "cnaes_permitidos": [
+      "comercio_eletronico",
+      "varejo_digital"
+    ],
+    "cnaes_observacao": "Validar CNAEs exatos autorizados no Termo de Adesão do cliente junto à SEFAZ-ES.",
+    "ufs_operacao_permitidas": ["interestadual"],
+    "tipos_operacao_permitidas": [
+      "venda_consumidor_final",
+      "marketplace_proprio_quando_admitido"
+    ],
+    "condicoes_especiais": [
+      "marketplace proprio somente quando expressamente previsto no Termo de Adesao",
+      "operacoes B2C exigem tratamento especifico e independente de DIFAL"
+    ],
+    "vedacoes": [
+      "operacao sem circulacao amparada pela modalidade",
+      "beneficio aplicado em operacao nao enquadrada no segmento e-commerce",
+      "operacoes internas nao previstas no regime",
+      "uso em operacoes B2B sem previsao no Termo",
+      "compensacao do DIFAL com o beneficio COMPETE"
+    ]
+  },
+
+  "impactos_fiscais": {
+    "tipo_beneficio": [
+      "reducao_base_calculo",
+      "estorno_debito",
+      "credito_presumido"
+    ],
+    "exige_cbenef": true,
+    "cbenef_permitidos": [],
+    "cbenef_status": "pendente_parametrizacao",
+    "cbenef_observacao": "Confirmar código junto à SEFAZ-ES após habilitação. Não utilizar em produção sem preenchimento.",
+    "apuracao_em_separado": true,
+    "permite_compensar_com_saldo_credor_comum": false,
+    "exige_estorno_credito": false,
+    "exige_recolhimento_em_codigo_proprio": true,
+    "exige_memoria_calculo": true
+  },
+
+  "regras_estorno": {
+    "exige_estorno": false,
+    "criterio": null,
+    "registro_sped_estorno": null,
+    "observacao": "Não há regra de estorno de crédito para esta modalidade. Revisar se houver alteração legislativa."
+  },
+
+  "regras_difal": {
+    "aplica_difal": true,
+    "hipotese": "operacao B2C interestadual para nao contribuinte (EC 87/2015)",
+    "campos_sped_difal": [
+      "ALIQ_DIFAL", "VL_DIFAL", "UF_DEST", "IND_FINAL"
+    ],
+    "validacoes": [
+      {
+        "codigo": "VAL-ECO-DIFAL-01",
+        "regra": "validar_IND_FINAL_igual_1_quando_consumidor_final_nao_contribuinte",
+        "prioridade_validacao": 1,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ECO-DIFAL-02",
+        "regra": "validar_apuracao_difal_separada_do_beneficio_compete",
+        "prioridade_validacao": 2,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ECO-DIFAL-03",
+        "regra": "validar_recolhimento_difal_para_uf_destino",
+        "prioridade_validacao": 3,
+        "severidade": "alto"
+      }
+    ],
+    "observacao": "Motor deve cruzar com módulo DIFAL específico. COMPETE E-commerce não isenta o DIFAL — são apurações distintas e independentes."
+  },
+
+  "regras_sped": {
+    "registros_afetados": ["C100", "C170", "C190", "E110", "E111", "E116"],
+    "campos_criticos": [
+      "cBenef", "CFOP", "CST", "UF_DEST", "IND_FINAL",
+      "VL_ICMS", "VL_BC_ICMS", "ALIQ_DIFAL", "VL_DIFAL"
+    ],
+    "validacoes": [
+      {
+        "codigo": "VAL-ECO-01",
+        "regra": "validar_cbenef_em_nf_e_efd",
+        "prioridade_validacao": 1,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ECO-02",
+        "regra": "validar_coerencia_beneficio_x_operacao_interestadual",
+        "prioridade_validacao": 2,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ECO-03",
+        "regra": "validar_difal_se_operacao_para_nao_contribuinte",
+        "prioridade_validacao": 3,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ECO-04",
+        "regra": "validar_apuracao_separada_do_beneficio",
+        "prioridade_validacao": 4,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ECO-05",
+        "regra": "validar_ind_final_em_operacoes_b2c",
+        "prioridade_validacao": 5,
+        "severidade": "alto"
+      },
+      {
+        "codigo": "VAL-ECO-06",
+        "regra": "validar_uf_dest_preenchida_corretamente",
+        "prioridade_validacao": 6,
+        "severidade": "medio"
+      }
+    ]
+  },
+
+  "regras_documentais": {
+    "cfops_comuns": ["6107", "6108", "6109", "6110"],
+    "csts_aceitos": ["20", "90"],
+    "csosn_aceitos": [],
+    "aliquotas_referencia": ["interestadual_4", "interestadual_7", "interestadual_12"],
+    "observacoes_nf": [
+      "cBenef obrigatorio quando houver fruicao do incentivo",
+      "IND_FINAL deve ser 1 em operacoes para consumidor final nao contribuinte",
+      "UF_DEST deve estar corretamente preenchida para calculo do DIFAL",
+      "base de calculo e aliquota devem refletir o beneficio aplicado"
+    ]
+  },
+
+  "alertas_motor": [
+    {
+      "codigo": "ECO-001",
+      "descricao": "Operacao B2C sem tratamento de DIFAL (IND_FINAL=1 sem apuracao DIFAL)",
+      "severidade": "critico",
+      "prioridade_validacao": 1,
+      "acao_sugerida": "Verificar e apurar DIFAL separadamente do beneficio COMPETE"
+    },
+    {
+      "codigo": "ECO-002",
+      "descricao": "cBenef ausente em operacao beneficiada interestadual",
+      "severidade": "critico",
+      "prioridade_validacao": 2,
+      "acao_sugerida": "Incluir cBenef correto na NF-e e no registro EFD"
+    },
+    {
+      "codigo": "ECO-003",
+      "descricao": "Uso de beneficio em operacao interna nao prevista",
+      "severidade": "critico",
+      "prioridade_validacao": 3,
+      "acao_sugerida": "Remover cBenef e ajustar a apuracao"
+    },
+    {
+      "codigo": "ECO-004",
+      "descricao": "Apuracao DIFAL e beneficio COMPETE misturados sem segregacao",
+      "severidade": "alto",
+      "prioridade_validacao": 4,
+      "acao_sugerida": "Segregar apuracoes conforme orientacao SEFAZ-ES"
+    },
+    {
+      "codigo": "ECO-005",
+      "descricao": "CFOP incompativel com operacao de venda para consumidor final",
+      "severidade": "alto",
+      "prioridade_validacao": 5,
+      "acao_sugerida": "Revisar CFOP e adequar a natureza da operacao"
+    }
+  ],
+
+  "severidade_enum": ["critico", "alto", "medio", "baixo", "info"],
+
+  "anexos_contexto": {
+    "planilha_apuracao_obrigatoria": true,
+    "controle_interno_obrigatorio": true,
+    "exige_habilitacao_previa": true,
+    "vinculo_termo_adesao": true,
+    "dependencias": ["DIFAL", "APURACAO_SEPARADA", "MEMORIA_CALCULO"],
+    "modulos_motor_relacionados": ["DIFAL", "COMPETE_ECOMMERCE"],
+    "observacoes": "Motor deve cruzar com modulo DIFAL. COMPETE E-commerce e o beneficio mais sensivel ao DIFAL B2C — as duas apuracoes sao independentes e nao podem ser compensadas entre si."
+  }
+}

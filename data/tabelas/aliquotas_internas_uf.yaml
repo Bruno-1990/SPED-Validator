@@ -1,0 +1,105 @@
+# Aliquotas internas padrao por UF - Vigencia 2026
+# Fonte: legislacao estadual consolidada (RICMS de cada estado)
+# Ultima atualizacao: 2026-04-05
+# Nota: muitos estados elevaram aliquotas entre 2023-2025 (LC 194/2022 + reformas estaduais)
+
+vigencia: "2026-01-01"
+
+aliquotas:
+  AC:
+    aliquota_padrao: 19.0
+    observacao: "Lei Complementar 422/2022"
+  AL:
+    aliquota_padrao: 19.0
+    observacao: "Lei 8.779/2022"
+  AM:
+    aliquota_padrao: 20.0
+    observacao: "Lei 7.000/2023"
+  AP:
+    aliquota_padrao: 18.0
+    observacao: "Lei 400/1997"
+  BA:
+    aliquota_padrao: 20.5
+    observacao: "Lei 14.629/2023 - aliquota modal 19% + 1.5% FCEP embutido"
+  CE:
+    aliquota_padrao: 20.0
+    observacao: "Lei 18.305/2023"
+  DF:
+    aliquota_padrao: 20.0
+    observacao: "Lei 7.326/2023"
+  ES:
+    aliquota_padrao: 17.0
+    observacao: "Lei 7.000/2001"
+  GO:
+    aliquota_padrao: 19.0
+    observacao: "Lei 22.460/2023"
+  MA:
+    aliquota_padrao: 22.0
+    observacao: "Lei 11.867/2022 - aliquota modal 20% + 2% FMPES"
+  MG:
+    aliquota_padrao: 18.0
+    observacao: "Lei 6.763/1975"
+  MS:
+    aliquota_padrao: 17.0
+    observacao: "Lei 1.810/1997"
+  MT:
+    aliquota_padrao: 17.0
+    observacao: "Lei 7.098/1998"
+  PA:
+    aliquota_padrao: 19.0
+    observacao: "Lei 8.315/2022"
+  PB:
+    aliquota_padrao: 20.0
+    observacao: "Lei 12.788/2023"
+  PE:
+    aliquota_padrao: 20.5
+    observacao: "Lei 18.305/2023 - aliquota modal 20% + 0.5% FECEP"
+  PI:
+    aliquota_padrao: 21.0
+    observacao: "Lei 7.928/2023 - aliquota modal 19% + 2% FECOP"
+  PR:
+    aliquota_padrao: 19.5
+    observacao: "Lei 21.850/2023 - aliquota modal 19% + 0.5% FECOP"
+  RJ:
+    aliquota_padrao: 22.0
+    observacao: "Lei 2.657/1996 + FECP 2% - aliquota modal 20% + 2% FECP"
+  RN:
+    aliquota_padrao: 20.0
+    observacao: "Lei 11.314/2022"
+  RO:
+    aliquota_padrao: 19.5
+    observacao: "Lei 5.629/2023 - aliquota modal 17.5% + 2% FECOEP"
+  RR:
+    aliquota_padrao: 20.0
+    observacao: "Lei 1.768/2023"
+  RS:
+    aliquota_padrao: 17.0
+    observacao: "Lei 8.820/1989"
+  SC:
+    aliquota_padrao: 17.0
+    observacao: "Lei 10.297/1996"
+  SE:
+    aliquota_padrao: 19.0
+    observacao: "Lei 9.156/2022"
+  SP:
+    aliquota_padrao: 18.0
+    observacao: "Lei 6.374/1989"
+  TO:
+    aliquota_padrao: 20.0
+    observacao: "Lei 4.141/2023"
+
+# Aliquotas interestaduais de referencia (para calculo DIFAL)
+interestaduais:
+  padrao_sul_sudeste: 12.0  # origem S/SE (exceto ES) para N/NE/CO/ES
+  padrao_demais: 7.0        # origem N/NE/CO/ES para S/SE (exceto ES)
+  importados: 4.0           # produtos importados (Resolucao SF 13/2012)
+
+  # UFs consideradas Sul/Sudeste para fins de aliquota interestadual
+  sul_sudeste:
+    - SP
+    - RJ
+    - MG
+    - PR
+    - SC
+    - RS
+  # Nota: ES, embora Sudeste, usa 12% como origem (equiparado aos demais)

@@ -73,7 +73,13 @@
       "Bash(pytest:*)",
       "Bash(ruff check:*)",
       "Bash(git stash:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(sed \"s/make_error\\(//\")",
+      "Bash(sed \"s/make_generic_error\\(//\")",
+      "Bash(sed \"s/['\\\\\"]//g\")",
+      "Bash(sed \"s/'//g\")",
+      "Bash(sed 's/\"//g')",
+      "Read(//c/Users/bmb19/OneDrive/Documentos/work/SPED/Count: $\\(wc -l < /tmp/**)"
     ]
   }
 }

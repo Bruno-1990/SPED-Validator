@@ -1,0 +1,208 @@
+{
+  "codigo_beneficio": "COMPETE_ATACADISTA",
+  "nome_beneficio": "COMPETE-ES Atacadista",
+  "uf": "ES",
+  "status_juridico": "vigente",
+  "versao_modelo": "3.0",
+  "ultima_revisao": "2025-04-07",
+
+  "fonte_legal_primaria": [
+    "Lei ES 10.568/2016",
+    "RICMS/ES - Decreto 1.090-R/2002 e alterações"
+  ],
+  "fonte_orientativa_secundaria": [
+    "Receita Orienta - COMPETE-ES/SEFAZ-ES"
+  ],
+
+  "vigencia_convenio_confaz": {
+    "numero_convenio": null,
+    "validade": null,
+    "renovacao_automatica": false,
+    "observacao": "Benefício de legislação estadual própria — sem amparo em Convênio CONFAZ. Sujeito a questionamento jurídico interestadual."
+  },
+
+  "ato_concessorio_cliente": {
+    "numero": "TERMO-ADESAO-2025-001",
+    "inicio_vigencia": "2025-01-01",
+    "fim_vigencia": null,
+    "segmento": "atacadista",
+    "modalidade": null,
+    "observacao_modalidade": "Pode conter mais de uma modalidade. Preencher quando definido no Termo."
+  },
+
+  "pre_requisitos_absolutos": [
+    {
+      "codigo": "PRE-ATK-01",
+      "descricao": "termo_adesao_vigente",
+      "observacao": "Contribuinte deve possuir Termo de Adesao ativo junto à SEFAZ-ES",
+      "bloqueia_se_ausente": true,
+      "prioridade": 1
+    },
+    {
+      "codigo": "PRE-ATK-02",
+      "descricao": "habilitacao_ativa_compete",
+      "observacao": "Habilitação no programa COMPETE-ES deve estar ativa no cadastro SEFAZ-ES",
+      "bloqueia_se_ausente": true,
+      "prioridade": 2
+    }
+  ],
+
+  "bloqueia_fruicao_se": [
+    "sem_termo_adesao_vigente",
+    "sem_habilitacao_ativa_compete",
+    "sem_cbenef_quando_obrigatorio",
+    "operacao_interna_nao_prevista_no_termo",
+    "apuracao_nao_segregada"
+  ],
+
+  "elegibilidade": {
+    "cnaes_permitidos": ["comercio_atacadista"],
+    "cnaes_observacao": "Validar CNAEs exatos autorizados no Termo de Adesão do cliente junto à SEFAZ-ES.",
+    "ufs_operacao_permitidas": ["interestadual"],
+    "tipos_operacao_permitidas": [
+      "saida_mercadoria",
+      "bonificacao_quando_admitida"
+    ],
+    "condicoes_especiais": [
+      "bonificacao somente quando expressamente prevista no Termo de Adesao"
+    ],
+    "vedacoes": [
+      "operacoes fora das hipoteses legais do beneficio",
+      "descumprimento de requisitos do termo de adesao",
+      "operacoes internas nao previstas no regime atacadista",
+      "aproveitamento de credito estranho ao fluxo do beneficio"
+    ]
+  },
+
+  "impactos_fiscais": {
+    "tipo_beneficio": [
+      "reducao_base_calculo",
+      "credito_presumido",
+      "estorno_debito",
+      "diferimento"
+    ],
+    "exige_cbenef": true,
+    "cbenef_permitidos": [],
+    "cbenef_status": "pendente_parametrizacao",
+    "cbenef_observacao": "Confirmar código junto à SEFAZ-ES após habilitação. Não utilizar em produção sem preenchimento.",
+    "apuracao_em_separado": true,
+    "permite_compensar_com_saldo_credor_comum": false,
+    "exige_estorno_credito": false,
+    "exige_recolhimento_em_codigo_proprio": true,
+    "exige_memoria_calculo": true
+  },
+
+  "regras_estorno": {
+    "exige_estorno": false,
+    "criterio": null,
+    "registro_sped_estorno": null,
+    "observacao": "Não há regra de estorno de crédito para esta modalidade. Revisar se houver alteração legislativa."
+  },
+
+  "regras_sped": {
+    "registros_afetados": ["C100", "C170", "C190", "E110", "E111", "E116"],
+    "campos_criticos": [
+      "cBenef", "CST", "CFOP", "VL_BC_ICMS", "VL_ICMS", "VL_ICMS_ST", "ALIQ_ICMS"
+    ],
+    "validacoes": [
+      {
+        "codigo": "VAL-ATK-01",
+        "regra": "se_operacao_beneficiada_entao_cbenef_obrigatorio",
+        "prioridade_validacao": 1,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ATK-02",
+        "regra": "apuracao_beneficio_separada_da_apuracao_comum",
+        "prioridade_validacao": 2,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ATK-03",
+        "regra": "vedar_compensacao_com_creditos_estranhos_ao_beneficio",
+        "prioridade_validacao": 3,
+        "severidade": "alto"
+      },
+      {
+        "codigo": "VAL-ATK-04",
+        "regra": "validar_cfop_compativel_com_operacao_interestadual",
+        "prioridade_validacao": 4,
+        "severidade": "alto"
+      },
+      {
+        "codigo": "VAL-ATK-05",
+        "regra": "validar_cst_aceito_para_o_beneficio",
+        "prioridade_validacao": 5,
+        "severidade": "medio"
+      },
+      {
+        "codigo": "VAL-ATK-06",
+        "regra": "exigir_memoria_calculo_suporte",
+        "prioridade_validacao": 6,
+        "severidade": "medio"
+      }
+    ]
+  },
+
+  "regras_documentais": {
+    "cfops_comuns": ["6101", "6102", "6108", "6910"],
+    "csts_aceitos": ["20", "51", "90"],
+    "csosn_aceitos": [],
+    "aliquotas_referencia": ["interestadual_7", "interestadual_12"],
+    "observacoes_nf": [
+      "informar cBenef em todas as NF-e quando houver fruicao do incentivo",
+      "base de calculo e aliquota devem refletir o beneficio aplicado",
+      "CFOP deve ser compativel com a natureza da operacao atacadista interestadual"
+    ]
+  },
+
+  "alertas_motor": [
+    {
+      "codigo": "ATK-001",
+      "descricao": "Operacao interestadual sem cBenef para contribuinte beneficiario do COMPETE Atacadista",
+      "severidade": "critico",
+      "prioridade_validacao": 1,
+      "acao_sugerida": "Verificar se a operacao e beneficiada e incluir cBenef correto"
+    },
+    {
+      "codigo": "ATK-002",
+      "descricao": "Apuracao do beneficio realizada junto com apuracao comum sem separacao",
+      "severidade": "critico",
+      "prioridade_validacao": 2,
+      "acao_sugerida": "Segregar apuracao conforme exigencia SEFAZ-ES"
+    },
+    {
+      "codigo": "ATK-003",
+      "descricao": "Credito aproveitado fora da memoria do beneficio",
+      "severidade": "alto",
+      "prioridade_validacao": 3,
+      "acao_sugerida": "Estornar credito e incluir na apuracao separada do beneficio"
+    },
+    {
+      "codigo": "ATK-004",
+      "descricao": "CFOP incompativel com a modalidade atacadista",
+      "severidade": "alto",
+      "prioridade_validacao": 4,
+      "acao_sugerida": "Revisar CFOP utilizado e adequar a operacao"
+    },
+    {
+      "codigo": "ATK-005",
+      "descricao": "Memoria de calculo ausente ou incompleta para o periodo",
+      "severidade": "medio",
+      "prioridade_validacao": 5,
+      "acao_sugerida": "Elaborar memoria de calculo detalhada por operacao beneficiada"
+    }
+  ],
+
+  "severidade_enum": ["critico", "alto", "medio", "baixo", "info"],
+
+  "anexos_contexto": {
+    "planilha_apuracao_obrigatoria": true,
+    "controle_interno_obrigatorio": true,
+    "exige_habilitacao_previa": true,
+    "vinculo_termo_adesao": true,
+    "dependencias": ["APURACAO_SEPARADA", "MEMORIA_CALCULO"],
+    "modulos_motor_relacionados": ["COMPETE_ATACADISTA"],
+    "observacoes": "SEFAZ/ES exige apuracao em separado com memoria de calculo. O beneficio somente pode ser fruido por contribuinte com Termo de Adesao vigente. Modalidade atacadista restrita a operacoes interestaduais."
+  }
+}
