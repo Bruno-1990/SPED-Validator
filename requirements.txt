@@ -20,8 +20,11 @@ python-docx>=0.8.0
 pdfplumber>=0.10.0
 sentence-transformers>=2.2.0,<3.0.0
 numpy>=1.24.0,<2.0.0
-torch>=2.0.0,<3.0.0
 tqdm>=4.65.0
+
+# PyTorch CPU-only (modelo all-MiniLM-L6-v2 nao precisa de GPU)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0,<3.0.0
 
 # Testes
 pytest>=7.0.0
