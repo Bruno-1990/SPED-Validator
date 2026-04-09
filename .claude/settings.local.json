@@ -79,7 +79,14 @@
       "Bash(sed \"s/['\\\\\"]//g\")",
       "Bash(sed \"s/'//g\")",
       "Bash(sed 's/\"//g')",
-      "Read(//c/Users/bmb19/OneDrive/Documentos/work/SPED/Count: $\\(wc -l < /tmp/**)"
+      "Read(//c/Users/bmb19/OneDrive/Documentos/work/SPED/Count: $\\(wc -l < /tmp/**)",
+      "Bash(py --version)",
+      "Bash(py:*)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(git remote:*)",
+      "Bash(git pull:*)",
+      "Bash(sed 's/^[ \\\\t]*//')",
+      "Bash(sed 's/ as .*//')"
     ]
   }
 }

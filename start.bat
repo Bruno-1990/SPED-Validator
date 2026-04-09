@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 chcp 65001 >nul 2>&1
 title SPED EFD Audit v5.0
 cd /d "%~dp0"
@@ -40,9 +41,21 @@ REM --- Ativar venv ---
 call ".venv-win\Scripts\activate.bat"
 set "PYTHONPATH=%CD%"
 
-REM --- Instalar deps Python somente se necessario ---
-pip show fastapi >nul 2>&1
-if errorlevel 1 (
+REM --- Verificar deps Python uma a uma ---
+set "MISSING="
+for %%P in (fastapi uvicorn python-multipart pydantic starlette pyyaml python-docx pdfplumber sentence-transformers numpy torch tqdm pytest pytest-cov httpx) do (
+    pip show %%P >nul 2>&1
+    if errorlevel 1 (
+        if defined MISSING (
+            set "MISSING=!MISSING!, %%P"
+        ) else (
+            set "MISSING=%%P"
+        )
+    )
+)
+
+if defined MISSING (
+    echo   [SETUP] Pacotes faltando: !MISSING!
     echo   [SETUP] Instalando dependencias Python...
     python -m pip install --upgrade pip >nul 2>&1
     python -m pip install -r requirements.txt
@@ -51,8 +64,9 @@ if errorlevel 1 (
         pause
         exit /b 1
     )
-) else (
     echo   [OK] Dependencias Python instaladas.
+) else (
+    echo   [OK] Todas as dependencias Python ja instaladas.
 )
 
 REM --- Instalar deps Frontend somente se necessario ---
