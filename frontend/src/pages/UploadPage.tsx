@@ -219,14 +219,39 @@ export default function UploadPage() {
     if (statsAccum.autorizadas + statsAccum.canceladas > 0) {
       setCruzandoXml(true)
       setCruzPct(0)
-      setCruzLog(['Iniciando cruzamento XML x SPED...'])
+
+      const etapas = [
+        'Carregando XMLs e registros C100...',
+        'Verificando NF-e ausentes (XML001/XML002)...',
+        'Comparando valores: VL_DOC, VL_ICMS (XML003/XML004)...',
+        'Comparando VL_ICMS_ST, VL_IPI (XML005/XML006)...',
+        'Verificando NF-e canceladas (XML011)...',
+        'Contando itens C170 vs XML (XML012)...',
+        'Validando CNPJ participantes (XML013)...',
+        'Conferindo datas de emissao (XML014/XML015)...',
+        'Persistindo divergencias...',
+        'Gerando sugestoes de correcao...',
+      ]
+      setCruzLog([etapas[0]])
+
+      // Progresso visual enquanto aguarda resposta
+      let etapaIdx = 0
+      const timer = setInterval(() => {
+        etapaIdx++
+        if (etapaIdx < etapas.length) {
+          setCruzPct(Math.min(90, etapaIdx * 10))
+          setCruzLog(prev => [...prev, etapas[etapaIdx]])
+        }
+      }, 2500)
 
       try {
         const result = await api.cruzarXml(fileId!)
+        clearInterval(timer)
         setCruzPct(100)
-        setCruzLog(prev => [...prev, `Concluido: ${result.divergencias} divergencias encontradas.`])
+        setCruzLog(prev => [...prev, `Concluido: ${result.divergencias.toLocaleString()} divergencias encontradas.`])
         setCruzResult(result)
       } catch {
+        clearInterval(timer)
         setCruzLog(prev => [...prev, 'Erro no cruzamento.'])
       }
       setCruzandoXml(false)
