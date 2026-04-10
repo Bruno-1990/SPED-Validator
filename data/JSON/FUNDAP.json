@@ -4,44 +4,40 @@
   "uf": "ES",
   "status_juridico": "vigente",
   "versao_modelo": "3.0",
-  "ultima_revisao": "2025-04-07",
-
+  "ultima_revisao": "2025-04-09",
   "fonte_legal_primaria": [
     "Lei ES 2.508/1970",
-    "RICMS/ES - Decreto 1.090-R/2002 e alterações — disposicoes sobre regime especial de importacao"
+    "RICMS/ES — Decreto 1.090-R/2002 — disposicoes sobre regime especial de importacao"
   ],
   "fonte_orientativa_secundaria": [
-    "Normas estaduais do FUNDAP",
-    "SEFAZ/ES - comunicados sobre recolhimento FUNDAP"
+    "SEFAZ/ES — comunicados sobre recolhimento FUNDAP",
+    "Parecer Normativo 670/2024 — SEFAZ/ES (FUNDAP + COMPETE Atacadista — coexistencia admitida em operacoes distintas)"
   ],
-
   "vigencia_convenio_confaz": {
     "numero_convenio": null,
     "validade": null,
     "renovacao_automatica": false,
-    "observacao": "Regime especial vigente desde 1970, sem amparo direto em Convênio CONFAZ. Historicamente contestado em operações interestaduais. Monitorar posição do STF/STJ."
+    "observacao": "Regime especial vigente desde 1970, sem amparo direto em Convenio CONFAZ. Historicamente contestado em operacoes interestaduais. Monitorar posicao do STF/STJ."
   },
-
   "ato_concessorio_cliente": {
-    "numero": "FUNDAP-2025-001",
-    "inicio_vigencia": "2025-01-01",
+    "numero": null,
+    "inicio_vigencia": null,
     "fim_vigencia": null,
     "segmento": null,
     "modalidade": "importacao_portuaria",
-    "observacao_modalidade": "Regime exclusivo para importação desembarcada no ES via porto ou aeroporto habilitado. Habilitação ativa é pré-requisito absoluto."
+    "observacao_modalidade": "Preencher com dados do credenciamento FUNDAP do cliente. Regime exclusivo para importacao desembarcada em porto ou aeroporto habilitado no ES. Habilitacao ativa e pre-requisito absoluto."
   },
-
   "pre_requisitos_absolutos": [
     {
       "codigo": "PRE-FUN-01",
       "descricao": "habilitacao_ativa_fundap",
-      "observacao": "Contribuinte deve estar habilitado e ativo no programa FUNDAP junto à SEFAZ-ES. Sem habilitação, nenhuma operação pode ser amparada.",
+      "observacao": "Contribuinte deve estar habilitado e ativo no programa FUNDAP junto a SEFAZ-ES. Sem habilitacao, nenhuma operacao pode ser amparada.",
       "bloqueia_se_ausente": true,
       "prioridade": 1
     },
     {
       "codigo": "PRE-FUN-02",
-      "descricao": "desembaraco_em_porto_ou_aeroporto_do_es",
+      "descricao": "desembaraco_em_porto_ou_aeroporto_habilitado_no_es",
       "observacao": "O desembaraco da importacao deve ocorrer obrigatoriamente em porto ou aeroporto habilitado no Espirito Santo",
       "bloqueia_se_ausente": true,
       "prioridade": 2
@@ -54,23 +50,20 @@
       "prioridade": 3
     }
   ],
-
   "bloqueia_fruicao_se": [
     "sem_habilitacao_ativa_fundap",
     "desembaraco_fora_do_es",
     "sem_vinculo_di_due",
     "sem_cbenef_quando_obrigatorio",
     "codigo_recolhimento_incompativel",
-    "apuracao_nao_segregada"
+    "apuracao_nao_segregada",
+    "cumulacao_com_fundap_e_compete_na_mesma_operacao"
   ],
-
   "elegibilidade": {
     "cnaes_permitidos": [
-      "importacao",
-      "trading",
-      "comercio_exterior"
+      "importacao", "trading", "comercio_exterior"
     ],
-    "cnaes_observacao": "Validar CNAEs autorizados no cadastro FUNDAP do contribuinte junto à SEFAZ-ES.",
+    "cnaes_observacao": "Validar CNAEs autorizados no cadastro FUNDAP do contribuinte junto a SEFAZ-ES.",
     "ufs_operacao_permitidas": ["ES", "interestadual", "importacao"],
     "tipos_operacao_permitidas": [
       "desembaraco_importacao",
@@ -78,16 +71,16 @@
     ],
     "condicoes_especiais": [
       "desembaraco deve ocorrer em porto ou aeroporto habilitado no ES",
-      "saida subsequente deve ter vinculo rastreavel com importacao amparada"
+      "saida subsequente deve ter vinculo rastreavel com importacao amparada",
+      "FUNDAP + COMPETE Atacadista pode coexistir desde que nao na mesma operacao (Parecer 670/2024)"
     ],
     "vedacoes": [
       "operacao sem lastro de importacao amparada pelo FUNDAP",
-      "uso do tratamento fora do fluxo FUNDAP",
       "desembaraco em UF diferente do ES",
-      "contribuinte sem habilitacao ativa no programa"
+      "contribuinte sem habilitacao ativa no programa",
+      "cumulacao com FUNDAP e COMPETE na mesma operacao"
     ]
   },
-
   "impactos_fiscais": {
     "tipo_beneficio": [
       "tratamento_importacao",
@@ -96,21 +89,19 @@
     "exige_cbenef": true,
     "cbenef_permitidos": [],
     "cbenef_status": "pendente_parametrizacao",
-    "cbenef_observacao": "Confirmar código junto à SEFAZ-ES. Verificar se existe CBENEF distinto para desembaraço e saída subsequente. Não utilizar em produção sem preenchimento.",
+    "cbenef_observacao": "Confirmar codigo junto a SEFAZ-ES. Verificar se existe CBENEF distinto para desembaraco e saida subsequente. Nao utilizar em producao sem preenchimento.",
     "apuracao_em_separado": true,
     "permite_compensar_com_saldo_credor_comum": false,
     "exige_estorno_credito": false,
     "exige_recolhimento_em_codigo_proprio": true,
     "exige_memoria_calculo": true
   },
-
   "regras_estorno": {
     "exige_estorno": false,
     "criterio": null,
     "registro_sped_estorno": null,
-    "observacao": "Não há regra de estorno de crédito prevista para o FUNDAP. Diferente do INVEST-ES. Revisar se houver alteração legislativa ou comunicado SEFAZ-ES."
+    "observacao": "Nao ha regra de estorno de credito prevista para o FUNDAP. Diferente do INVEST-ES Importacao. Revisar se houver alteracao legislativa ou comunicado SEFAZ-ES."
   },
-
   "regras_habilitacao": {
     "exige_habilitacao_fundap": true,
     "verificacao_obrigatoria": "confirmar habilitacao ativa no cadastro FUNDAP/SEFAZ-ES antes de aplicar o regime",
@@ -118,7 +109,6 @@
     "prioridade_validacao": 1,
     "alerta_associado": "FUND-001"
   },
-
   "regras_importacao": {
     "vinculo_di_due": true,
     "documentos_obrigatorios": [
@@ -127,10 +117,9 @@
       "NF-e de entrada (importacao)"
     ],
     "prioridade_validacao": 2,
-    "observacao": "A DI/DUE é o lastro documental central do FUNDAP. Motor deve exigir vínculo entre o documento de importação e a NF-e de saída subsequente.",
+    "observacao": "A DI/DUE e o lastro documental central do FUNDAP. Motor deve exigir vinculo entre o documento de importacao e a NF-e de saida subsequente.",
     "alerta_associado": "FUND-002"
   },
-
   "regras_sped": {
     "registros_afetados": ["C100", "C170", "C190", "E110", "E111", "E116"],
     "campos_criticos": [
@@ -178,10 +167,15 @@
         "regra": "validar_apuracao_separada",
         "prioridade_validacao": 7,
         "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-FUN-08",
+        "regra": "validar_nao_cumulacao_fundap_compete_na_mesma_operacao",
+        "prioridade_validacao": 8,
+        "severidade": "alto"
       }
     ]
   },
-
   "regras_documentais": {
     "cfops_comuns": ["3101", "3102", "6101", "6102"],
     "csts_aceitos": ["20", "51", "90"],
@@ -194,7 +188,6 @@
       "manter rastreabilidade com o documento de desembaraco (DI/DUE)"
     ]
   },
-
   "alertas_motor": [
     {
       "codigo": "FUND-001",
@@ -233,15 +226,13 @@
     },
     {
       "codigo": "FUND-006",
-      "descricao": "Apuracao FUNDAP misturada com apuracao comum sem segregacao",
-      "severidade": "alto",
+      "descricao": "FUNDAP e COMPETE Atacadista cumulados na mesma operacao",
+      "severidade": "critico",
       "prioridade_validacao": 6,
-      "acao_sugerida": "Segregar apuracoes conforme exigencia SEFAZ-ES"
+      "acao_sugerida": "Separar operacoes — coexistencia admitida apenas em operacoes distintas (Parecer 670/2024)"
     }
   ],
-
   "severidade_enum": ["critico", "alto", "medio", "baixo", "info"],
-
   "anexos_contexto": {
     "planilha_apuracao_obrigatoria": true,
     "controle_interno_obrigatorio": true,
@@ -250,6 +241,6 @@
     "vinculo_di_due": true,
     "dependencias": ["IMPORTACAO", "HABILITACAO_FUNDAP", "VINCULO_DI_DUE", "APURACAO_SEPARADA"],
     "modulos_motor_relacionados": ["IMPORTACAO", "FUNDAP"],
-    "observacoes": "Motor deve cruzar fluxo de importacao com documentos de desembaraco (DI/DUE). Habilitacao no programa FUNDAP e pre-requisito absoluto. Regime de longa data, mas com historico de questionamentos em operacoes interestaduais — monitorar."
+    "observacoes": "Habilitacao no FUNDAP e pre-requisito absoluto — sem ela nenhuma operacao pode ser amparada. DI/DUE e o lastro documental central. Regime vigente desde 1970 com historico de questionamentos interestaduais — monitorar. FUNDAP + COMPETE Atacadista podem coexistir em operacoes distintas (Parecer 670/2024)."
   }
 }

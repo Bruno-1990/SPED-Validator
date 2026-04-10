@@ -1,0 +1,323 @@
+{
+  "codigo_beneficio": "INVEST_ES_INDUSTRIA",
+  "nome_beneficio": "INVEST-ES Indústria",
+  "uf": "ES",
+  "status_juridico": "vigente",
+  "versao_modelo": "3.0",
+  "ultima_revisao": "2025-04-09",
+  "fonte_legal_primaria": [
+    "Lei ES 10.550/2016 — Art. 3 (atualizada pela Lei 12.692/2025)",
+    "RICMS/ES — Decreto 1.090-R/2002 — disposicoes sobre INVEST-ES"
+  ],
+  "fonte_orientativa_secundaria": [
+    "Resolucao INVEST-ES no 1/2026 — procedimentos administrativos (vigente a partir de 27/03/2026)",
+    "Parecer Normativo 001/2013 — vedacao de cumulacao INVEST x COMPETE na mesma operacao",
+    "Parecer Normativo 310/2024 — SEFAZ/ES — apuracao credito presumido e vedacao cumulacao",
+    "Parecer 884/2024 — SEFAZ/ES — forma de apuracao do credito presumido e devolucoes",
+    "Resolucao INVEST-ES no 1545/2021 e no 1905 (anteriores — base historica)"
+  ],
+  "vigencia_convenio_confaz": {
+    "numero_convenio": null,
+    "validade": null,
+    "renovacao_automatica": false,
+    "observacao": "Beneficio de legislacao estadual propria — sem amparo em Convenio CONFAZ. Monitorar posicao do STF/STJ."
+  },
+  "ato_concessorio_cliente": {
+    "numero": null,
+    "inicio_vigencia": null,
+    "fim_vigencia": null,
+    "segmento": null,
+    "modalidade": "industria",
+    "prazo_fruicao_anos": 12,
+    "prazo_prorrogacao_anos": 12,
+    "observacao_modalidade": "Preencher com numero e vigencia do Termo de Acordo INVEST-ES do cliente. Prazo de fruicao de 12 anos, prorrogavel pelo mesmo periodo (Lei 10.550/2016 atualizada pela Lei 12.692/2025)."
+  },
+  "pre_requisitos_absolutos": [
+    {
+      "codigo": "PRE-IND-01",
+      "descricao": "termo_de_acordo_invest_es_vigente",
+      "observacao": "Contribuinte deve possuir Termo de Acordo INVEST-ES ativo emitido pela ADERES/SEDES. Renovacao/prorrogacao deve ser requerida dentro do prazo.",
+      "bloqueia_se_ausente": true,
+      "prioridade": 1
+    },
+    {
+      "codigo": "PRE-IND-02",
+      "descricao": "projeto_industrial_aprovado_nao_totalmente_terceirizado",
+      "observacao": "Estabelecimento deve realizar processo industrial proprio — vedada terceirizacao integral (analogia ao Parecer Normativo 001/2024 COMPETE e Parecer 310/2024 INVEST)",
+      "bloqueia_se_ausente": true,
+      "prioridade": 2
+    },
+    {
+      "codigo": "PRE-IND-03",
+      "descricao": "nao_optante_simples_nacional",
+      "observacao": "Optantes pelo Simples Nacional nao podem celebrar Termo de Acordo INVEST-ES — devem se desvincular antes (Resolucao INVEST 1/2026)",
+      "bloqueia_se_ausente": true,
+      "prioridade": 3
+    }
+  ],
+  "bloqueia_fruicao_se": [
+    "sem_termo_de_acordo_invest_es_vigente",
+    "contribuinte_optante_pelo_simples_nacional",
+    "sem_cbenef_quando_obrigatorio",
+    "cumulacao_com_compete_na_mesma_operacao",
+    "apuracao_nao_segregada",
+    "combinacao_parcial_invest_com_ricms_gerando_terceiro_beneficio"
+  ],
+  "elegibilidade": {
+    "cnaes_permitidos": [
+      "industria_em_geral — validar CNAEs autorizados no Termo de Acordo"
+    ],
+    "cnaes_observacao": "Qualquer segmento industrial pode requerer o INVEST-ES — elegibilidade definida pelo projeto apresentado e aprovado pela ADERES/SEDES. Municipios fora da Grande Vitoria podem ter percentuais diferenciados.",
+    "ufs_operacao_permitidas": [
+      "ES",
+      "interestadual",
+      "importacao"
+    ],
+    "tipos_operacao_permitidas": [
+      "importacao_maquinas_equipamentos_ativo_imob",
+      "aquisicao_interestadual_maquinas_equipamentos_ativo_imob",
+      "importacao_insumos_materias_primas",
+      "aquisicao_interna_materias_primas_e_insumos",
+      "saida_interestadual_produtos_industrializados",
+      "saida_interna_produtos_industrializados",
+      "exportacao_quando_prevista_no_termo"
+    ],
+    "condicoes_especiais": [
+      "INVEST-ES industria e COMPETE-ES sao mutuamente exclusivos NA MESMA operacao — escolha deve ser feita por periodo e tomando o beneficio como um todo (Pareceres 001/2013 e 310/2024)",
+      "credito presumido calculado sobre o ICMS efetivamente devido (debitos menos creditos) — nao ha limitacao de credito de entrada, diferente do COMPETE",
+      "municipios fora da Grande Vitoria podem ter percentuais de reducao mais favoraveis — verificar no Termo de Acordo",
+      "NF-e de saida com beneficio deve conter no campo dados adicionais: ICMS diferido/isento na forma da Lei 10.550/2016 e Termo de Acordo INVEST/ES XX/XX"
+    ],
+    "vedacoes": [
+      "cumulacao ou combinacao parcial com beneficios do COMPETE-ES na mesma operacao",
+      "aplicacao do INVEST-ES em operacoes nao cobertas pelo Termo de Acordo",
+      "optantes pelo Simples Nacional",
+      "diferimento de ICMS de compras de materias-primas escriturado como credito (Parecer 310/2024)"
+    ]
+  },
+  "impactos_fiscais": {
+    "tipo_beneficio": [
+      "diferimento",
+      "isencao",
+      "credito_presumido",
+      "reducao_base_calculo"
+    ],
+    "detalhamento_beneficios": {
+      "diferimento_importacao_maquinas": {
+        "hipotese": "importacao de maquinas e equipamentos para integracao no ativo permanente imobilizado",
+        "referencia_legal": "Art. 3, I, a, Lei 10.550/2016"
+      },
+      "diferimento_difal_maquinas_interestadual": {
+        "hipotese": "DIFAL na aquisicao interestadual de maquinas e equipamentos para ativo permanente",
+        "referencia_legal": "Art. 3, I, b, Lei 10.550/2016"
+      },
+      "diferimento_importacao_insumos": {
+        "hipotese": "importacao de insumos e materias-primas para o estabelecimento industrial importador",
+        "momento_pagamento": "saida dos produtos resultantes da industrializacao",
+        "referencia_legal": "Art. 3, I, c, Lei 10.550/2016"
+      },
+      "diferimento_aquisicao_interna_materiais": {
+        "hipotese": "aquisicao interna de materias-primas e insumos de pessoa juridica contribuinte de ICMS regular",
+        "condicao": "fornecedor sem irregularidades perante o fisco no momento da autorizacao da NF-e",
+        "referencia_legal": "Art. 3, I, d/e/f, Lei 10.550/2016 — Resolucao INVEST 1/2026 Art. 33"
+      },
+      "isencao_construcao": {
+        "hipotese": "ICMS nas operacoes com mercadorias ou bens destinados exclusivamente a construcao, ampliacao ou expansao do empreendimento",
+        "vedacao": "nao aplica em aquisicoes para funcionamento da empresa",
+        "referencia_legal": "Art. 3, II, Lei 10.550/2016"
+      },
+      "credito_presumido_interestadual": {
+        "limite": "ate 70% do valor do ICMS devido mensalmente nas operacoes alcancadas",
+        "metodologia": "calculado sobre o ICMS efetivamente apurado (debitos menos creditos) — sem limite de credito de entrada diferente do COMPETE",
+        "referencia_legal": "Art. 3, III e par. 6, Lei 10.550/2016 — Parecer 884/2024"
+      },
+      "reducao_bc_interna": {
+        "limite": "ate 70% do valor da base de calculo",
+        "referencia_legal": "Art. 3, IV, a, Lei 10.550/2016"
+      }
+    },
+    "exige_cbenef": true,
+    "cbenef_permitidos": [],
+    "cbenef_status": "pendente_parametrizacao",
+    "cbenef_observacao": "Confirmar codigo junto a SEFAZ-ES. Podem existir CBENEFs distintos por tipo de beneficio (diferimento, credito presumido, isencao). Nao utilizar em producao sem preenchimento.",
+    "apuracao_em_separado": true,
+    "permite_compensar_com_saldo_credor_comum": false,
+    "exige_estorno_credito": false,
+    "exige_recolhimento_em_codigo_proprio": false,
+    "exige_memoria_calculo": true,
+    "codigos_recolhimento": {
+      "observacao": "INVEST-ES nao demanda codigo de DUA especifico. Recolhimento pelo codigo ordinario conforme atividade do contribuinte.",
+      "codigo_ordinario_comercio": "121-0",
+      "codigo_ordinario_industria": "122-8"
+    }
+  },
+  "regras_estorno": {
+    "exige_estorno": false,
+    "criterio": null,
+    "registro_sped_estorno": null,
+    "observacao": "INVEST-ES Industria nao tem regra de estorno de credito como o INVEST-ES Importacao. O diferimento de ICMS de compras internas nao gera credito escrituravel (Parecer 310/2024). Revisar se houver alteracao legislativa."
+  },
+  "regras_sped": {
+    "registros_afetados": [
+      "C100",
+      "C170",
+      "C190",
+      "E110",
+      "E111",
+      "E116"
+    ],
+    "campos_criticos": [
+      "cBenef",
+      "CST",
+      "CFOP",
+      "VL_BC_ICMS",
+      "VL_ICMS",
+      "ALIQ_ICMS",
+      "VL_AJ_CREDITOS"
+    ],
+    "validacoes": [
+      {
+        "codigo": "VAL-IND-01",
+        "regra": "validar_termo_acordo_invest_es_vigente_e_operacoes_cobertas",
+        "prioridade_validacao": 1,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-IND-02",
+        "regra": "validar_cbenef_em_operacoes_beneficiadas",
+        "prioridade_validacao": 2,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-IND-03",
+        "regra": "validar_nao_cumulacao_com_compete_na_mesma_operacao",
+        "prioridade_validacao": 3,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-IND-04",
+        "regra": "validar_apuracao_credito_presumido_sobre_icms_efetivamente_apurado_nao_sobre_debito_bruto",
+        "prioridade_validacao": 4,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-IND-05",
+        "regra": "validar_diferimento_compras_internas_nao_escriturado_como_credito",
+        "prioridade_validacao": 5,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-IND-06",
+        "regra": "validar_isencao_construcao_apenas_em_aquisicoes_obra_nao_funcionamento",
+        "prioridade_validacao": 6,
+        "severidade": "alto"
+      },
+      {
+        "codigo": "VAL-IND-07",
+        "regra": "validar_nf_saida_com_dados_adicionais_invest_es_preenchidos",
+        "prioridade_validacao": 7,
+        "severidade": "medio"
+      }
+    ]
+  },
+  "regras_documentais": {
+    "cfops_comuns": [
+      "3101",
+      "3102",
+      "5101",
+      "6101",
+      "6102",
+      "7101"
+    ],
+    "csts_aceitos": [
+      "20",
+      "40",
+      "41",
+      "50",
+      "51",
+      "90"
+    ],
+    "csosn_aceitos": [],
+    "aliquotas_referencia": [
+      "interna_7_12_17",
+      "interestadual_4",
+      "interestadual_7",
+      "interestadual_12"
+    ],
+    "observacoes_nf": [
+      "NF-e de saida com beneficio deve conter no campo dados adicionais: ICMS diferido/isento na forma da Lei no 10.550 de 30/06/2016 e Termo de Acordo INVEST/ES XX/XX — Processo no XXXX (Resolucao INVEST 1/2026 Art. 33)",
+      "cBenef obrigatorio quando houver fruicao do beneficio",
+      "Fornecedor que emitir NF-e com diferimento INVEST deve verificar regularidade fiscal do adquirente no momento da autorizacao"
+    ]
+  },
+  "alertas_motor": [
+    {
+      "codigo": "IND-001",
+      "descricao": "Cumulacao de INVEST-ES industria com COMPETE-ES na mesma operacao",
+      "severidade": "critico",
+      "prioridade_validacao": 1,
+      "acao_sugerida": "Separar operacoes — beneficios sao mutuamente exclusivos por periodo e operacao (Pareceres 001/2013 e 310/2024)"
+    },
+    {
+      "codigo": "IND-002",
+      "descricao": "cBenef ausente em operacao beneficiada",
+      "severidade": "critico",
+      "prioridade_validacao": 2,
+      "acao_sugerida": "Incluir cBenef correto na NF-e e no registro EFD"
+    },
+    {
+      "codigo": "IND-003",
+      "descricao": "Diferimento de ICMS de compras internas escriturado como credito indevidamente",
+      "severidade": "critico",
+      "prioridade_validacao": 3,
+      "acao_sugerida": "Estornar credito indevido — diferimento nao gera direito a credito (Parecer 310/2024)"
+    },
+    {
+      "codigo": "IND-004",
+      "descricao": "Credito presumido calculado sobre debito bruto em vez de ICMS efetivamente apurado (debitos menos creditos)",
+      "severidade": "critico",
+      "prioridade_validacao": 4,
+      "acao_sugerida": "Recalcular credito presumido sobre ICMS efetivamente apurado (Parecer 884/2024)"
+    },
+    {
+      "codigo": "IND-005",
+      "descricao": "Isencao de ICMS aplicada em aquisicao para funcionamento da empresa — restrita a construcao/expansao",
+      "severidade": "alto",
+      "prioridade_validacao": 5,
+      "acao_sugerida": "Verificar destinacao da aquisicao — isencao e exclusiva para construcao, ampliacao ou expansao"
+    },
+    {
+      "codigo": "IND-006",
+      "descricao": "NF-e de saida com beneficio sem dados adicionais INVEST-ES obrigatorios",
+      "severidade": "medio",
+      "prioridade_validacao": 6,
+      "acao_sugerida": "Incluir dados adicionais conforme Resolucao INVEST 1/2026 Art. 33"
+    }
+  ],
+  "severidade_enum": [
+    "critico",
+    "alto",
+    "medio",
+    "baixo",
+    "info"
+  ],
+  "anexos_contexto": {
+    "planilha_apuracao_obrigatoria": true,
+    "controle_interno_obrigatorio": true,
+    "exige_habilitacao_previa": true,
+    "vinculo_termo_acordo_invest_es": true,
+    "prazo_fruicao_controlado": true,
+    "dependencias": [
+      "APURACAO_SEPARADA",
+      "MEMORIA_CALCULO",
+      "ATIVO_IMOBILIZADO",
+      "IMPORTACAO"
+    ],
+    "modulos_motor_relacionados": [
+      "INVEST_ES_INDUSTRIA",
+      "ATIVO_IMOBILIZADO",
+      "IMPORTACAO"
+    ],
+    "observacoes": "INVEST-ES Industria tem estrutura de beneficios mais complexa do portfólio: diferimento (importacao, DIFAL, insumos internos), isencao (construcao) e credito presumido (ate 70% ICMS apurado nas saidas). Prazo 12 anos prorrogavel. Legislacao atualizada pela Lei 12.692/2025 e Resolucao INVEST 1/2026. Vedada cumulacao com COMPETE na mesma operacao (Pareceres 001/2013 e 310/2024)."
+  }
+}

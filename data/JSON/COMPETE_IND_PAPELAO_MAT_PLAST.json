@@ -1,0 +1,288 @@
+{
+  "codigo_beneficio": "COMPETE_IND_PAPELAO_MAT_PLAST",
+  "nome_beneficio": "COMPETE-ES Indústrias de Embalagem de Papel, Papelão e Material Plástico",
+  "uf": "ES",
+  "status_juridico": "vigente",
+  "versao_modelo": "3.0",
+  "ultima_revisao": "2025-04-09",
+  "fonte_legal_primaria": [
+    "Lei ES 10.568/2016 — Art. 14",
+    "RICMS/ES — Decreto 1.090-R/2002 — Capítulo XXXIX-A"
+  ],
+  "fonte_orientativa_secundaria": [
+    "Receita Orienta COMPETE-ES/SEFAZ-ES"
+  ],
+  "vigencia_convenio_confaz": {
+    "numero_convenio": null,
+    "validade": null,
+    "renovacao_automatica": false,
+    "observacao": "Beneficio de legislacao estadual propria depositado no CONFAZ em observancia a LC 160/2017 e Convenio ICMS 190/2017 (conforme Portaria 176-R/2025). Vigencia assegurada para os periodos de fruicao anteriores. Monitorar eventuais impugnacoes interestaduais por contribuintes de outros estados."
+  },
+  "ato_concessorio_cliente": {
+    "numero": null,
+    "inicio_vigencia": null,
+    "fim_vigencia": null,
+    "segmento": "industria_embalagem_plastico_papel_papelao",
+    "modalidade": null,
+    "observacao_modalidade": "Preencher com dados do Termo de Adesao do cliente. Verificar se inclui reciclagem plastica."
+  },
+  "pre_requisitos_absolutos": [
+    {
+      "codigo": "PRE-PAP-01",
+      "descricao": "termo_adesao_vigente",
+      "observacao": "Contribuinte deve possuir Termo de Adesao ativo junto a SEFAZ-ES/SEDES",
+      "bloqueia_se_ausente": true,
+      "prioridade": 1
+    },
+    {
+      "codigo": "PRE-PAP-02",
+      "descricao": "enquadramento_como_industria_embalagem_ou_reciclagem_plastica",
+      "observacao": "Beneficio restrito a industrias de embalagem de material plastico, papel, papelao e reciclagem plastica — Art. 14 Lei 10.568/2016",
+      "bloqueia_se_ausente": true,
+      "prioridade": 2
+    }
+  ],
+  "bloqueia_fruicao_se": [
+    "sem_termo_adesao_vigente",
+    "estabelecimento_fora_do_segmento_embalagem_reciclagem",
+    "sem_cbenef_quando_obrigatorio",
+    "apuracao_nao_segregada",
+    "diferimento_importacao_polimeros_sem_ncm_autorizada"
+  ],
+  "elegibilidade": {
+    "cnaes_permitidos": [
+      "2221-8/00 — fabricacao de laminados planos e tubulares de material plastico",
+      "2222-6/00 — fabricacao de embalagens de material plastico",
+      "2223-4/00 — fabricacao de tubos e acessorios de material plastico para uso na construcao",
+      "2229-3/01 — fabricacao de artefatos de material plastico para usos industriais",
+      "2229-3/99 — fabricacao de artefatos de material plastico para outros usos",
+      "1731-1/00 — fabricacao de embalagens de papel",
+      "1732-0/00 — fabricacao de embalagens de cartolina e papel-cartao",
+      "3839-4/99 — recuperacao de materiais nao especificados anteriormente (reciclagem plastica)"
+    ],
+    "cnaes_observacao": "CNAEs de referencia. Validar lista exata no Termo de Adesao do cliente.",
+    "ufs_operacao_permitidas": [
+      "ES",
+      "interestadual",
+      "importacao"
+    ],
+    "tipos_operacao_permitidas": [
+      "saida_interna",
+      "saida_interestadual",
+      "importacao_polimeros_ncm_autorizadas"
+    ],
+    "condicoes_especiais": [
+      "diferimento de importacao restrito aos polimeros NCM 3901, 3902 e 3903 — para o momento da saida do produto resultante da industrializacao",
+      "reducao de base de calculo aplica-se a operacoes internas",
+      "credito presumido aplica-se a operacoes interestaduais"
+    ],
+    "vedacoes": [
+      "diferimento de importacao em NCMs nao listadas (3901, 3902, 3903)",
+      "aproveitamento de beneficio em operacao fora do segmento autorizado",
+      "cumulacao de beneficios nao prevista em lei"
+    ]
+  },
+  "impactos_fiscais": {
+    "tipo_beneficio": [
+      "reducao_base_calculo",
+      "credito_presumido",
+      "diferimento_importacao"
+    ],
+    "detalhamento_beneficios": {
+      "reducao_bc_interna": {
+        "carga_efetiva": "7%",
+        "hipotese": "operacoes internas",
+        "referencia_legal": "Art. 14, I, Lei 10.568/2016"
+      },
+      "credito_presumido_interestadual": {
+        "percentual": "7%",
+        "hipotese": "operacoes interestaduais",
+        "referencia_legal": "Art. 14, II, Lei 10.568/2016"
+      },
+      "diferimento_importacao_polimeros": {
+        "ncms_autorizadas": [
+          "3901 — polimeros de etileno",
+          "3902 — polimeros de propileno",
+          "3903 — polimeros de estireno"
+        ],
+        "momento_pagamento": "saida dos produtos resultantes da industrializacao",
+        "referencia_legal": "Art. 14, III, a, Lei 10.568/2016"
+      }
+    },
+    "exige_cbenef": true,
+    "cbenef_permitidos": [],
+    "cbenef_status": "pendente_parametrizacao",
+    "cbenef_observacao": "Confirmar codigos junto a SEFAZ-ES — podem existir CBENEFs distintos para operacao interna, interestadual e importacao. Nao utilizar em producao sem preenchimento.",
+    "apuracao_em_separado": true,
+    "permite_compensar_com_saldo_credor_comum": false,
+    "exige_estorno_credito": false,
+    "exige_recolhimento_em_codigo_proprio": true,
+    "exige_memoria_calculo": true,
+    "codigos_recolhimento": {
+      "observacao": "COMPETE industrial deve recolher com codigo proprio conforme atividade",
+      "codigo_industria": "938-5",
+      "codigo_comercio": "937-7",
+      "referencia": "codigos de recolhimento SEFAZ/ES para beneficios COMPETE"
+    }
+  },
+  "regras_estorno": {
+    "exige_estorno": false,
+    "criterio": null,
+    "registro_sped_estorno": null,
+    "observacao": "Nao ha regra de estorno de credito prevista no Art. 14. Revisar se houver alteracao legislativa."
+  },
+  "regras_importacao_diferimento": {
+    "aplica_diferimento_importacao": true,
+    "ncms_autorizadas": [
+      "3901",
+      "3902",
+      "3903"
+    ],
+    "condicao": "polimeros destinados exclusivamente a industrializacao no proprio estabelecimento",
+    "momento_encerramento_diferimento": "saida dos produtos resultantes da industrializacao",
+    "cfop_importacao": "3101",
+    "observacao": "Diferimento encerra na saida do produto industrializado. Motor deve rastrear o vínculo entre a importacao do polimero e a saida do produto final."
+  },
+  "regras_sped": {
+    "registros_afetados": [
+      "C100",
+      "C170",
+      "C190",
+      "E110",
+      "E111",
+      "E116"
+    ],
+    "campos_criticos": [
+      "cBenef",
+      "CST",
+      "CFOP",
+      "VL_BC_ICMS",
+      "VL_ICMS",
+      "ALIQ_ICMS",
+      "COD_NCM"
+    ],
+    "validacoes": [
+      {
+        "codigo": "VAL-PAP-01",
+        "regra": "validar_cbenef_em_operacoes_beneficiadas",
+        "prioridade_validacao": 1,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-PAP-02",
+        "regra": "validar_reducao_bc_apenas_em_operacoes_internas",
+        "prioridade_validacao": 2,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-PAP-03",
+        "regra": "validar_credito_presumido_apenas_em_operacoes_interestaduais",
+        "prioridade_validacao": 3,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-PAP-04",
+        "regra": "validar_diferimento_importacao_apenas_para_ncm_3901_3902_3903",
+        "prioridade_validacao": 4,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-PAP-05",
+        "regra": "validar_apuracao_separada",
+        "prioridade_validacao": 5,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-PAP-06",
+        "regra": "validar_encerramento_diferimento_na_saida_do_produto_industrializado",
+        "prioridade_validacao": 6,
+        "severidade": "alto"
+      }
+    ]
+  },
+  "regras_documentais": {
+    "cfops_comuns": [
+      "5101",
+      "6101",
+      "6102",
+      "3101"
+    ],
+    "csts_aceitos": [
+      "20",
+      "51",
+      "90"
+    ],
+    "csosn_aceitos": [],
+    "aliquotas_referencia": [
+      "interna_7",
+      "interestadual_7",
+      "interestadual_12"
+    ],
+    "observacoes_nf": [
+      "cBenef obrigatorio quando houver fruicao do incentivo",
+      "NF-e de importacao de polimero deve registrar diferimento com CFOP 3101",
+      "NF-e de saida do produto industrializado deve encerrar o diferimento de importacao"
+    ]
+  },
+  "alertas_motor": [
+    {
+      "codigo": "PAP-001",
+      "descricao": "cBenef ausente em operacao interna ou interestadual beneficiada",
+      "severidade": "critico",
+      "prioridade_validacao": 1,
+      "acao_sugerida": "Incluir cBenef correto na NF-e e no registro EFD"
+    },
+    {
+      "codigo": "PAP-002",
+      "descricao": "Diferimento de importacao aplicado em NCM nao autorizada (fora de 3901/3902/3903)",
+      "severidade": "critico",
+      "prioridade_validacao": 2,
+      "acao_sugerida": "Verificar NCM da mercadoria importada e recolher ICMS se indevidamente diferido"
+    },
+    {
+      "codigo": "PAP-003",
+      "descricao": "Credito presumido de 7% aplicado em operacao interna — beneficio restrito a saidas interestaduais",
+      "severidade": "critico",
+      "prioridade_validacao": 3,
+      "acao_sugerida": "Corrigir apuracao — operacoes internas tem reducao de BC, nao credito presumido"
+    },
+    {
+      "codigo": "PAP-004",
+      "descricao": "Diferimento de importacao de polimero sem encerramento na saida do produto industrializado",
+      "severidade": "alto",
+      "prioridade_validacao": 4,
+      "acao_sugerida": "Rastrear produto importado e verificar saida do produto resultante"
+    },
+    {
+      "codigo": "PAP-005",
+      "descricao": "Apuracao do beneficio nao segregada da apuracao comum",
+      "severidade": "critico",
+      "prioridade_validacao": 5,
+      "acao_sugerida": "Segregar apuracoes conforme exigencia SEFAZ-ES"
+    }
+  ],
+  "severidade_enum": [
+    "critico",
+    "alto",
+    "medio",
+    "baixo",
+    "info"
+  ],
+  "anexos_contexto": {
+    "planilha_apuracao_obrigatoria": true,
+    "controle_interno_obrigatorio": true,
+    "exige_habilitacao_previa": true,
+    "vinculo_termo_adesao": true,
+    "dependencias": [
+      "APURACAO_SEPARADA",
+      "MEMORIA_CALCULO",
+      "IMPORTACAO",
+      "CONTROLE_NCM"
+    ],
+    "modulos_motor_relacionados": [
+      "COMPETE_IND_PAPELAO_MAT_PLAST",
+      "IMPORTACAO"
+    ],
+    "observacoes": "Unico COMPETE com tres modalidades simultaneas: reducao BC (interno), credito presumido (interestadual) e diferimento importacao polimeros. Motor deve controlar o ciclo do diferimento de importacao — da entrada do polimero ate a saida do produto industrializado."
+  }
+}

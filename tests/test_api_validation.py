@@ -33,7 +33,7 @@ def client(tmp_path: Path) -> TestClient:
     from api.deps import get_db
     app.dependency_overrides[get_db] = override_get_db
     yield TestClient(app)
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.fixture
@@ -48,6 +48,7 @@ def valid_sped(sped_valid_path: Path) -> bytes:
 
 def _upload(client: TestClient, sped_bytes: bytes) -> int:
     r = client.post("/api/files/upload", files={"file": ("sped.txt", sped_bytes)})
+    assert r.status_code == 200, f"Upload falhou: {r.status_code} {r.text}"
     return r.json()["file_id"]
 
 

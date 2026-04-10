@@ -23,6 +23,14 @@ from ..services.context_builder import TaxRegime, ValidationContext
 from ..services.reference_loader import ReferenceLoader
 from .fiscal_semantics import _ncm_is_monofasico
 from .helpers import (
+    CST_TRIBUTADO,
+    CST_ISENTO_NT,
+    CST_DIFERIMENTO,
+    CST_RESIDUAL,
+    CSOSN_COM_CREDITO,
+    CSOSN_COM_ST,
+    CSOSN_SEM_DEBITO,
+    CSOSN_VALIDOS,
     F_C170_ALIQ_ICMS,
     F_C170_COD_ITEM,
     F_C170_CST_ICMS,
@@ -38,10 +46,8 @@ from .helpers import (
 )
 
 # CSTs Tabela A (Regime Normal) — nao devem aparecer em Simples
-_CST_TABELA_A = {
-    "00", "02", "10", "12", "13", "15", "20", "30", "40", "41",
-    "50", "51", "52", "53", "60", "61", "70", "72", "74", "90",
-}
+# Construido da uniao de todos os CSTs ICMS do JSON
+_CST_TABELA_A = CST_TRIBUTADO | CST_ISENTO_NT | CST_DIFERIMENTO | CST_RESIDUAL
 
 # CSOSN isentos/imunes/nao tributados — nao devem ter BC/ICMS
 _CSOSN_ZERO = {"300", "400"}
@@ -78,10 +84,10 @@ _CST_PIS_COFINS_SN_DESC: dict[str, str] = {
 # CSTs que exigem NCM monofasico para serem validos
 _CST_EXIGE_MONOFASICO = {"04"}
 
-# Fallback hardcoded (usado se YAML não disponível)
-_CSOSN_VALIDOS_FALLBACK = {"101", "102", "103", "201", "202", "203", "300", "400", "500", "900"}
-_CSOSN_CREDITO_FALLBACK = {"101", "201"}
-_CSOSN_ST_FALLBACK = {"201", "202", "203"}
+# CSOSN sets unificados (helpers.py carrega do JSON, com fallback)
+_CSOSN_VALIDOS_FALLBACK = CSOSN_VALIDOS
+_CSOSN_CREDITO_FALLBACK = CSOSN_COM_CREDITO
+_CSOSN_ST_FALLBACK = CSOSN_COM_ST
 
 
 def _get_cst_pis_cofins_sn(context: ValidationContext | None) -> frozenset[str]:

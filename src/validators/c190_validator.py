@@ -3,6 +3,7 @@
 Regras implementadas:
 - C190_001: VL_OPR do C190 reconstruido a partir dos C170 com rateio de despesas do C100
 - C190_002: Combinacao incompativel de CST+CFOP+ALIQ no C190
+             (classificacao baseada em Tabela_CST_Vigente.json — campo 'efeitos')
 """
 
 from __future__ import annotations
@@ -12,11 +13,9 @@ from collections import defaultdict
 from ..models import SpedRecord, ValidationError
 from ..parser import group_by_register
 from ..services.context_builder import ValidationContext
+from ..services.reference_loader import ReferenceLoader
 from .helpers import (
-    ALIQ_INTERESTADUAIS,
     CFOP_REMESSA_SAIDA,
-    CST_ISENTO_NT,
-    CST_TRIBUTADO,
     F_C100_VL_DOC,
     F_C100_VL_FRT,
     F_C100_VL_ICMS_ST,
@@ -44,6 +43,11 @@ from .helpers import (
 )
 from .tolerance import get_tolerance
 
+# Aliquota exclusivamente interestadual — nunca e aliquota interna
+# 4% = Res. Senado 13/2012 (produtos importados)
+# 7% e 12% podem ser internas (cesta basica, transporte, etc.)
+_ALIQ_EXCLUSIVAMENTE_INTERESTADUAL = {4.0}
+
 # ──────────────────────────────────────────────
 # API publica
 # ──────────────────────────────────────────────
@@ -55,9 +59,10 @@ def validate_c190(
     """Executa validacoes de consolidacao C190."""
     groups = group_by_register(records)
     errors: list[ValidationError] = []
+    loader = context.reference_loader if context else None
 
     errors.extend(_check_c190_001(groups))
-    errors.extend(_check_c190_002(groups))
+    errors.extend(_check_c190_002(groups, loader))
 
     return errors
 
@@ -189,6 +194,14 @@ def _check_c190_001(
                                     get_field(it, F_C170_CFOP),
                                     round(to_float(get_field(it, F_C170_ALIQ_ICMS)), 2)) == key)
             tol_consol = get_tolerance("consolidacao", n_items=n_itens_combo)
+
+            # Quando há residual (despesas não explícitas no C100), o rateio
+            # proporcional é estimativa — o emitente pode ter distribuído de
+            # forma diferente. Aumentar tolerância em função da despesa rateada.
+            if residual_doc > 0 and despesa_rateada > 0:
+                # Tolerância adicional: 5% da despesa rateada para esta combinação
+                tol_consol = max(tol_consol, despesa_rateada * 0.05)
+
             diff_opr = abs(vl_opr_c190 - vl_opr_esperado)
             if diff_opr > tol_consol:
                 composicao = f"Sum(VL_ITEM-VL_DESC)={soma_itens:.2f}"
@@ -240,42 +253,75 @@ def _check_c190_001(
 
 def _check_c190_002(
     groups: dict[str, list[SpedRecord]],
+    loader: ReferenceLoader | None = None,
 ) -> list[ValidationError]:
-    """Detecta combinacoes incoerentes de CST+CFOP+ALIQ no C190."""
+    """Detecta combinacoes incoerentes de CST+CFOP+ALIQ no C190.
+
+    Classificacao dos CSTs baseada nos 'efeitos' da Tabela_CST_Vigente.json:
+    - debito_proprio: CST com aliquota obrigatoria (00,02,10,12,13,15,20,70,72,74)
+    - sem_debito_proprio: CST sem aliquota propria (30,40,41,50,51,52,53,60,61)
+    - monofasico: tributacao ad rem, ALIQ_ICMS=0 e esperado (02,15,53,61)
+    - residual: CST 90 — catch-all, nao gera erro por aliquota ausente
+    """
     errors: list[ValidationError] = []
+
+    # Sets de CST carregados do JSON via helpers (fonte unica)
+    from .helpers import CST_MONOFASICO, CST_RESIDUAL
+    if loader:
+        cst_debito_proprio = loader.csts_com_efeito("debito_proprio")
+        cst_sem_debito = loader.csts_com_efeito("sem_debito_proprio")
+        cst_monofasico_l = loader.csts_com_efeito("monofasico")
+        cst_residual_l = loader.csts_com_efeito("residual")
+    else:
+        # Fallback: sets do helpers.py (ja carregados do JSON)
+        from .helpers import CST_ISENTO_NT, CST_TRIBUTADO
+        cst_debito_proprio = CST_TRIBUTADO
+        cst_sem_debito = CST_ISENTO_NT
+        cst_monofasico_l = CST_MONOFASICO
+        cst_residual_l = CST_RESIDUAL
+
+    # CSTs com debito_proprio que podem legitimamente ter ALIQ=0
+    cst_aliq_zero_ok = cst_monofasico_l | cst_residual_l
 
     for rec in groups.get("C190", []):
         cst = trib(get_field(rec, "CST_ICMS"))
         cfop = get_field(rec, "CFOP")
         aliq = to_float(get_field(rec, "ALIQ_ICMS"))
         vl_opr = to_float(get_field(rec, "VL_OPR"))
+        vl_bc = to_float(get_field(rec, "VL_BC_ICMS"))
 
         if not cst or not cfop or vl_opr == 0:
             continue
 
-        # Regra 1: CST isento/NT com aliquota > 0
-        if cst in CST_ISENTO_NT and aliq > 0:
+        # Regra 1: CST sem debito proprio com aliquota > 0 E base > 0
+        # Efeito 'sem_debito_proprio' = nao deveria ter ALIQ e BC positivos.
+        # CST 30 (isento+ST) pode ter ALIQ informativa com BC=0.
+        if cst in cst_sem_debito and aliq > 0 and vl_bc > 0:
             errors.append(make_error(
                 rec, "CST_ICMS", "C190_COMBINACAO_INCOMPATIVEL",
                 (
-                    f"C190 com CST {cst} (isento/NT) e ALIQ={aliq:.2f}%. "
-                    f"CST de isencao ou nao-tributacao nao deveria ter aliquota "
-                    f"positiva. Revise a classificacao fiscal dos itens."
+                    f"C190 com CST {cst} (sem debito proprio) e ALIQ={aliq:.2f}% "
+                    f"com VL_BC_ICMS={vl_bc:.2f}. "
+                    f"CST sem debito proprio nao deveria ter "
+                    f"aliquota e base de calculo positivas simultaneamente."
                 ),
                 field_no=2,
                 value=f"CST={cst} CFOP={cfop} ALIQ={aliq:.2f}%",
             ))
 
-        # Regra 2: CST tributado com aliquota zero em CFOP de venda (nao remessa)
-        if (cst in CST_TRIBUTADO
+        # Regra 2: CST com debito proprio e aliquota zero em saida
+        # Excecoes: monofasicos (ad rem), residual (90), remessas
+        if (cst in cst_debito_proprio
+                and cst not in cst_aliq_zero_ok
                 and aliq == 0
                 and cfop[:1] in ("5", "6")
                 and cfop not in CFOP_REMESSA_SAIDA):
             errors.append(make_error(
                 rec, "ALIQ_ICMS", "C190_COMBINACAO_INCOMPATIVEL",
                 (
-                    f"C190 com CST {cst} (tributado) e ALIQ=0% em "
-                    f"CFOP {cfop}. CST tributado deveria ter aliquota positiva. "
+                    f"C190 com CST {cst} (debito proprio) e ALIQ=0% em "
+                    f"CFOP {cfop}. CST com debito proprio deveria ter "
+                    f"aliquota positiva. "
                     f"Revise se o CST deveria ser 40/41/50 ou se a aliquota "
                     f"esta faltando."
                 ),
@@ -283,29 +329,35 @@ def _check_c190_002(
                 value=f"CST={cst} CFOP={cfop} ALIQ=0",
             ))
 
-        # Regra 3: CFOP interestadual com aliquota interna
-        if cfop[:1] == "6" and aliq >= 17 and cst in CST_TRIBUTADO:
+        # Regra 3: CFOP interestadual com aliquota >= 17% (tipica interna)
+        # Excecao: remessas interestaduais
+        if (cfop[:1] == "6"
+                and aliq >= 17
+                and cst in cst_debito_proprio
+                and cfop not in CFOP_REMESSA_SAIDA):
             errors.append(make_error(
                 rec, "ALIQ_ICMS", "C190_COMBINACAO_INCOMPATIVEL",
                 (
                     f"C190 com CFOP interestadual {cfop} e ALIQ={aliq:.2f}% "
                     f"(tipica interna). Aliquotas interestaduais validas "
-                    f"sao 4%, 7% ou 12%."
+                    f"sao 4%, 7% ou 12% (Res. Senado 13/2012)."
                 ),
                 field_no=4,
                 value=f"CST={cst} CFOP={cfop} ALIQ={aliq:.2f}%",
             ))
 
-        # Regra 4: CFOP interno com aliquota interestadual
+        # Regra 4: CFOP interno com aliquota exclusivamente interestadual
+        # Apenas 4% e exclusivamente interestadual (Res. Senado 13/2012).
+        # 7% e 12% podem ser internas (cesta basica, transporte, etc.)
         if (cfop[:1] == "5"
-                and aliq in ALIQ_INTERESTADUAIS
-                and cst in CST_TRIBUTADO):
+                and aliq in _ALIQ_EXCLUSIVAMENTE_INTERESTADUAL
+                and cst in cst_debito_proprio):
             errors.append(make_error(
                 rec, "ALIQ_ICMS", "C190_COMBINACAO_INCOMPATIVEL",
                 (
-                    f"C190 com CFOP interno {cfop} e ALIQ={aliq:.2f}% "
-                    f"(tipica interestadual). Operacoes internas geralmente "
-                    f"usam aliquotas de 17% a 25%."
+                    f"C190 com CFOP interno {cfop} e ALIQ={aliq:.2f}%. "
+                    f"A aliquota de 4% e exclusivamente interestadual "
+                    f"(Res. Senado 13/2012 — produtos importados)."
                 ),
                 field_no=4,
                 value=f"CST={cst} CFOP={cfop} ALIQ={aliq:.2f}%",

@@ -75,12 +75,15 @@ def run_full_validation(
     context = build_context(file_id, db)
 
     # MOD-04: Carregar apenas regras vigentes para o período do arquivo
+    from .rule_loader import RuleIndex
     if context.periodo_ini and context.periodo_fim:
         loader = RuleLoader()
         active_rules = loader.load_rules_for_period(
             context.periodo_ini, context.periodo_fim
         )
+        all_rules = loader.load_all_rules()
         context.active_rules = [r["id"] for r in active_rules]
+        context.rule_index = RuleIndex(active_rules, all_rules)
 
     # Reconstruir registros do banco
     records = _load_records(db, file_id)
@@ -138,8 +141,8 @@ def run_full_validation(
     all_errors.extend(validate_bloco_c_servicos(records, context=context))
     all_errors.extend(validate_bloco_k(records, context=context))
 
-    # Persistir erros
-    _persist_errors(db, file_id, all_errors)
+    # Persistir erros (rule_index para severidade/certeza/vigência do YAML)
+    _persist_errors(db, file_id, all_errors, rule_index=context.rule_index)
 
     # Atualizar status
     db.execute(
@@ -294,8 +297,20 @@ def _load_records(db: sqlite3.Connection, file_id: int) -> list[SpedRecord]:
     return records
 
 
-def _severity_for(error_type: str) -> str:
-    """Determina severidade com base no tipo de erro."""
+def _severity_for(error_type: str, rule_index=None) -> str:
+    """Determina severidade com base no tipo de erro.
+
+    Prioridade:
+    1. rules.yaml (via RuleIndex) — fonte primária
+    2. Fallback hardcoded — para error_types sem entrada no YAML
+    """
+    # 1. Tentar severidade do YAML
+    if rule_index is not None:
+        sev = rule_index.get_severity(error_type)
+        if sev:
+            return sev
+
+    # 2. Fallback hardcoded (compatibilidade)
     critical = {
         "CALCULO_DIVERGENTE", "CRUZAMENTO_DIVERGENTE",
         "SOMA_DIVERGENTE", "CONTAGEM_DIVERGENTE",
@@ -459,7 +474,7 @@ def _calc_materialidade(err: ValidationError) -> float:
         return 0.0
 
 
-def _persist_errors(db: sqlite3.Connection, file_id: int, errors: list[ValidationError]) -> None:
+def _persist_errors(db: sqlite3.Connection, file_id: int, errors: list[ValidationError], rule_index=None) -> None:
     """Persiste erros de validação no banco."""
     # Limpar correções e erros anteriores (corrections referencia validation_errors)
     db.execute("DELETE FROM corrections WHERE file_id = ?", (file_id,))
@@ -477,13 +492,28 @@ def _persist_errors(db: sqlite3.Connection, file_id: int, errors: list[Validatio
 
     for err in errors:
         record_id = line_to_record.get(err.line_number) if err.line_number > 0 else None
-        # Resolve certeza/impacto: prefer value from error itself, fallback to rules.yaml
+
+        # Filtrar por vigência: se error_type existe no YAML mas não está vigente, descartar
+        if rule_index and not rule_index.is_error_type_active(err.error_type):
+            if rule_index.error_type_exists_in_yaml(err.error_type):
+                continue  # regra existe no YAML mas fora da vigência — descartar
+
+        # Certeza/impacto: YAML é fonte primária, validator pode override
         certeza = err.certeza
         impacto = err.impacto
-        if certeza == "objetivo" and impacto == "relevante":
-            # Defaults — try to enrich from rules.yaml
+        if rule_index:
+            ci = rule_index.get_certeza_impacto(err.error_type)
+            if ci:
+                certeza, impacto = ci
+        elif certeza == "objetivo" and impacto == "relevante":
             ci = ci_map.get(err.error_type, ("objetivo", "relevante"))
             certeza, impacto = ci
+        # Validator override prevalece se explicitamente diferente dos defaults
+        if err.certeza != "objetivo":
+            certeza = err.certeza
+        if err.impacto != "relevante":
+            impacto = err.impacto
+
         materialidade = _calc_materialidade(err)
         db.execute(
             """INSERT INTO validation_errors
@@ -494,7 +524,7 @@ def _persist_errors(db: sqlite3.Connection, file_id: int, errors: list[Validatio
             (
                 file_id, record_id, err.line_number, err.register, err.field_no,
                 err.field_name, err.value, err.error_type,
-                _severity_for(err.error_type), err.message,
+                _severity_for(err.error_type, rule_index), err.message,
                 err.expected_value, err.categoria, certeza, impacto,
                 materialidade,
             ),

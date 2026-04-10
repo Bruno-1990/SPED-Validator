@@ -65,9 +65,17 @@ def upload_file(db: sqlite3.Connection, filepath: str | Path) -> int:
     db.commit()
 
     # Log
+    msg_cliente = ""
+    if ctx.cliente and ctx.cliente.encontrado:
+        beneficios = ", ".join(ctx.cliente.beneficios_fiscais) if ctx.cliente.beneficios_fiscais else "nenhum"
+        msg_cliente = (
+            f" Cliente encontrado: {ctx.cliente.razao_social}."
+            f" Regime MySQL: {ctx.cliente.regime_tributario}."
+            f" Beneficios: {beneficios}."
+        )
     _log(
         db, file_id, "upload",
-        f"Arquivo {filepath.name} processado: {len(records)} registros. Regime: {ctx.regime.value}.",
+        f"Arquivo {filepath.name} processado: {len(records)} registros. Regime: {ctx.regime.value}.{msg_cliente}",
     )
 
     return file_id

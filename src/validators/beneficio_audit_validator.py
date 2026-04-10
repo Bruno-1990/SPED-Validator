@@ -925,17 +925,19 @@ def _check_diagnostico_causa_raiz(ctx: _BeneficioContext) -> list[ValidationErro
     erros_c170_c190 = 0
     erros_c190_e110 = 0
 
-    # C170 -> C190: verificar por CST+CFOP+ALIQ
+    # C170 -> C190: verificar por CST+CFOP+ALIQ (chave completa 3 digitos)
+    # O C190 totaliza por CST_ICMS(3d) + CFOP + ALIQ conforme Guia Pratico.
+    # Usar CST completo para nao colapsar origens diferentes (ex: 000 vs 500).
     c170_totais: dict[tuple[str, str, str], float] = defaultdict(float)
     for r in ctx.groups.get("C170", []):
-        cst = trib(get_field(r, F_C170_CST_ICMS))
+        cst = get_field(r, F_C170_CST_ICMS)
         cfop = get_field(r, F_C170_CFOP)
         aliq = get_field(r, F_C170_ALIQ_ICMS)
         c170_totais[(cst, cfop, aliq)] += to_float(get_field(r, F_C170_VL_ICMS))
 
     c190_totais: dict[tuple[str, str, str], float] = defaultdict(float)
     for r in ctx.c190_records:
-        cst = trib(get_field(r, F_C190_CST))
+        cst = get_field(r, F_C190_CST)
         cfop = get_field(r, F_C190_CFOP)
         aliq = get_field(r, F_C190_ALIQ)
         c190_totais[(cst, cfop, aliq)] += to_float(get_field(r, F_C190_VL_ICMS))

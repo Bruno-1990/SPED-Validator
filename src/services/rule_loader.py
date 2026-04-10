@@ -85,6 +85,60 @@ class RuleLoader:
         return list(self._load_all())
 
 
+class RuleIndex:
+    """Indice pre-computado de regras por error_type para enriquecimento rapido.
+
+    Usado na camada de persistencia para aplicar severity, certeza, impacto e
+    corrigivel do rules.yaml nos erros gerados pelos validators.
+    """
+
+    def __init__(self, active_rules: list[dict], all_rules: list[dict] | None = None) -> None:
+        self._by_error_type: dict[str, dict] = {}
+        self._active_error_types: set[str] = set()
+        self._all_error_types: set[str] = set()
+
+        for r in active_rules:
+            et = r.get("error_type", "")
+            if et:
+                self._active_error_types.add(et)
+                if et not in self._by_error_type:
+                    self._by_error_type[et] = r
+
+        # Se all_rules fornecido, mapeia todos os error_types conhecidos no YAML
+        for r in (all_rules or active_rules):
+            et = r.get("error_type", "")
+            if et:
+                self._all_error_types.add(et)
+
+    def get_severity(self, error_type: str) -> str | None:
+        """Retorna severity da regra, ou None se nao encontrada."""
+        rule = self._by_error_type.get(error_type)
+        return rule.get("severity") if rule else None
+
+    def get_corrigivel(self, error_type: str) -> str | None:
+        """Retorna corrigivel (automatico/proposta/investigar/impossivel)."""
+        rule = self._by_error_type.get(error_type)
+        return rule.get("corrigivel") if rule else None
+
+    def get_certeza_impacto(self, error_type: str) -> tuple[str, str] | None:
+        """Retorna (certeza, impacto) da regra, ou None."""
+        rule = self._by_error_type.get(error_type)
+        if not rule:
+            return None
+        return (
+            rule.get("certeza", "objetivo"),
+            rule.get("impacto", "relevante"),
+        )
+
+    def is_error_type_active(self, error_type: str) -> bool:
+        """True se o error_type esta em alguma regra ativa (vigente)."""
+        return error_type in self._active_error_types
+
+    def error_type_exists_in_yaml(self, error_type: str) -> bool:
+        """True se o error_type existe em qualquer regra do YAML (ativa ou nao)."""
+        return error_type in self._all_error_types
+
+
 def _parse_date(value: str | date) -> date | None:
     """Converte string YYYY-MM-DD para date."""
     if isinstance(value, date):

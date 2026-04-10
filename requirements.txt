@@ -10,8 +10,14 @@ python-multipart>=0.0.6
 pydantic>=2.0.0,<3.0.0
 starlette>=0.27.0
 
+# Carregamento de .env
+python-dotenv>=1.0.0
+
 # YAML (rules.yaml + tabelas de referencia)
 pyyaml>=6.0
+
+# MySQL (consulta tabela clientes - DCTF_WEB)
+mysql-connector-python>=8.0.0
 
 # Conversao de documentos
 python-docx>=0.8.0
@@ -19,7 +25,7 @@ python-docx>=0.8.0
 # Indexacao de documentos e busca semantica
 pdfplumber>=0.10.0
 sentence-transformers>=2.2.0,<3.0.0
-numpy>=1.24.0,<2.0.0
+numpy>=1.24.0
 tqdm>=4.65.0
 
 # PyTorch CPU-only (modelo all-MiniLM-L6-v2 nao precisa de GPU)

@@ -16,6 +16,7 @@ from .helpers import (
     CFOP_REMESSA_SAIDA,
     CFOP_RETORNO_ENTRADA,
     CFOP_VENDA,
+    CST_DIFERIMENTO,
     CST_ISENTO_NT,
     F_0000_UF,
     F_0150_COD_PART,
@@ -384,8 +385,9 @@ def _check_parametrizacao_sistemica(
             if not cfop or not cst:
                 continue
             t = trib(cst)
-            # Venda + isento = incompativel
-            if cfop in CFOP_VENDA and t in CST_ISENTO_NT:
+            # Venda + isento/NT = incompativel (exceto diferimento que e
+            # legitimo em beneficio fiscal — INVEST-ES, COMPETE, etc.)
+            if cfop in CFOP_VENDA and t in CST_ISENTO_NT and t not in CST_DIFERIMENTO:
                 incomp_count += 1
 
         ratio = incomp_count / len(recs)

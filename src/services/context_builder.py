@@ -8,13 +8,17 @@ e naturezas de operacao para uso durante a validacao.
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
 
+logger = logging.getLogger(__name__)
+
 from ..validators.helpers import fields_to_dict
-from .reference_loader import ReferenceLoader
+from .client_service import ClienteInfo, buscar_cliente
+from .reference_loader import BeneficioProfile, ReferenceLoader
 
 
 class TaxRegime(Enum):
@@ -53,7 +57,12 @@ class ValidationContext:
     naturezas: dict[str, str] = field(default_factory=dict)       # cod_nat -> descr
     reference_loader: ReferenceLoader | None = None
     active_rules: list[str] = field(default_factory=list)
+    rule_index: object | None = None  # RuleIndex (import circular evitado)
     found_errors: list[str] = field(default_factory=list)
+    # Dados do cliente (MySQL DCTF_WEB)
+    cliente: ClienteInfo | None = None
+    # Benefícios fiscais resolvidos (JSON x MySQL)
+    beneficios_ativos: list[BeneficioProfile] = field(default_factory=list)
 
 
 def _parse_date(dt_str: str) -> date | None:
@@ -120,6 +129,32 @@ def build_context(file_id: int, db: sqlite3.Connection) -> ValidationContext:
         ctx.uf_contribuinte = f.get("UF", "")
         ctx.ind_perfil = f.get("IND_PERFIL", "")
         ctx.regime = _determine_regime(ctx.ind_perfil)
+
+    # -- Consultar cliente no MySQL (DCTF_WEB) pelo CNPJ --
+    if ctx.cnpj:
+        cliente = buscar_cliente(ctx.cnpj)
+        ctx.cliente = cliente if cliente.encontrado else None
+
+        # Se o MySQL tem regime_tributario, prevalece sobre o IND_PERFIL
+        if cliente.encontrado and cliente.regime_tributario:
+            regime_mysql = cliente.regime_tributario.strip().lower()
+            if "simples" in regime_mysql:
+                ctx.regime = TaxRegime.SIMPLES_NACIONAL
+            elif regime_mysql in ("mei", "microempreendedor"):
+                ctx.regime = TaxRegime.MEI
+            elif regime_mysql in ("normal", "lucro real", "lucro presumido"):
+                ctx.regime = TaxRegime.NORMAL
+
+    # -- Resolver benefícios fiscais (JSON x MySQL) --
+    if ctx.cliente and ctx.cliente.beneficios_fiscais and loader:
+        resolvidos = loader.get_beneficios_do_cliente(ctx.cliente.beneficios_fiscais)
+        ctx.beneficios_ativos = resolvidos
+        codigos_json = {b.codigo for b in resolvidos}
+        for cod in ctx.cliente.beneficios_fiscais:
+            if cod not in codigos_json:
+                logger.warning(
+                    "Beneficio '%s' declarado no MySQL sem JSON correspondente", cod
+                )
 
     # Verificar se o usuario informou regime_override no upload
     row_override = db.execute(

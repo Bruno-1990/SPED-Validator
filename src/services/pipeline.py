@@ -12,6 +12,7 @@ from ..validators.aliquota_validator import validate_aliquotas
 from ..validators.audit_rules import validate_audit_rules
 from ..validators.base_calculo_validator import validate_base_calculo
 from ..validators.beneficio_audit_validator import validate_beneficio_audit
+from ..validators.beneficio_cross_validator import validate_beneficio_cross
 from ..validators.beneficio_validator import validate_beneficio
 from ..validators.bloco_d_validator import validate_bloco_d
 from ..validators.c190_validator import validate_c190
@@ -111,14 +112,19 @@ def run_pipeline(
         context = build_context(file_id, db)
 
         # Carregar apenas regras vigentes para o período do arquivo
+        from .rule_loader import RuleIndex
         active_error_types: set[str] | None = None
+        rule_index: RuleIndex | None = None
         if context.periodo_ini and context.periodo_fim:
             loader = RuleLoader()
             active_rules = loader.load_rules_for_period(
                 context.periodo_ini, context.periodo_fim
             )
+            all_rules = loader.load_all_rules()
             context.active_rules = [r["id"] for r in active_rules]
-            active_error_types = {r["error_type"] for r in active_rules if r.get("error_type")}
+            rule_index = RuleIndex(active_rules, all_rules)
+            context.rule_index = rule_index
+            active_error_types = rule_index._active_error_types
 
         records = _load_records(db, file_id)
 
@@ -138,7 +144,7 @@ def run_pipeline(
         progress.stage_progress = 100
 
         structural_errors = _filter_by_vigencia(structural_errors, active_error_types)
-        _persist_stage_errors(db, file_id, structural_errors)
+        _persist_stage_errors(db, file_id, structural_errors, rule_index=rule_index)
         progress.errors_by_stage["estrutural"] = len(structural_errors)
         progress.total_errors = len(structural_errors)
 
@@ -207,6 +213,9 @@ def run_pipeline(
         progress.detail = "Beneficios fiscais (BENE_001 a BENE_003)"
         cross_errors.extend(validate_beneficio(records, context=context))
 
+        progress.detail = "Cruzamento beneficios fiscais x regras JSON"
+        cross_errors.extend(validate_beneficio_cross(records, context=context))
+
         progress.detail = "Devolucoes (DEV_001 a DEV_003)"
         cross_errors.extend(validate_devolucao(records, context=context))
 
@@ -238,7 +247,7 @@ def run_pipeline(
         cross_errors = _deduplicate_errors(cross_errors)
         cross_errors = _filter_by_vigencia(cross_errors, active_error_types)
 
-        _persist_stage_errors(db, file_id, cross_errors)
+        _persist_stage_errors(db, file_id, cross_errors, rule_index=rule_index)
         progress.errors_by_stage["cruzamento"] = len(cross_errors)
         progress.total_errors += len(cross_errors)
 
@@ -253,7 +262,7 @@ def run_pipeline(
         progress.stage_progress = 0
         progress.detail = "Gerando mensagens amigaveis e buscando base legal"
 
-        _enrich_errors(db, file_id, doc_db_path, progress)
+        _enrich_errors(db, file_id, doc_db_path, progress, rule_index=rule_index)
         progress.stage_progress = 100
 
         # Finalizar
@@ -396,6 +405,7 @@ def _persist_stage_errors(
     db: sqlite3.Connection,
     file_id: int,
     errors: list[ValidationError],
+    rule_index=None,
 ) -> None:
     """Persiste erros de um estágio (append, não limpa anteriores)."""
     # Cache line_number -> record_id
@@ -410,6 +420,11 @@ def _persist_stage_errors(
         line_to_record[ln] = rid
 
     for err in errors:
+        # Filtrar por vigência: error_type no YAML mas fora da vigência → descartar
+        if rule_index and not rule_index.is_error_type_active(err.error_type):
+            if rule_index.error_type_exists_in_yaml(err.error_type):
+                continue
+
         record_id = line_to_record.get(err.line_number) if err.line_number > 0 else None
         db.execute(
             """INSERT INTO validation_errors
@@ -419,7 +434,7 @@ def _persist_stage_errors(
             (
                 file_id, record_id, err.line_number, err.register, err.field_no,
                 err.field_name, err.value, err.error_type,
-                _severity_for(err.error_type), err.message,
+                _severity_for(err.error_type, rule_index), err.message,
                 err.expected_value, err.categoria,
             ),
         )
@@ -431,6 +446,7 @@ def _enrich_errors(
     file_id: int,
     doc_db_path: str | None,
     progress: PipelineProgress,
+    rule_index=None,
 ) -> None:
     """Enriquece erros com mensagens amigáveis e base legal.
 
@@ -488,23 +504,30 @@ def _enrich_errors(
                 sample["message"],
             )
 
-        # Determinar se auto-corrigível (botao "Corrigir" no frontend)
+        # Determinar se auto-corrigível
+        # Fonte primária: campo 'corrigivel' do rules.yaml
+        # Fallback: lógica hardcoded para error_types sem entrada no YAML
         auto_correctable = 0
-        if (
-            error_type in ("CALCULO_DIVERGENTE", "SOMA_DIVERGENTE", "CRUZAMENTO_DIVERGENTE",
-                           "C190_DIVERGE_C170") and sample["expected_value"]
-            or error_type == "CONTAGEM_DIVERGENTE" and sample["expected_value"]
-        ):
-            auto_correctable = 1
-        elif error_type == "ALIQ_ICMS_AUSENTE" and sample["expected_value"]:
-            # Botao aparece, mas auto_correction_service pula (requer clique do usuario)
-            auto_correctable = 1
-        elif error_type == "CST_HIPOTESE" and sample["expected_value"]:
-            # Hipotese de CST — sempre requer confirmacao manual
-            auto_correctable = 1
-        elif error_type == "CALCULO_ARREDONDAMENTO" and sample["expected_value"]:
-            # Arredondamento — usuario decide se padroniza o valor
-            auto_correctable = 1
+        if rule_index:
+            corrigivel = rule_index.get_corrigivel(error_type)
+            if corrigivel == "automatico" and sample.get("expected_value"):
+                auto_correctable = 1
+            elif corrigivel == "proposta" and sample.get("expected_value"):
+                auto_correctable = 1  # proposta: mostra botao, usuario confirma
+        if not auto_correctable:
+            # Fallback hardcoded (error_types sem entrada no YAML)
+            if (
+                error_type in ("CALCULO_DIVERGENTE", "SOMA_DIVERGENTE", "CRUZAMENTO_DIVERGENTE",
+                               "C190_DIVERGE_C170") and sample["expected_value"]
+                or error_type == "CONTAGEM_DIVERGENTE" and sample["expected_value"]
+            ):
+                auto_correctable = 1
+            elif error_type == "ALIQ_ICMS_AUSENTE" and sample["expected_value"]:
+                auto_correctable = 1
+            elif error_type == "CST_HIPOTESE" and sample["expected_value"]:
+                auto_correctable = 1
+            elif error_type == "CALCULO_ARREDONDAMENTO" and sample["expected_value"]:
+                auto_correctable = 1
 
         # Atualizar todos os erros do grupo
         for entry in entries:

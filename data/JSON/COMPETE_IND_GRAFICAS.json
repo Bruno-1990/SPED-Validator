@@ -1,0 +1,280 @@
+{
+  "codigo_beneficio": "COMPETE_IND_GRAFICAS",
+  "nome_beneficio": "COMPETE-ES Indústrias Gráficas",
+  "uf": "ES",
+  "status_juridico": "vigente",
+  "versao_modelo": "3.0",
+  "ultima_revisao": "2025-04-09",
+  "fonte_legal_primaria": [
+    "Lei ES 10.568/2016 — Art. 10",
+    "RICMS/ES — Decreto 1.090-R/2002 — Capítulo XXXIX-A"
+  ],
+  "fonte_orientativa_secundaria": [
+    "Receita Orienta COMPETE-ES/SEFAZ-ES",
+    "Parecer Normativo 001/2024 — SEFAZ/ES (vedacao terceirizacao integral)"
+  ],
+  "vigencia_convenio_confaz": {
+    "numero_convenio": null,
+    "validade": null,
+    "renovacao_automatica": false,
+    "observacao": "Beneficio de legislacao estadual propria depositado no CONFAZ em observancia a LC 160/2017 e Convenio ICMS 190/2017 (conforme Portaria 176-R/2025). Vigencia assegurada para os periodos de fruicao anteriores. Monitorar eventuais impugnacoes interestaduais por contribuintes de outros estados."
+  },
+  "ato_concessorio_cliente": {
+    "numero": null,
+    "inicio_vigencia": null,
+    "fim_vigencia": null,
+    "segmento": "industria_grafica",
+    "modalidade": null,
+    "observacao_modalidade": "Preencher com dados do Termo de Adesao do cliente. Vedada terceirizacao integral do processo produtivo (Parecer Normativo 001/2024)."
+  },
+  "pre_requisitos_absolutos": [
+    {
+      "codigo": "PRE-GRF-01",
+      "descricao": "termo_adesao_vigente",
+      "observacao": "Contribuinte deve possuir Termo de Adesao ativo junto a SEFAZ-ES/SEDES",
+      "bloqueia_se_ausente": true,
+      "prioridade": 1
+    },
+    {
+      "codigo": "PRE-GRF-02",
+      "descricao": "processo_produtivo_proprio_nao_terceirizado_integralmente",
+      "observacao": "Vedada terceirizacao integral — ao menos parte do processo produtivo deve ser do proprio estabelecimento (Parecer Normativo 001/2024)",
+      "bloqueia_se_ausente": true,
+      "prioridade": 2
+    },
+    {
+      "codigo": "PRE-GRF-03",
+      "descricao": "mercadorias_industrializadas_no_es",
+      "observacao": "Credito presumido aplica-se somente a mercadorias industrializadas no ES — par. 2, Art. 10, Lei 10.568/2016",
+      "bloqueia_se_ausente": true,
+      "prioridade": 3
+    }
+  ],
+  "bloqueia_fruicao_se": [
+    "sem_termo_adesao_vigente",
+    "mercadoria_nao_industrializada_no_es",
+    "terceirizacao_integral_do_processo_produtivo",
+    "sem_cbenef_quando_obrigatorio",
+    "apuracao_nao_segregada",
+    "estorno_proporcional_nao_realizado"
+  ],
+  "elegibilidade": {
+    "cnaes_permitidos": [
+      "1811-3/01",
+      "1811-3/02",
+      "1812-1/00",
+      "1813-0/01",
+      "1813-0/99",
+      "1821-1/00",
+      "1822-9/01",
+      "1822-9/99"
+    ],
+    "cnaes_observacao": "CNAEs de industrias graficas e servicos graficos. Validar lista exata no Termo de Adesao.",
+    "ufs_operacao_permitidas": [
+      "interestadual"
+    ],
+    "tipos_operacao_permitidas": [
+      "saida_interestadual_produto_industrializado_no_es",
+      "aquisicao_maquinas_equipamentos_ativo_imob_com_diferimento_difal"
+    ],
+    "condicoes_especiais": [
+      "credito presumido restrito a mercadorias industrializadas no proprio estabelecimento no ES",
+      "diferimento de DIFAL limitado a maquinas e equipamentos listados no RICMS/ES destinados exclusivamente ao processo produtivo"
+    ],
+    "vedacoes": [
+      "terceirizacao integral do processo produtivo",
+      "aplicacao do beneficio em mercadorias nao industrializadas no ES",
+      "aproveitamento de credito de entrada acima de 7%",
+      "nao realizacao do estorno proporcional quando da utilizacao do beneficio"
+    ]
+  },
+  "impactos_fiscais": {
+    "tipo_beneficio": [
+      "credito_presumido",
+      "diferimento_difal_ativo_imobilizado"
+    ],
+    "detalhamento_beneficios": {
+      "credito_presumido_interestadual": {
+        "percentual": "5%",
+        "base": "saidas interestaduais de mercadorias industrializadas no ES",
+        "referencia_legal": "Art. 10, II, Lei 10.568/2016"
+      },
+      "diferimento_difal": {
+        "hipotese": "aquisicao interestadual ou importacao de maquinas e equipamentos para ativo imobilizado — uso exclusivo no processo produtivo",
+        "momento_pagamento": "desincorporacao do ativo",
+        "referencia_legal": "Art. 10, I, Lei 10.568/2016"
+      }
+    },
+    "exige_cbenef": true,
+    "cbenef_permitidos": [],
+    "cbenef_status": "pendente_parametrizacao",
+    "cbenef_observacao": "Confirmar codigo junto a SEFAZ-ES apos habilitacao. Nao utilizar em producao sem preenchimento.",
+    "limite_credito_entrada": "7%",
+    "apuracao_em_separado": true,
+    "permite_compensar_com_saldo_credor_comum": false,
+    "exige_estorno_credito": true,
+    "exige_recolhimento_em_codigo_proprio": true,
+    "exige_memoria_calculo": true,
+    "codigos_recolhimento": {
+      "observacao": "COMPETE industrial deve recolher com codigo proprio conforme atividade",
+      "codigo_industria": "938-5",
+      "codigo_comercio": "937-7",
+      "referencia": "codigos de recolhimento SEFAZ/ES para beneficios COMPETE"
+    }
+  },
+  "regras_estorno": {
+    "exige_estorno": true,
+    "criterio": "estorno_proporcional_credito_entrada_excedente_a_7pct",
+    "criterio_detalhado": [
+      "O credito de ICMS relativo as aquisicoes deve ser estornado proporcionalmente a reducao da carga tributaria (par. unico Art. 10, Lei 10.568/2016)",
+      "Credito de entrada limitado a 7% — o excedente deve ser estornado"
+    ],
+    "registro_sped_estorno": "E111",
+    "campo_sped": "VL_AJ_DEBITOS",
+    "codigo_ajuste_referencia": "consultar_tabela_sefaz_es_ajustes",
+    "prioridade_validacao": 1,
+    "observacao": "Estorno proporcional obrigatorio. Diferente do INVEST-ES — aqui o estorno e sobre o credito de entrada excedente ao limite de 7%, nao sobre saldo credor."
+  },
+  "regras_sped": {
+    "registros_afetados": [
+      "C100",
+      "C170",
+      "C190",
+      "E110",
+      "E111",
+      "E116"
+    ],
+    "campos_criticos": [
+      "cBenef",
+      "CST",
+      "CFOP",
+      "VL_BC_ICMS",
+      "VL_ICMS",
+      "ALIQ_ICMS",
+      "VL_AJ_DEBITOS"
+    ],
+    "validacoes": [
+      {
+        "codigo": "VAL-GRF-01",
+        "regra": "validar_estorno_proporcional_credito_entrada_limitado_7pct",
+        "prioridade_validacao": 1,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-GRF-02",
+        "regra": "validar_credito_presumido_apenas_em_saidas_interestaduais_industrializadas_no_es",
+        "prioridade_validacao": 2,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-GRF-03",
+        "regra": "validar_cbenef_em_operacoes_beneficiadas",
+        "prioridade_validacao": 3,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-GRF-04",
+        "regra": "validar_apuracao_separada_do_beneficio",
+        "prioridade_validacao": 4,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-GRF-05",
+        "regra": "validar_diferimento_difal_somente_ativo_imob_processo_produtivo",
+        "prioridade_validacao": 5,
+        "severidade": "alto"
+      },
+      {
+        "codigo": "VAL-GRF-06",
+        "regra": "validar_cfop_compativel_saida_interestadual_industrial",
+        "prioridade_validacao": 6,
+        "severidade": "alto"
+      }
+    ]
+  },
+  "regras_documentais": {
+    "cfops_comuns": [
+      "6101",
+      "6102",
+      "6109",
+      "5101"
+    ],
+    "csts_aceitos": [
+      "00",
+      "20",
+      "51",
+      "90"
+    ],
+    "csosn_aceitos": [],
+    "aliquotas_referencia": [
+      "interestadual_4",
+      "interestadual_7",
+      "interestadual_12"
+    ],
+    "observacoes_nf": [
+      "cBenef obrigatorio quando houver fruicao do incentivo",
+      "aliquota interestadual plena na NF-e — credito presumido aplicado apenas na apuracao via E111, nao na NF-e",
+      "base de calculo integral na NF-e — ajuste via E111 na EFD"
+    ]
+  },
+  "alertas_motor": [
+    {
+      "codigo": "GRF-001",
+      "descricao": "Estorno proporcional do credito de entrada nao realizado ou realizado abaixo do minimo exigido",
+      "severidade": "critico",
+      "prioridade_validacao": 1,
+      "acao_sugerida": "Apurar e lancar estorno proporcional no E111 — credito entrada limitado a 7%"
+    },
+    {
+      "codigo": "GRF-002",
+      "descricao": "Credito presumido aplicado em mercadoria nao industrializada no ES",
+      "severidade": "critico",
+      "prioridade_validacao": 2,
+      "acao_sugerida": "Verificar origem da mercadoria — beneficio vedado para produtos nao produzidos no ES"
+    },
+    {
+      "codigo": "GRF-003",
+      "descricao": "cBenef ausente em operacao beneficiada interestadual",
+      "severidade": "critico",
+      "prioridade_validacao": 3,
+      "acao_sugerida": "Incluir cBenef correto na NF-e e no registro EFD"
+    },
+    {
+      "codigo": "GRF-004",
+      "descricao": "Diferimento de DIFAL aplicado em bem nao destinado exclusivamente ao processo produtivo",
+      "severidade": "alto",
+      "prioridade_validacao": 4,
+      "acao_sugerida": "Verificar destinacao do bem e estornar diferimento indevido"
+    },
+    {
+      "codigo": "GRF-005",
+      "descricao": "Processo produtivo integralmente terceirizado — beneficio inaplicavel (Parecer Normativo 001/2024)",
+      "severidade": "critico",
+      "prioridade_validacao": 5,
+      "acao_sugerida": "Suspender fruicao do beneficio e revisar estrutura operacional"
+    }
+  ],
+  "severidade_enum": [
+    "critico",
+    "alto",
+    "medio",
+    "baixo",
+    "info"
+  ],
+  "anexos_contexto": {
+    "planilha_apuracao_obrigatoria": true,
+    "controle_interno_obrigatorio": true,
+    "exige_habilitacao_previa": true,
+    "vinculo_termo_adesao": true,
+    "dependencias": [
+      "APURACAO_SEPARADA",
+      "MEMORIA_CALCULO",
+      "ESTORNO_CREDITO"
+    ],
+    "modulos_motor_relacionados": [
+      "COMPETE_IND_GRAFICAS",
+      "ATIVO_IMOBILIZADO"
+    ],
+    "observacoes": "Credito de entrada limitado a 7% e estorno proporcional obrigatorio — ponto critico de fiscalizacao. Credito presumido de 5% aplicado apenas na apuracao (E111), nao na NF-e. Vedacao expressa a terceirizacao integral do processo produtivo (Parecer Normativo 001/2024)."
+  }
+}

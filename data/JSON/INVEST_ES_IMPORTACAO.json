@@ -1,0 +1,305 @@
+{
+  "codigo_beneficio": "INVEST_ES_IMPORTACAO",
+  "nome_beneficio": "INVEST-ES Importação",
+  "uf": "ES",
+  "status_juridico": "vigente",
+  "versao_modelo": "3.0",
+  "ultima_revisao": "2025-04-09",
+  "fonte_legal_primaria": [
+    "Lei ES 10.550/2016 — Art. 3 modalidade importacao (atualizada pela Lei 12.692/2025)",
+    "RICMS/ES — Decreto 1.090-R/2002"
+  ],
+  "fonte_orientativa_secundaria": [
+    "Resolucao INVEST-ES no 1/2026 — procedimentos administrativos (vigente 27/03/2026)",
+    "Portaria SEDES 054/2024 — renovacao obrigatoria ate 31/10/2024 para importadoras ativas ate 21/07/2023",
+    "Informativo GETRI 010/2024 — regra de estorno de credito",
+    "Parecer Normativo 001/2013 — vedacao cumulacao INVEST x COMPETE na mesma operacao"
+  ],
+  "vigencia_convenio_confaz": {
+    "numero_convenio": null,
+    "validade": null,
+    "renovacao_automatica": false,
+    "observacao": "Beneficio de legislacao estadual propria — sem amparo em Convenio CONFAZ. Monitorar posicao do STF/STJ sobre beneficios unilaterais de ICMS-importacao."
+  },
+  "ato_concessorio_cliente": {
+    "numero": null,
+    "inicio_vigencia": null,
+    "fim_vigencia": null,
+    "segmento": null,
+    "modalidade": "importacao",
+    "prazo_fruicao_anos": 12,
+    "observacao_modalidade": "Preencher com numero e vigencia do Termo de Acordo INVEST-ES. Verificar se houve renovacao em 2024 conforme Portaria 054/2024."
+  },
+  "pre_requisitos_absolutos": [
+    {
+      "codigo": "PRE-IMP-01",
+      "descricao": "termo_de_acordo_invest_es_vigente",
+      "observacao": "Contribuinte deve possuir Termo de Acordo INVEST-ES ativo. Importadoras ativas ate 21/07/2023 deveriam ter concluido renovacao ate 31/10/2024 (Portaria 054/2024).",
+      "bloqueia_se_ausente": true,
+      "prioridade": 1
+    },
+    {
+      "codigo": "PRE-IMP-02",
+      "descricao": "desembaraco_no_es",
+      "observacao": "Importacao deve ser desembarcada em porto ou aeroporto do ES",
+      "bloqueia_se_ausente": true,
+      "prioridade": 2
+    },
+    {
+      "codigo": "PRE-IMP-03",
+      "descricao": "operacao_dentro_da_modalidade_concedida_no_termo",
+      "observacao": "Somente operacoes previstas no Termo de Acordo individual sao amparadas",
+      "bloqueia_se_ausente": true,
+      "prioridade": 3
+    }
+  ],
+  "bloqueia_fruicao_se": [
+    "sem_termo_de_acordo_invest_es_vigente",
+    "desembaraco_fora_do_es",
+    "sem_cbenef_quando_obrigatorio",
+    "saldo_credor_sem_estorno_quando_exigido",
+    "cumulacao_com_compete_na_mesma_operacao",
+    "apuracao_nao_segregada",
+    "compensacao_indevida_com_apuracao_comum"
+  ],
+  "elegibilidade": {
+    "cnaes_permitidos": [
+      "comercio_exterior",
+      "importacao",
+      "distribuicao",
+      "industrializacao"
+    ],
+    "cnaes_observacao": "Validar CNAEs autorizados no Termo de Acordo INVEST-ES do cliente junto a ADERES/SEFAZ-ES.",
+    "ufs_operacao_permitidas": [
+      "ES",
+      "interestadual",
+      "importacao"
+    ],
+    "tipos_operacao_permitidas": [
+      "desembaraco_importacao",
+      "saida_subsequente",
+      "exportacao_quando_prevista_no_termo"
+    ],
+    "condicoes_especiais": [
+      "exportacao somente quando expressamente prevista no Termo de Acordo",
+      "saida subsequente deve estar vinculada ao desembaraco amparado"
+    ],
+    "vedacoes": [
+      "manutencao de saldo credor fora das hipoteses legais",
+      "cumulacao com COMPETE-ES na mesma operacao (Parecer 001/2013)",
+      "uso do beneficio em operacao nao coberta pelo Termo de Acordo",
+      "transferencia ou compensacao do saldo credor com apuracao comum"
+    ]
+  },
+  "impactos_fiscais": {
+    "tipo_beneficio": [
+      "diferimento",
+      "credito_presumido",
+      "tratamento_importacao"
+    ],
+    "detalhamento_beneficios": {
+      "diferimento_importacao": {
+        "hipotese": "importacao de mercadorias e bens pelo contribuinte beneficiario",
+        "momento_pagamento": "saida subsequente do produto",
+        "referencia_legal": "Art. 3, I, Lei 10.550/2016"
+      },
+      "credito_presumido_saida_subsequente": {
+        "limite": "conforme percentual definido no Termo de Acordo individual",
+        "referencia_legal": "Art. 3, III, Lei 10.550/2016"
+      }
+    },
+    "exige_cbenef": true,
+    "cbenef_permitidos": [],
+    "cbenef_status": "pendente_parametrizacao",
+    "cbenef_observacao": "Confirmar junto a SEFAZ-ES. Podem existir CBENEFs distintos para desembaraco e saida subsequente. Nao utilizar em producao sem preenchimento.",
+    "apuracao_em_separado": true,
+    "permite_compensar_com_saldo_credor_comum": false,
+    "exige_estorno_credito": true,
+    "exige_recolhimento_em_codigo_proprio": false,
+    "exige_memoria_calculo": true,
+    "codigos_recolhimento": {
+      "observacao": "INVEST-ES nao demanda codigo de DUA especifico. Recolhimento pelo codigo ordinario conforme atividade do contribuinte.",
+      "codigo_ordinario_comercio": "121-0",
+      "codigo_ordinario_industria": "122-8"
+    }
+  },
+  "regras_estorno": {
+    "exige_estorno": true,
+    "criterio": "quando_gerar_saldo_credor_fora_das_hipoteses_legais",
+    "criterio_detalhado": [
+      "saldo credor gerado pela entrada beneficiada que nao seja absorvido pela saida subsequente",
+      "saldo credor que nao corresponda a operacao de exportacao autorizada no Termo",
+      "qualquer saldo credor que o contribuinte pretenda transferir ou compensar com apuracao comum"
+    ],
+    "registro_sped_estorno": "E111",
+    "campo_sped": "VL_AJ_DEBITOS",
+    "codigo_ajuste_referencia": "consultar_tabela_sefaz_es_ajustes",
+    "prioridade_validacao": 1,
+    "observacao": "SEFAZ/ES orienta interpretacao literal do beneficio. Estorno exigido conforme Informativo GETRI 010/2024. Motor deve disparar alerta CRITICO sempre que houver saldo credor em contribuinte INVEST-ES Importacao fora das hipoteses de exportacao."
+  },
+  "regras_sped": {
+    "registros_afetados": [
+      "C100",
+      "C170",
+      "C190",
+      "E110",
+      "E111",
+      "E116"
+    ],
+    "campos_criticos": [
+      "cBenef",
+      "VL_BC_ICMS",
+      "VL_ICMS",
+      "CFOP",
+      "CST",
+      "VL_AJ_DEBITOS",
+      "ALIQ_ICMS"
+    ],
+    "validacoes": [
+      {
+        "codigo": "VAL-IMP-01",
+        "regra": "validar_estorno_de_credito_quando_gerar_saldo_credor_fora_das_hipoteses",
+        "prioridade_validacao": 1,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-IMP-02",
+        "regra": "validar_cbenef_no_desembaraco_e_na_saida_subsequente",
+        "prioridade_validacao": 2,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-IMP-03",
+        "regra": "validar_apuracao_separada",
+        "prioridade_validacao": 3,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-IMP-04",
+        "regra": "validar_ausencia_de_compensacao_com_apuracao_comum",
+        "prioridade_validacao": 4,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-IMP-05",
+        "regra": "validar_excecao_exportacao_autorizada_no_termo",
+        "prioridade_validacao": 5,
+        "severidade": "alto"
+      },
+      {
+        "codigo": "VAL-IMP-06",
+        "regra": "validar_vinculo_desembaraco_x_saida_subsequente",
+        "prioridade_validacao": 6,
+        "severidade": "alto"
+      },
+      {
+        "codigo": "VAL-IMP-07",
+        "regra": "validar_nao_cumulacao_com_compete_na_mesma_operacao",
+        "prioridade_validacao": 7,
+        "severidade": "critico"
+      }
+    ]
+  },
+  "regras_documentais": {
+    "cfops_comuns": [
+      "3101",
+      "3102",
+      "6101",
+      "6102",
+      "7101"
+    ],
+    "csts_aceitos": [
+      "20",
+      "51",
+      "90"
+    ],
+    "csosn_aceitos": [],
+    "aliquotas_referencia": [
+      "interestadual_4",
+      "interestadual_7",
+      "interestadual_12"
+    ],
+    "observacoes_nf": [
+      "cBenef obrigatorio quando houver fruicao do beneficio",
+      "NF-e de saida subsequente deve ser coerente com o desembaraco de importacao",
+      "CFOP 3101/3102 para entrada de importacao; 6101/6102 para saida subsequente; 7101 para exportacao quando prevista"
+    ]
+  },
+  "alertas_motor": [
+    {
+      "codigo": "IMP-001",
+      "descricao": "Saldo credor indevido em contribuinte INVEST-ES Importacao fora das hipoteses de exportacao autorizada",
+      "severidade": "critico",
+      "prioridade_validacao": 1,
+      "acao_sugerida": "Apurar e registrar estorno de credito no E111 conforme GETRI 010/2024"
+    },
+    {
+      "codigo": "IMP-002",
+      "descricao": "Ausencia de estorno de credito exigido para o periodo",
+      "severidade": "critico",
+      "prioridade_validacao": 2,
+      "acao_sugerida": "Verificar criterio de estorno e incluir ajuste no E111"
+    },
+    {
+      "codigo": "IMP-003",
+      "descricao": "Operacao beneficiada sem cBenef ou com cBenef incorreto",
+      "severidade": "critico",
+      "prioridade_validacao": 3,
+      "acao_sugerida": "Corrigir cBenef na NF-e e no registro EFD"
+    },
+    {
+      "codigo": "IMP-004",
+      "descricao": "Uso do beneficio fora da modalidade concedida no Termo de Acordo INVEST-ES",
+      "severidade": "critico",
+      "prioridade_validacao": 4,
+      "acao_sugerida": "Verificar escopo do Termo e suspender fruicao na operacao"
+    },
+    {
+      "codigo": "IMP-005",
+      "descricao": "Saida subsequente sem vinculo com desembaraco de importacao",
+      "severidade": "alto",
+      "prioridade_validacao": 5,
+      "acao_sugerida": "Cruzar documentos de importacao (DI/DUE) com NF-e de saida"
+    },
+    {
+      "codigo": "IMP-006",
+      "descricao": "Saldo credor transferido ou compensado com apuracao comum indevidamente",
+      "severidade": "critico",
+      "prioridade_validacao": 6,
+      "acao_sugerida": "Estornar compensacao indevida e segregar apuracoes"
+    },
+    {
+      "codigo": "IMP-007",
+      "descricao": "Importadora ativa ate 21/07/2023 sem confirmacao de renovacao ate 31/10/2024",
+      "severidade": "alto",
+      "prioridade_validacao": 7,
+      "acao_sugerida": "Verificar renovacao junto a SEDES — nao cumprimento resulta em exclusao (Portaria 054/2024)"
+    }
+  ],
+  "severidade_enum": [
+    "critico",
+    "alto",
+    "medio",
+    "baixo",
+    "info"
+  ],
+  "anexos_contexto": {
+    "planilha_apuracao_obrigatoria": true,
+    "controle_interno_obrigatorio": true,
+    "exige_habilitacao_previa": true,
+    "vinculo_termo_acordo_invest_es": true,
+    "vinculo_documento_importacao": true,
+    "dependencias": [
+      "IMPORTACAO",
+      "ESTORNO_CREDITO",
+      "APURACAO_SEPARADA",
+      "MEMORIA_CALCULO"
+    ],
+    "modulos_motor_relacionados": [
+      "INVEST_ES_IMPORTACAO",
+      "IMPORTACAO",
+      "ESTORNO_CREDITO"
+    ],
+    "observacoes": "Unico beneficio do portfolio com estorno de credito estrutural obrigatorio (GETRI 010/2024). Motor deve monitorar saldo credor em todos os periodos. Renovacao 2024 critica — verificar status junto a SEDES. Vedada cumulacao com COMPETE na mesma operacao (Parecer 001/2013). Resolucao INVEST 1/2026 atualiza procedimentos apos Lei 12.692/2025."
+  }
+}

@@ -31,7 +31,7 @@ def client(tmp_path: Path) -> TestClient:
     from api.deps import get_db
     app.dependency_overrides[get_db] = override_get_db
     yield TestClient(app)
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.fixture
@@ -150,6 +150,7 @@ class TestValidationAPI:
 class TestRecordsAPI:
     def _upload(self, client: TestClient, sped_bytes: bytes) -> int:
         r = client.post("/api/files/upload", files={"file": ("sped.txt", sped_bytes)})
+        assert r.status_code == 200, f"Upload falhou: {r.status_code} {r.text}"
         return r.json()["file_id"]
 
     def test_list_records(self, client: TestClient, valid_sped: bytes) -> None:
@@ -205,6 +206,7 @@ class TestRecordsAPI:
 class TestReportAPI:
     def _upload_and_validate(self, client: TestClient, sped_bytes: bytes) -> int:
         r = client.post("/api/files/upload", files={"file": ("sped.txt", sped_bytes)})
+        assert r.status_code == 200, f"Upload falhou: {r.status_code} {r.text}"
         file_id = r.json()["file_id"]
         client.post(f"/api/files/{file_id}/validate")
         return file_id
@@ -234,6 +236,7 @@ class TestReportAPI:
 
     def test_download_corrected(self, client: TestClient, valid_sped: bytes) -> None:
         r = client.post("/api/files/upload", files={"file": ("sped.txt", valid_sped)})
+        assert r.status_code == 200, f"Upload falhou: {r.status_code} {r.text}"
         file_id = r.json()["file_id"]
         r = client.get(f"/api/files/{file_id}/download")
         assert r.status_code == 200

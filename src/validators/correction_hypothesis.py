@@ -228,14 +228,13 @@ def _build_hypothesis(
             f"confirmam aliquota de {aliq_plausivel:.2f}%"
         )
 
-    # Etapa 4: Cruzar com C190
-    cst_trib = trib(cst_item)
+    # Etapa 4: Cruzar com C190 (chave completa CST 3 digitos + CFOP)
     for c190 in c190_recs:
-        c190_cst = trib(get_field(c190, F_C190_CST))
+        c190_cst = get_field(c190, F_C190_CST)
         c190_cfop = get_field(c190, F_C190_CFOP)
         c190_aliq = to_float(get_field(c190, F_C190_ALIQ))
 
-        if c190_cst == cst_trib and c190_cfop == cfop_item:
+        if c190_cst == cst_item and c190_cfop == cfop_item:
             # C190 tem aliquota preenchida?
             if c190_aliq == aliq_plausivel:
                 hypothesis.score += 20
@@ -253,7 +252,7 @@ def _build_hypothesis(
                 break
 
     # Etapa 5: CST/CFOP compativeis com tributacao
-    if cst_trib in CST_TRIBUTADO:
+    if trib(cst_item) in CST_TRIBUTADO:
         hypothesis.score += 10
         hypothesis.reasons.append(
             f"CST {cst_item} indica tributacao (compativel com ICMS destacado)"

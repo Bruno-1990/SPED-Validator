@@ -17,18 +17,20 @@ from ..models import SpedRecord, ValidationError
 from ..parser import group_by_register
 from ..services.context_builder import TaxRegime, ValidationContext
 from .helpers import (
+    CST_DIFERIMENTO,
+    CST_ISENTO_NT,
+    CST_RESIDUAL,
+    CST_TRIBUTADO,
+    CSOSN_VALIDOS,
     get_field,
     make_error,
     to_float,
 )
 from .tolerance import get_tolerance
 
-# CSTs validos por regime
-_CST_TABELA_A = {
-    "00", "02", "10", "12", "13", "15", "20", "30", "40", "41",
-    "50", "51", "52", "53", "60", "61", "70", "72", "74", "90",
-}
-_CST_TABELA_B = {"101", "102", "103", "201", "202", "203", "300", "400", "500", "900"}
+# CSTs validos por regime (construidos do JSON via helpers)
+_CST_TABELA_A = CST_TRIBUTADO | CST_ISENTO_NT | CST_DIFERIMENTO | CST_RESIDUAL
+_CST_TABELA_B = CSOSN_VALIDOS
 
 
 # ──────────────────────────────────────────────

@@ -3,6 +3,10 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # Versão do motor de regras
 ENGINE_VERSION = "3.0.0"
 
@@ -33,6 +37,13 @@ DB_PATH = DB_DIR / "sped.db"
 # Limite de upload (padrão: 50MB, configurável via env)
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
+
+# MySQL (DCTF_WEB - tabela clientes)
+MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
+MYSQL_PORT = int(os.getenv("MYSQL_PORT", "3306"))
+MYSQL_USER = os.getenv("MYSQL_USER", "root")
+MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
+MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "DCTF_WEB")
 
 # Modelo de embeddings
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"

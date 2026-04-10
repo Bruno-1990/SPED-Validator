@@ -1,0 +1,364 @@
+{
+  "codigo_beneficio": "SUBSTITUICAO_TRIBUTARIA_ES",
+  "nome_beneficio": "Substituição Tributária — ICMS/ES",
+  "uf": "ES",
+  "status_juridico": "vigente",
+  "versao_modelo": "3.0",
+  "ultima_revisao": "2025-04-09",
+  "fonte_legal_primaria": [
+    "Lei ES 7.000/2001 — Art. 104 (norma de regencia do ICMS/ES)",
+    "RICMS/ES — Decreto 1.090-R/2002 — Art. 265 e Anexo V (lista de produtos sujeitos a ST)",
+    "Convênio ICMS 142/2018 — CONFAZ (regime nacional de ST)"
+  ],
+  "fonte_orientativa_secundaria": [
+    "Portaria SEFAZ/ES 16-R/2019 atualizada — lista de produtos ST e MVAs",
+    "Portaria SEFAZ/ES 22-R/2018 atualizada — substitutos tributarios credenciados",
+    "Portaria SEFAZ/ES 6-R/2025 — ajuste de MVAs (bebidas frias, veiculos — jan/2025)",
+    "Portaria SEFAZ/ES 93-R/2025 — inclusao de vinhos NCM 2204 na ST (MVA 43,03%)",
+    "Decreto 6.208-R/2025 — bebidas quentes retornam a ST a partir de 01/11/2025",
+    "Decreto 5.917-R/2025 — GIA-ST dispensada; apuracao via EFD para regime ordinario",
+    "Receita Orienta SEFAZ/ES — Substituicao Tributaria"
+  ],
+  "vigencia_convenio_confaz": {
+    "numero_convenio": "Convenio ICMS 142/2018",
+    "validade": "indeterminado",
+    "renovacao_automatica": true,
+    "observacao": "A ST no ES tem fundamento tanto no Convenio ICMS 142/2018 (nacional) quanto em protocolos bilaterais e legislacao estadual propria (Art. 265 RICMS/ES e Portaria 16-R/2019)."
+  },
+  "ato_concessorio_cliente": {
+    "numero": null,
+    "inicio_vigencia": null,
+    "fim_vigencia": null,
+    "segmento": null,
+    "modalidade": "regime_de_tributacao",
+    "observacao_modalidade": "A ST nao tem Termo de Adesao — e regime obrigatorio para produtos e contribuintes definidos na legislacao. Substitutos tributarios devem estar credenciados na Portaria 22-R/2018."
+  },
+  "pre_requisitos_absolutos": [
+    {
+      "codigo": "PRE-ST-01",
+      "descricao": "produto_listado_no_art_265_ricms_e_portaria_16r_2019",
+      "observacao": "A ST aplica-se apenas aos produtos expressamente listados no Art. 265 do RICMS/ES e no Anexo Unico da Portaria 16-R/2019 — com NCM/SH e CEST correspondentes",
+      "bloqueia_se_ausente": true,
+      "prioridade": 1
+    },
+    {
+      "codigo": "PRE-ST-02",
+      "descricao": "correspondencia_ncm_e_cest_e_descricao",
+      "observacao": "Para enquadramento na ST e necessario que o produto atenda simultaneamente NCM, CEST e descricao do Convenio 142/2018 (clausula 2, pars. 1 e 2)",
+      "bloqueia_se_ausente": true,
+      "prioridade": 2
+    },
+    {
+      "codigo": "PRE-ST-03",
+      "descricao": "substituto_credenciado_quando_exigido",
+      "observacao": "Substituto tributario de outro estado deve estar credenciado conforme Portaria 22-R/2018. Adquirente capixaba de estado nao signatario e substituto de si proprio (CFOP 2403)",
+      "bloqueia_se_ausente": false,
+      "prioridade": 3
+    }
+  ],
+  "bloqueia_fruicao_se": [
+    "produto_nao_listado_na_portaria_16r_2019_ou_art_265_ricms",
+    "ncm_cest_ou_descricao_sem_correspondencia_ao_convenio_142_2018",
+    "st_aplicada_a_produto_usado_como_insumo_por_industria_ou_restaurante_quando_vedado"
+  ],
+  "elegibilidade": {
+    "contribuintes_alcancados": [
+      "fabricante — substituto tributario nas saidas para o ES",
+      "importador — substituto tributario na entrada de produto sujeito a ST",
+      "adquirente_no_es_de_estado_nao_signatario — substituto de si proprio na entrada"
+    ],
+    "produtos_segmentos_principais": [
+      "bebidas frias (MVAs atualizadas pela Portaria 6-R/2025)",
+      "bebidas quentes — retorno a ST a partir de 01/11/2025 (Decreto 6.208-R/2025)",
+      "vinhos NCM 2204 — incluidos na ST pela Portaria 93-R/2025 — MVA 43,03%",
+      "veiculos automotores — MVAs atualizadas pela Portaria 6-R/2025",
+      "materiais de construcao e congêneres — Convenio 142/2018",
+      "combustiveis e lubrificantes",
+      "cigarros e produtos do fumo",
+      "produtos de papelaria (Protocolo revogado em 2025 pelo CONFAZ)",
+      "medicamentos e produtos farmaceuticos",
+      "perfumaria e higiene pessoal",
+      "autopecas",
+      "demais produtos listados no Anexo V RICMS/ES e Portaria 16-R/2019"
+    ],
+    "vedacoes": [
+      "aplicacao de ST em produto adquirido como insumo por industria (quando vedado pela legislacao)",
+      "ST em produto adquirido como insumo por lanchonete, padaria, restaurante para producao propria",
+      "ST em NCM nao listada — descricao nao suficiente — NCM e CEST devem coincidir"
+    ]
+  },
+  "impactos_fiscais": {
+    "tipo_beneficio": [
+      "substituicao_tributaria"
+    ],
+    "detalhamento_beneficios": {
+      "st_retencao_na_fonte": {
+        "hipotese": "operacoes com produtos listados no Art. 265 RICMS/ES e Portaria 16-R/2019",
+        "responsavel": "substituto tributario (fabricante, importador ou adquirente de estado nao signatario)",
+        "base_calculo": "valor da operacao propria + MVA definida na Portaria 16-R/2019",
+        "referencia_legal": "Art. 265 e Anexo V RICMS/ES — Convenio ICMS 142/2018"
+      }
+    },
+    "exige_cbenef": false,
+    "cbenef_permitidos": [],
+    "cbenef_status": "nao_aplicavel",
+    "apuracao_em_separado": true,
+    "obrigacao_acessoria_antiga": "GIA-ST — dispensada pelo Decreto 5.917-R/2025",
+    "obrigacao_acessoria_atual": "OIE/EFD — regime ordinario apura e informa ST via EFD (blocos C e E200). Simples Nacional usa documentacao fiscal propria. Conforme Decreto 5.917-R/2025.",
+    "exige_estorno_credito": false,
+    "exige_recolhimento_em_codigo_proprio": true,
+    "exige_memoria_calculo": false
+  },
+  "regras_estorno": {
+    "exige_estorno": false,
+    "criterio": null,
+    "registro_sped_estorno": null,
+    "observacao": "A ST nao tem regra de estorno de credito — o imposto e retido e recolhido antecipadamente pelo substituto. Devolucoes e cancelamentos tem tratamento especifico no RICMS/ES."
+  },
+  "regras_aquisicao_estado_nao_signatario": {
+    "cfop_entrada": "2403",
+    "procedimento": "adquirente capixaba soma todas as operacoes do mes com o mesmo fornecedor e recolhe ST em DUA unico no vencimento da Portaria 16-R/2019",
+    "vedacao_credito": "vedado o aproveitamento do credito destacado na NF-e de aquisicao nessa hipotese",
+    "observacao": "Receita Orienta SEFAZ/ES — questao 15"
+  },
+  "regras_sped": {
+    "registros_afetados": [
+      "C100",
+      "C170",
+      "C190",
+      "C195",
+      "C197",
+      "E110",
+      "E111",
+      "E220",
+      "E230",
+      "E240",
+      "E250"
+    ],
+    "campos_criticos": [
+      "CFOP",
+      "CST",
+      "VL_ICMS_ST",
+      "VL_BC_ICMS_ST",
+      "MVA",
+      "CEST",
+      "COD_NCM",
+      "VL_ICMS"
+    ],
+    "validacoes": [
+      {
+        "codigo": "VAL-ST-01",
+        "regra": "validar_produto_listado_no_art_265_ricms_e_portaria_16r_2019",
+        "prioridade_validacao": 1,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ST-02",
+        "regra": "validar_correspondencia_ncm_cest_e_descricao_convenio_142_2018",
+        "prioridade_validacao": 2,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ST-03",
+        "regra": "validar_mva_aplicada_conforme_portaria_16r_2019_atualizada",
+        "prioridade_validacao": 3,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ST-04",
+        "regra": "validar_cfop_2403_para_aquisicao_de_estado_nao_signatario",
+        "prioridade_validacao": 4,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ST-05",
+        "regra": "validar_apuracao_st_na_efd_em_vez_de_gia_st_dispensada",
+        "prioridade_validacao": 5,
+        "severidade": "medio"
+      },
+      {
+        "codigo": "VAL-ST-06",
+        "regra": "validar_bebidas_quentes_na_st_a_partir_de_01_11_2025",
+        "prioridade_validacao": 6,
+        "severidade": "alto"
+      },
+      {
+        "codigo": "VAL-ST-07",
+        "regra": "validar_vinhos_ncm_2204_na_st_conforme_portaria_93r_2025",
+        "prioridade_validacao": 7,
+        "severidade": "alto"
+      },
+      {
+        "codigo": "VAL-ST-08",
+        "regra": "validar_vedacao_st_em_insumos_de_industria_e_restaurante_quando_aplicavel",
+        "prioridade_validacao": 8,
+        "severidade": "medio"
+      }
+    ],
+    "registros_afetados_por_cenario": {
+      "substituto_tributario_retencao_saida": {
+        "registros": [
+          "C100",
+          "C170",
+          "C195",
+          "C197",
+          "E110",
+          "E220",
+          "E230"
+        ],
+        "observacao": "Substituto que retém ST na saída — destaque em C195/C197 e apuração em E220/E230"
+      },
+      "substituido_tributario_entrada": {
+        "registros": [
+          "C100",
+          "C101",
+          "C170",
+          "C191",
+          "E110",
+          "E111"
+        ],
+        "observacao": "Substituído na entrada — C101 para ICMS-ST da NF-e de entrada; C191 para complemento; E111 para ajustes"
+      },
+      "adquirente_estado_nao_signatario_cfop_2403": {
+        "registros": [
+          "C100",
+          "C170",
+          "E110",
+          "E111",
+          "E250"
+        ],
+        "observacao": "Adquirente capixaba de estado nao signatario — CFOP 2403, recolhimento DUA mensal via E250"
+      },
+      "apuracao_geral_st_efd": {
+        "registros": [
+          "E200",
+          "E210",
+          "E220",
+          "E230",
+          "E240",
+          "E250"
+        ],
+        "observacao": "Bloco E200/filhos — apuracao ICMS-ST por UF. GIA-ST dispensada (Decreto 5.917-R/2025); regime ordinario usa OIE/EFD"
+      }
+    }
+  },
+  "regras_documentais": {
+    "cfops_comuns": [
+      "1403 — compra para comercializacao em operacao com ST",
+      "2403 — compra de estado nao signatario para ST de propria responsabilidade",
+      "5401 — venda com ST pelo fabricante/importador",
+      "5403 — venda com ST por quem ja foi substituido",
+      "6401 — venda interestadual com ST",
+      "6403 — venda interestadual ST por substituido"
+    ],
+    "csts_aceitos": [
+      "10",
+      "30",
+      "60",
+      "70"
+    ],
+    "csosn_aceitos": [
+      "201",
+      "202",
+      "203",
+      "500",
+      "900"
+    ],
+    "mva_referencia": "consultar_portaria_16r_2019_por_segmento_de_produto",
+    "observacoes_nf": [
+      "CEST obrigatorio em produtos sujeitos a ST (Convenio 142/2018)",
+      "destaque do ICMS-ST obrigatorio na NF-e do substituto",
+      "GIA-ST dispensada pelo Decreto 5.917-R/2025 — apurar e informar via EFD",
+      "para vinhos NCM 2204 — MVA original 43,03% conforme Portaria 93-R/2025",
+      "bebidas quentes retornam a ST a partir de 01/11/2025 (Decreto 6.208-R/2025)"
+    ]
+  },
+  "alertas_motor": [
+    {
+      "codigo": "ST-001",
+      "descricao": "Produto sujeito a ST com CST incorreto (sem codigo de ST) — 00 ou 90 em operacao que deveria ser 10 ou 60",
+      "severidade": "critico",
+      "prioridade_validacao": 1,
+      "acao_sugerida": "Verificar enquadramento do produto na Portaria 16-R/2019 e corrigir CST na NF-e"
+    },
+    {
+      "codigo": "ST-002",
+      "descricao": "MVA desatualizada em relacao a Portaria 16-R/2019 vigente (incluindo atualizacoes 6-R/2025 e 93-R/2025)",
+      "severidade": "critico",
+      "prioridade_validacao": 2,
+      "acao_sugerida": "Atualizar MVA conforme versao vigente da Portaria 16-R/2019"
+    },
+    {
+      "codigo": "ST-003",
+      "descricao": "Aquisicao de estado nao signatario sem CFOP 2403 e sem recolhimento de ST proprio",
+      "severidade": "critico",
+      "prioridade_validacao": 3,
+      "acao_sugerida": "Escriturar pelo CFOP 2403 e recolher ST em DUA no vencimento da Portaria 16-R/2019"
+    },
+    {
+      "codigo": "ST-004",
+      "descricao": "GIA-ST ainda sendo gerada — dispensada pelo Decreto 5.917-R/2025",
+      "severidade": "info",
+      "prioridade_validacao": 4,
+      "acao_sugerida": "Migrar apuracao e informacao de ST para a EFD conforme Decreto 5.917-R/2025"
+    },
+    {
+      "codigo": "ST-005",
+      "descricao": "Bebida quente sem ST em periodo posterior a 01/11/2025",
+      "severidade": "critico",
+      "prioridade_validacao": 5,
+      "acao_sugerida": "Aplicar ST conforme Decreto 6.208-R/2025 a partir de 01/11/2025"
+    },
+    {
+      "codigo": "ST-006",
+      "descricao": "Vinho NCM 2204 sem ST apos vigencia da Portaria 93-R/2025",
+      "severidade": "critico",
+      "prioridade_validacao": 6,
+      "acao_sugerida": "Aplicar ST com MVA original 43,03% conforme Portaria 93-R/2025"
+    },
+    {
+      "codigo": "ST-007",
+      "descricao": "CEST ausente em produto sujeito a ST",
+      "severidade": "alto",
+      "prioridade_validacao": 7,
+      "acao_sugerida": "Incluir CEST correto conforme Convenio 142/2018 e Portaria 16-R/2019"
+    },
+    {
+      "codigo": "ST-008",
+      "descricao": "ST aplicada em produto de papelaria apos revogacao do Protocolo (CONFAZ 2025)",
+      "severidade": "medio",
+      "prioridade_validacao": 8,
+      "acao_sugerida": "Verificar se o produto ainda esta sujeito a ST no ES apos revogacao do Protocolo pelo CONFAZ em 2025"
+    },
+    {
+      "codigo": "ST-009",
+      "descricao": "Substituto tributario apurando ST fora dos registros E200/E220/E230/E250 da EFD — estrutura OIE nao utilizada",
+      "severidade": "alto",
+      "prioridade_validacao": 9,
+      "acao_sugerida": "Migrar apuracao para blocos OIE da EFD (E200 e filhos) conforme Decreto 5.917-R/2025 e orientacao SEFAZ/ES"
+    }
+  ],
+  "severidade_enum": [
+    "critico",
+    "alto",
+    "medio",
+    "baixo",
+    "info"
+  ],
+  "anexos_contexto": {
+    "planilha_apuracao_obrigatoria": false,
+    "controle_interno_obrigatorio": true,
+    "exige_habilitacao_previa": false,
+    "credenciamento_substituto_quando_aplicavel": true,
+    "dependencias": [
+      "CONTROLE_NCM",
+      "CONTROLE_CEST",
+      "EFD_ICMS_IPI"
+    ],
+    "modulos_motor_relacionados": [
+      "SUBSTITUICAO_TRIBUTARIA_ES",
+      "DIFAL"
+    ],
+    "observacoes": "ST e regime obrigatorio — nao tem Termo de Adesao. GIA-ST dispensada desde jan/2025 (Decreto 5.917-R/2025) — apuracao via EFD. Bebidas quentes retornam a ST em 01/11/2025 (Decreto 6.208-R/2025). Vinhos NCM 2204 incluidos na ST pela Portaria 93-R/2025 — MVA 43,03%. Motor deve manter tabela de MVAs atualizada com versoes vigentes da Portaria 16-R/2019. Papelaria — verificar impacto da revogacao do Protocolo pelo CONFAZ em 2025."
+  }
+}

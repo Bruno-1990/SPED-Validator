@@ -25,6 +25,8 @@ from ..services.context_builder import ValidationContext
 from .helpers import (
     ALIQ_INTERESTADUAIS,
     CFOP_REMESSA_RETORNO,
+    CST_TRIBUTADO,
+    cst_origem,
     get_field,
     make_error,
     make_generic_error,
@@ -55,7 +57,16 @@ _CFOP_INTERESTADUAL_REVENDA_INDUSTRIA = {
 }
 
 # CSTs que indicam operacao com DIFAL (tributado com diferencial)
-_CST_COM_DIFAL = {"00", "02", "10", "12", "13", "15", "20", "70", "90"}
+# Usa CST_TRIBUTADO do helpers.py (alimentado por Tabela_CST_Vigente.json)
+# que inclui 00,02,10,12,13,15,20,70,72,74 (exclui 90 residual)
+_CST_COM_DIFAL = CST_TRIBUTADO
+
+# CSTs de origem que indicam produto importado sujeito a aliquota 4%
+# (Resolucao Senado 13/2012)
+# Origem 1 = importacao direta, 2 = importacao mercado interno,
+# 3 = nacional conteudo importacao > 40%, 8 = nacional importacao > 70%
+# Excecoes (seguem 7/12%): 4 = PPB, 6/7 = sem similar nacional CAMEX
+_CST_ORIGEM_IMPORTADA_4PCT = {"1", "2", "3", "8"}
 
 
 # ──────────────────────────────────────────────
@@ -155,6 +166,7 @@ def validate_difal(
         errors.extend(_check_difal_006(rec, cfop, uf_dest, loader))
         errors.extend(_check_difal_007(rec, cfop, ind_ie, uf_dest))
         errors.extend(_check_difal_008(rec, cfop, ind_ie))
+        errors.extend(_check_difal_010(rec, cfop, uf_declarante, uf_dest, loader))
 
     # DIFAL_009: validacao de partilha (nivel arquivo)
     if context and context.periodo_ini and loader:
@@ -612,3 +624,73 @@ def _check_difal_009(ano: int, loader) -> list[ValidationError]:
         register="E300",
         value=f"ANO={ano}",
     )]
+
+
+# ──────────────────────────────────────────────
+# DIFAL_010: Aliquota interestadual incompativel com origem do CST
+# ──────────────────────────────────────────────
+
+def _check_difal_010(
+    record: SpedRecord,
+    cfop: str,
+    uf_declarante: str,
+    uf_dest: str,
+    loader=None,
+) -> list[ValidationError]:
+    """Aliquota interestadual incompativel com o digito de origem do CST.
+
+    Resolucao Senado 13/2012:
+    - Origens 1,2,3,8 (importados ou CI>40%) → aliquota 4%
+    - Origens 4 (PPB), 6,7 (sem similar CAMEX) → seguem 7% ou 12% conforme UF
+    - Origem 0,5 (nacionais normais) → seguem 7% ou 12% conforme UF
+
+    Regra: se CST tem origem importada (1/2/3/8) e aliquota != 4%, erro.
+    Se CST tem origem nacional/PPB/CAMEX (0/4/5/6/7) e aliquota = 4%, erro.
+    """
+    cst = get_field(record, "CST_ICMS")
+    origem = cst_origem(cst)
+    if not origem:
+        return []  # CST sem 3 digitos — nao verificar
+
+    t = trib(cst)
+    if t not in _CST_COM_DIFAL:
+        return []
+
+    aliq = to_float(get_field(record, "ALIQ_ICMS"))
+    if aliq <= 0:
+        return []
+
+    # Origem importada (1/2/3/8) deveria usar aliquota 4%
+    if origem in _CST_ORIGEM_IMPORTADA_4PCT and abs(aliq - 4.0) > 0.01:
+        aliq_esperada = _aliq_interestadual_esperada(uf_declarante, uf_dest, loader)
+        # Se a aliquota nao e 4% e tambem nao e a esperada pela matriz UF,
+        # pode ser que o CST de origem esteja errado ou a aliquota esteja errada
+        return [make_error(
+            record, "ALIQ_ICMS", "DIFAL_ALIQ_ORIGEM_INCOMPATIVEL",
+            (
+                f"CST {cst} indica origem importada (digito {origem}) — "
+                f"aliquota interestadual esperada: 4% (Res. Senado 13/2012). "
+                f"Encontrada: {aliq:.2f}%. "
+                f"Verifique se a origem da mercadoria esta correta ou se "
+                f"o produto se enquadra nas excecoes (PPB, sem similar CAMEX)."
+            ),
+            field_no=14,
+            value=f"CST={cst} ALIQ={aliq:.2f}% CFOP={cfop}",
+            expected_value="4.00",
+        )]
+
+    # Origem nacional/PPB/CAMEX (0/4/5/6/7) usando aliquota 4% indevidamente
+    if origem not in _CST_ORIGEM_IMPORTADA_4PCT and abs(aliq - 4.0) < 0.01:
+        return [make_error(
+            record, "ALIQ_ICMS", "DIFAL_ALIQ_ORIGEM_INCOMPATIVEL",
+            (
+                f"CST {cst} indica origem nacional (digito {origem}), "
+                f"mas aliquota interestadual e de 4% (exclusiva para importados). "
+                f"Para mercadoria nacional, a aliquota interestadual deve ser "
+                f"7% ou 12% conforme UF de origem/destino."
+            ),
+            field_no=14,
+            value=f"CST={cst} ALIQ={aliq:.2f}% CFOP={cfop}",
+        )]
+
+    return []

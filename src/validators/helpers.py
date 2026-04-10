@@ -109,6 +109,7 @@ REGISTER_FIELDS: dict[str, list[str]] = {
         "VL_SLD_CREDOR_TRANSPORTAR", "DEB_ESP",
     ],
     "E111": ["REG", "COD_AJ_APUR", "DESCR_COMPL_AJ", "VL_AJ_APUR"],
+    "E116": ["REG", "COD_OR", "VL_OR", "DT_VCTO", "COD_REC", "NUM_PROC", "IND_PROC"],
     "E200": ["REG", "UF", "DT_INI", "DT_FIN"],
     "E210": [
         "REG", "IND_MOV_ST", "VL_SLD_CRED_ANT_ST", "VL_DEVOL_ST",
@@ -184,8 +185,34 @@ def to_float(value: str) -> float:
 
 
 def trib(cst: str) -> str:
-    """Extrai a parte da tributacao (ultimos 2 digitos) de um CST."""
+    """Extrai a parte da tributacao (ultimos 2 digitos) de um CST.
+
+    Util para checagens de classificacao (membership em sets como CST_TRIBUTADO)
+    onde a origem nao importa. Para consolidacao C170->C190, usar CST completo.
+    """
     return cst[-2:] if len(cst) >= 2 else cst
+
+
+def cst_origem(cst: str) -> str:
+    """Extrai o digito de origem (1o digito) de um CST de 3 digitos.
+
+    Formato CST ICMS: ABB onde A=origem, BB=tributacao.
+    Origens: 0=nacional, 1=estrangeira direta, 2=estrangeira mercado interno,
+    3=nacional CI>40%, 4=nacional PPB, 5=nacional CI<40%,
+    6=estrangeira sem similar CAMEX, 7=estrangeira sem similar (adquirida MI),
+    8=nacional CI>70%.
+    Retorna "" se CST tem menos de 3 digitos.
+    """
+    return cst[0] if len(cst) >= 3 else ""
+
+
+def cst_normalizar(cst: str) -> str:
+    """Normaliza CST para 3 digitos com padding de zero na origem.
+
+    CST de 2 digitos (ex: "00") vira "000" (origem nacional presumida).
+    CST de 3 digitos permanece inalterado.
+    """
+    return cst.zfill(3) if len(cst) == 2 else cst
 
 
 def make_error(
@@ -229,23 +256,139 @@ def make_generic_error(
 
 
 # ──────────────────────────────────────────────
-# Constantes — CST
+# Constantes — CST (construidas a partir de Tabela_CST_Vigente.json)
 # ──────────────────────────────────────────────
+#
+# Os sets abaixo sao construidos a partir dos 'efeitos' de cada CST no JSON.
+# Se o JSON nao existir, usam fallback hardcoded para compatibilidade.
+# Fonte: data/JSON/Tabela_CST_Vigente.json → blocos.CST_ICMS.tabela_b_tributacao
 
-# ICMS — CSTs que indicam tributacao (debito proprio)
-CST_TRIBUTADO = {"00", "02", "10", "12", "13", "15", "20", "70", "90"}
+def _load_cst_sets() -> dict[str, set[str]]:
+    """Carrega classificacao de CSTs a partir do JSON de referencia."""
+    import json
+    from pathlib import Path
 
-# ICMS — CSTs que indicam isencao/nao-tributacao/suspensao
-CST_ISENTO_NT = {"30", "40", "41", "50", "60", "61"}
+    json_path = Path(__file__).parent.parent.parent / "data" / "JSON" / "Tabela_CST_Vigente.json"
+
+    # Fallback hardcoded (ultima atualizacao: 2026-04-07)
+    fallback = {
+        "debito_proprio": {"00", "02", "10", "12", "13", "15", "20", "70", "72", "74"},
+        "sem_debito_proprio": {"30", "40", "41", "50", "51", "52", "53", "60", "61"},
+        "monofasico": {"02", "15", "53", "61"},
+        "diferimento": {"51", "52", "53"},
+        "isencao": {"30", "40"},
+        "nao_incidencia": {"41"},
+        "suspensao": {"50"},
+        "tem_st_subsequente": {"10", "15", "30", "52", "70"},
+        "tem_st_antecedente": {"12", "72"},
+        "tem_st_concomitante": {"13", "74"},
+        "icms_recolhido_anteriormente": {"60", "61"},
+        "reducao_base_calculo": {"20", "70", "72", "74"},
+        "residual": {"90"},
+    }
+
+    if not json_path.exists():
+        return fallback
+
+    try:
+        with open(json_path, encoding="utf-8") as f:
+            data = json.load(f)
+
+        result: dict[str, set[str]] = {}
+
+        # CST ICMS (Tabela B — tributacao)
+        tab_b = data.get("blocos", {}).get("CST_ICMS", {}).get("tabela_b_tributacao", [])
+        codigos = tab_b if isinstance(tab_b, list) else tab_b.get("codigos", [])
+        for entry in codigos:
+            codigo = entry.get("codigo", "")
+            if not codigo:
+                continue
+            for efeito in entry.get("efeitos", []):
+                result.setdefault(efeito, set()).add(codigo)
+
+        # CSOSN (Simples Nacional) — prefixo "csosn_" nos efeitos
+        csosn_block = data.get("blocos", {}).get("CSOSN", {})
+        csosn_codigos = csosn_block.get("codigos", [])
+        for entry in csosn_codigos:
+            codigo = entry.get("codigo", "")
+            if not codigo:
+                continue
+            for efeito in entry.get("efeitos", []):
+                result.setdefault(f"csosn_{efeito}", set()).add(codigo)
+
+        # Garantir que todas as chaves esperadas existam
+        for key in fallback:
+            result.setdefault(key, set())
+
+        return result
+    except Exception:
+        return fallback
+
+
+_CST_SETS = _load_cst_sets()
+
+# ICMS — CSTs com debito proprio (devem ter aliquota)
+# JSON efeito: debito_proprio
+CST_TRIBUTADO = _CST_SETS["debito_proprio"]
+
+# ICMS — CSTs sem debito proprio (isencao/NT/suspensao/diferimento/ST cobrada)
+# JSON efeito: sem_debito_proprio
+CST_ISENTO_NT = _CST_SETS["sem_debito_proprio"]
 
 # ICMS — CST diferimento
-CST_DIFERIMENTO = {"51", "52", "53"}
+# JSON efeito: diferimento
+CST_DIFERIMENTO = _CST_SETS["diferimento"]
 
-# CSTs de ST (substituicao tributaria)
-CST_ST = {"10", "12", "13", "15", "30", "60", "61", "70", "72", "74"}
+# CSTs de ST (substituicao tributaria) — uniao de subsequente, antecedente,
+# concomitante e cobrado anteriormente
+CST_ST = (
+    _CST_SETS["tem_st_subsequente"]
+    | _CST_SETS["tem_st_antecedente"]
+    | _CST_SETS["tem_st_concomitante"]
+    | _CST_SETS["icms_recolhido_anteriormente"]
+)
 
 # CSTs monofasico combustiveis (LC 192/2022)
-CST_MONOFASICO = {"02", "15", "53", "61"}
+# JSON efeito: monofasico
+CST_MONOFASICO = _CST_SETS["monofasico"]
+
+# CSTs com reducao de base de calculo
+# JSON efeito: reducao_base_calculo
+CST_REDUCAO_BC = _CST_SETS["reducao_base_calculo"]
+
+# CST residual (catch-all)
+CST_RESIDUAL = _CST_SETS["residual"]
+
+# ──────────────────────────────────────────────
+# Constantes — CSOSN (Simples Nacional)
+# Fonte: Tabela_CST_Vigente.json → blocos.CSOSN
+# ──────────────────────────────────────────────
+
+# CSOSN com debito proprio (tributado pelo SN)
+CSOSN_TRIBUTADO = _CST_SETS.get("csosn_debito_proprio", {"101", "102", "201", "202"})
+
+# CSOSN sem debito proprio (isento/imune/NT/ST cobrada)
+CSOSN_SEM_DEBITO = _CST_SETS.get("csosn_sem_debito_proprio", {"103", "203", "300", "400", "500"})
+
+# CSOSN com permissao de credito ao destinatario
+CSOSN_COM_CREDITO = _CST_SETS.get("csosn_gera_credito_destinatario", {"101", "201"})
+
+# CSOSN com ST subsequente
+CSOSN_COM_ST = _CST_SETS.get("csosn_tem_st_subsequente", {"201", "202", "203"})
+
+# CSOSN com encerramento de tributacao (ST cobrada anteriormente)
+CSOSN_ST_COBRADA = _CST_SETS.get("csosn_icms_recolhido_anteriormente", {"500"})
+
+# CSOSN residual
+CSOSN_RESIDUAL = _CST_SETS.get("csosn_residual", {"900"})
+
+# Todos os CSOSNs validos
+CSOSN_VALIDOS = CSOSN_TRIBUTADO | CSOSN_SEM_DEBITO | CSOSN_RESIDUAL
+
+
+# ──────────────────────────────────────────────
+# Constantes gerais
+# ──────────────────────────────────────────────
 
 # Aliquotas interestaduais validas (Resolucao Senado 13/2012)
 ALIQ_INTERESTADUAIS = {4.0, 7.0, 12.0}

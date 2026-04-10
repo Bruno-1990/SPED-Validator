@@ -11,7 +11,9 @@ from .helpers import (
     CFOP_REMESSA_RETORNO,
     CST_DIFERIMENTO,
     CST_ISENTO_NT,
+    CST_RESIDUAL,
     CST_TRIBUTADO,
+    CSOSN_VALIDOS,
     get_field,
     make_error,
     to_float,
@@ -22,21 +24,14 @@ if TYPE_CHECKING:
     from ..services.context_builder import ValidationContext
 
 # ──────────────────────────────────────────────
-# CSTs validos por tipo de imposto (locais)
+# CSTs validos por tipo de imposto (do JSON via helpers)
 # ──────────────────────────────────────────────
 
 # ICMS - Tabela A (Origem) + Tabela B (Tributacao)
-# Origem: 0-8, Tributacao: 00,10,20,30,40,41,50,51,60,70,90
-_CST_ICMS_TRIBUTACAO = {
-    "00", "02", "10", "12", "13", "15", "20", "30", "40", "41",
-    "50", "51", "52", "53", "60", "61", "70", "72", "74", "90",
-}
+_CST_ICMS_TRIBUTACAO = CST_TRIBUTADO | CST_ISENTO_NT | CST_DIFERIMENTO | CST_RESIDUAL
 
 # ICMS Simples Nacional (CSOSN)
-_CSOSN_VALIDOS = {
-    "101", "102", "103", "201", "202", "203",
-    "300", "400", "500", "900",
-}
+_CSOSN_VALIDOS = CSOSN_VALIDOS
 
 # CSTs de IPI
 _CST_IPI_VALIDOS = {
@@ -201,7 +196,9 @@ def _validate_exemptions_c170(record: SpedRecord) -> list[ValidationError]:
     vl_icms = to_float(get_field(record, "VL_ICMS"))
 
     # CST isento/nao-tributado: valores devem ser zero
-    if t in CST_ISENTO_NT and (vl_bc_icms > 0 or vl_icms > 0):
+    # Excecao: CST de diferimento (51/52/53) pode ter BC informativa
+    # (o ICMS e diferido, nao isento — BC pode ser preenchida)
+    if t in CST_ISENTO_NT and t not in CST_DIFERIMENTO and (vl_bc_icms > 0 or vl_icms > 0):
         errors.append(make_error(
             record, "VL_ICMS", "ISENCAO_INCONSISTENTE",
             f"CST {cst_icms} indica isencao/nao-tributacao, "
@@ -281,8 +278,11 @@ def _validate_cst_tributado_aliq_zero(record: SpedRecord) -> list[ValidationErro
     if t not in CST_TRIBUTADO:
         return []
 
-    # CSTs que admitem zero conforme Guia Pratico (20, 51, 90)
-    if t in ("20", "51", "90"):
+    # CSTs que admitem aliquota zero conforme Guia Pratico:
+    # 20 = reducao BC (BC pode estar reduzida a zero, resultando em ALIQ=0 no C190)
+    # 02/15/53/61 = monofasico (tributacao ad rem R$/litro, nao ad valorem %)
+    from .helpers import CST_MONOFASICO
+    if t == "20" or t in CST_MONOFASICO:
         return []
 
     aliq = to_float(get_field(record, "ALIQ_ICMS"))

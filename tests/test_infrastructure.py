@@ -7,6 +7,7 @@ import json
 import sqlite3
 import warnings
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -91,7 +92,7 @@ def client(seeded_db: sqlite3.Connection) -> TestClient:
     app.dependency_overrides[get_db] = _override_db
     c = TestClient(app)
     yield c
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_db, None)
 
 
 # ──────────────────────────────────────────────
@@ -101,14 +102,15 @@ def client(seeded_db: sqlite3.Connection) -> TestClient:
 class TestUploadSizeLimit:
     """Upload > 100 MB deve retornar 413."""
 
-    def test_upload_over_100mb_returns_413(self, client: TestClient) -> None:
-        # Criar conteudo ligeiramente maior que o limite
-        oversized = b"x" * (MAX_FILE_SIZE + 1024)
-        response = client.post(
-            "/api/files/upload",
-            files={"file": ("big.txt", io.BytesIO(oversized), "text/plain")},
-        )
-        assert response.status_code == 413
+    def test_upload_over_limit_returns_413(self, client: TestClient) -> None:
+        # Usar MAX_FILE_SIZE reduzido via mock para evitar alocar 50MB+
+        with patch("api.routers.files.MAX_FILE_SIZE", 1024):
+            oversized = b"x" * 2048  # 2KB > 1KB limite mockado
+            response = client.post(
+                "/api/files/upload",
+                files={"file": ("big.txt", io.BytesIO(oversized), "text/plain")},
+            )
+            assert response.status_code == 413
 
     def test_upload_small_file_accepted(self, client: TestClient) -> None:
         # Arquivo SPED minimo valido

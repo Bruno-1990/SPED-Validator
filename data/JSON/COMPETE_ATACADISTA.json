@@ -4,205 +4,260 @@
   "uf": "ES",
   "status_juridico": "vigente",
   "versao_modelo": "3.0",
-  "ultima_revisao": "2025-04-07",
-
+  "ultima_revisao": "2025-04-09",
   "fonte_legal_primaria": [
-    "Lei ES 10.568/2016",
-    "RICMS/ES - Decreto 1.090-R/2002 e alterações"
+    "Lei ES 10.568/2016 — Art. 16 (redacao dada pela Lei 12.220/2024 — vigencia 01/10/2024)",
+    "RICMS/ES — Decreto 1.090-R/2002 — Capítulo XXXIX-A"
   ],
   "fonte_orientativa_secundaria": [
-    "Receita Orienta - COMPETE-ES/SEFAZ-ES"
+    "Receita Orienta COMPETE-ES/SEFAZ-ES",
+    "Parecer Normativo 670/2024 — SEFAZ/ES (FUNDAP + COMPETE Atacadista — coexistencia admitida em operacoes distintas)"
   ],
-
   "vigencia_convenio_confaz": {
     "numero_convenio": null,
     "validade": null,
     "renovacao_automatica": false,
-    "observacao": "Benefício de legislação estadual própria — sem amparo em Convênio CONFAZ. Sujeito a questionamento jurídico interestadual."
+    "observacao": "Beneficio de legislacao estadual propria depositado no CONFAZ em observancia a LC 160/2017 e Convenio ICMS 190/2017 (conforme Portaria 176-R/2025). Vigencia assegurada para os periodos de fruicao anteriores. Monitorar eventuais impugnacoes interestaduais por contribuintes de outros estados."
   },
-
   "ato_concessorio_cliente": {
-    "numero": "TERMO-ADESAO-2025-001",
-    "inicio_vigencia": "2025-01-01",
+    "numero": null,
+    "inicio_vigencia": null,
     "fim_vigencia": null,
     "segmento": "atacadista",
     "modalidade": null,
-    "observacao_modalidade": "Pode conter mais de uma modalidade. Preencher quando definido no Termo."
+    "observacao_modalidade": "Preencher com dados do Termo de Adesao. Verificar se o mesmo CNPJ e tambem beneficiario do FUNDAP — coexistencia admitida desde que nao na mesma operacao (Parecer 670/2024)."
   },
-
   "pre_requisitos_absolutos": [
     {
       "codigo": "PRE-ATK-01",
       "descricao": "termo_adesao_vigente",
-      "observacao": "Contribuinte deve possuir Termo de Adesao ativo junto à SEFAZ-ES",
+      "observacao": "Contribuinte deve possuir Termo de Adesao ativo junto a SEFAZ-ES/SEDES",
       "bloqueia_se_ausente": true,
       "prioridade": 1
     },
     {
       "codigo": "PRE-ATK-02",
-      "descricao": "habilitacao_ativa_compete",
-      "observacao": "Habilitação no programa COMPETE-ES deve estar ativa no cadastro SEFAZ-ES",
+      "descricao": "estabelecimento_comercial_atacadista_no_es",
+      "observacao": "Beneficio restrito a estabelecimento comercial atacadista estabelecido no ES — caput Art. 16 Lei 10.568/2016",
       "bloqueia_se_ausente": true,
       "prioridade": 2
+    },
+    {
+      "codigo": "PRE-ATK-03",
+      "descricao": "estabelecimento_fisicamente_autonomo",
+      "observacao": "Vedado dois estabelecimentos COMPETE no mesmo espaco fisico — pareceres GETRI 2025",
+      "bloqueia_se_ausente": true,
+      "prioridade": 3
     }
   ],
-
   "bloqueia_fruicao_se": [
     "sem_termo_adesao_vigente",
-    "sem_habilitacao_ativa_compete",
+    "operacao_nao_destinada_a_comercializacao_ou_industrializacao",
+    "operacao_interna",
     "sem_cbenef_quando_obrigatorio",
-    "operacao_interna_nao_prevista_no_termo",
-    "apuracao_nao_segregada"
+    "apuracao_nao_segregada_codigo_receita_380-8",
+    "credito_entrada_acima_de_7pct",
+    "cumulacao_com_fundap_na_mesma_operacao"
   ],
-
   "elegibilidade": {
-    "cnaes_permitidos": ["comercio_atacadista"],
-    "cnaes_observacao": "Validar CNAEs exatos autorizados no Termo de Adesão do cliente junto à SEFAZ-ES.",
-    "ufs_operacao_permitidas": ["interestadual"],
+    "cnaes_permitidos": [
+      "comercio_atacadista — validar CNAEs exatos no Termo de Adesao"
+    ],
+    "cnaes_observacao": "Qualquer CNAE de comercio atacadista — verificar lista autorizada junto a SEDES/SEFAZ-ES.",
+    "ufs_operacao_permitidas": [
+      "interestadual"
+    ],
     "tipos_operacao_permitidas": [
-      "saida_mercadoria",
-      "bonificacao_quando_admitida"
+      "saida_interestadual_destinada_a_comercializacao",
+      "saida_interestadual_destinada_a_industrializacao"
     ],
     "condicoes_especiais": [
-      "bonificacao somente quando expressamente prevista no Termo de Adesao"
+      "FUNDAP + COMPETE Atacadista pode coexistir desde que nao na mesma operacao (Parecer 670/2024)",
+      "credito de entrada limitado a 7% — vedado qualquer outro credito na apuracao do beneficio (par. 2, Art. 16, Lei 12.220/2024)"
     ],
     "vedacoes": [
-      "operacoes fora das hipoteses legais do beneficio",
-      "descumprimento de requisitos do termo de adesao",
-      "operacoes internas nao previstas no regime atacadista",
-      "aproveitamento de credito estranho ao fluxo do beneficio"
+      "saidas internas",
+      "operacoes nao destinadas a comercializacao ou industrializacao",
+      "credito de entrada acima de 7%",
+      "aproveitamento de outros creditos na apuracao do beneficio",
+      "cumulacao com FUNDAP na mesma operacao",
+      "dois_estabelecimentos_compete_mesmo_espaco_fisico — vedado conforme pareceres GETRI 2025"
     ]
   },
-
   "impactos_fiscais": {
     "tipo_beneficio": [
-      "reducao_base_calculo",
-      "credito_presumido",
-      "estorno_debito",
-      "diferimento"
+      "credito_presumido"
     ],
+    "detalhamento_beneficios": {
+      "credito_presumido_interestadual": {
+        "carga_efetiva": "1,1%",
+        "metodologia": "estorno do debito registrado nas saidas interestaduais de forma que, apos utilizacao dos creditos correspondentes, a carga tributaria efetiva resulte em 1,1%",
+        "codigo_receita_recolhimento": "380-8",
+        "referencia_legal": "Art. 16 Lei 10.568/2016 — redacao Lei 12.220/2024 — vigencia 01/10/2024"
+      }
+    },
     "exige_cbenef": true,
     "cbenef_permitidos": [],
     "cbenef_status": "pendente_parametrizacao",
-    "cbenef_observacao": "Confirmar código junto à SEFAZ-ES após habilitação. Não utilizar em produção sem preenchimento.",
+    "cbenef_observacao": "Confirmar codigo junto a SEFAZ-ES. Nao utilizar em producao sem preenchimento.",
+    "limite_credito_entrada": "7%",
     "apuracao_em_separado": true,
+    "codigo_receita_apuracao": "380-8",
     "permite_compensar_com_saldo_credor_comum": false,
     "exige_estorno_credito": false,
     "exige_recolhimento_em_codigo_proprio": true,
     "exige_memoria_calculo": true
   },
-
   "regras_estorno": {
     "exige_estorno": false,
     "criterio": null,
     "registro_sped_estorno": null,
-    "observacao": "Não há regra de estorno de crédito para esta modalidade. Revisar se houver alteração legislativa."
+    "observacao": "Nao ha regra de estorno de credito para esta modalidade. O mecanismo e de credito presumido/estorno de debito na apuracao. Revisar se houver alteracao legislativa."
   },
-
   "regras_sped": {
-    "registros_afetados": ["C100", "C170", "C190", "E110", "E111", "E116"],
+    "registros_afetados": [
+      "C100",
+      "C170",
+      "C190",
+      "E110",
+      "E111",
+      "E116"
+    ],
     "campos_criticos": [
-      "cBenef", "CST", "CFOP", "VL_BC_ICMS", "VL_ICMS", "VL_ICMS_ST", "ALIQ_ICMS"
+      "cBenef",
+      "CST",
+      "CFOP",
+      "VL_BC_ICMS",
+      "VL_ICMS",
+      "ALIQ_ICMS"
     ],
     "validacoes": [
       {
         "codigo": "VAL-ATK-01",
-        "regra": "se_operacao_beneficiada_entao_cbenef_obrigatorio",
+        "regra": "validar_apuracao_separada_codigo_receita_380-8",
         "prioridade_validacao": 1,
         "severidade": "critico"
       },
       {
         "codigo": "VAL-ATK-02",
-        "regra": "apuracao_beneficio_separada_da_apuracao_comum",
+        "regra": "validar_cbenef_em_saidas_interestaduais_beneficiadas",
         "prioridade_validacao": 2,
         "severidade": "critico"
       },
       {
         "codigo": "VAL-ATK-03",
-        "regra": "vedar_compensacao_com_creditos_estranhos_ao_beneficio",
+        "regra": "validar_credito_entrada_limitado_a_7pct_e_vedacao_outros_creditos",
         "prioridade_validacao": 3,
-        "severidade": "alto"
+        "severidade": "critico"
       },
       {
         "codigo": "VAL-ATK-04",
-        "regra": "validar_cfop_compativel_com_operacao_interestadual",
+        "regra": "validar_operacao_destinada_a_comercializacao_ou_industrializacao",
         "prioridade_validacao": 4,
         "severidade": "alto"
       },
       {
         "codigo": "VAL-ATK-05",
-        "regra": "validar_cst_aceito_para_o_beneficio",
+        "regra": "validar_cfop_interestadual_compativel",
         "prioridade_validacao": 5,
-        "severidade": "medio"
+        "severidade": "alto"
       },
       {
         "codigo": "VAL-ATK-06",
-        "regra": "exigir_memoria_calculo_suporte",
+        "regra": "validar_nao_cumulacao_com_fundap_na_mesma_operacao",
         "prioridade_validacao": 6,
-        "severidade": "medio"
+        "severidade": "alto"
       }
     ]
   },
-
   "regras_documentais": {
-    "cfops_comuns": ["6101", "6102", "6108", "6910"],
-    "csts_aceitos": ["20", "51", "90"],
+    "cfops_comuns": [
+      "6101",
+      "6102",
+      "6108",
+      "6910"
+    ],
+    "csts_aceitos": [
+      "20",
+      "51",
+      "90"
+    ],
     "csosn_aceitos": [],
-    "aliquotas_referencia": ["interestadual_7", "interestadual_12"],
+    "aliquotas_referencia": [
+      "interestadual_4",
+      "interestadual_7",
+      "interestadual_12"
+    ],
     "observacoes_nf": [
-      "informar cBenef em todas as NF-e quando houver fruicao do incentivo",
-      "base de calculo e aliquota devem refletir o beneficio aplicado",
-      "CFOP deve ser compativel com a natureza da operacao atacadista interestadual"
+      "cBenef obrigatorio quando houver fruicao do incentivo",
+      "aliquota interestadual plena na NF-e — ajuste via apuracao com codigo receita 380-8",
+      "CFOP deve ser compativel com saida interestadual destinada a comercializacao ou industrializacao"
     ]
   },
-
   "alertas_motor": [
     {
       "codigo": "ATK-001",
-      "descricao": "Operacao interestadual sem cBenef para contribuinte beneficiario do COMPETE Atacadista",
+      "descricao": "Apuracao do beneficio nao realizada em separado ou codigo receita 380-8 nao utilizado",
       "severidade": "critico",
       "prioridade_validacao": 1,
-      "acao_sugerida": "Verificar se a operacao e beneficiada e incluir cBenef correto"
+      "acao_sugerida": "Segregar apuracao e utilizar codigo de receita 380-8 conforme Art. 16 par. 1 Lei 10.568/2016"
     },
     {
       "codigo": "ATK-002",
-      "descricao": "Apuracao do beneficio realizada junto com apuracao comum sem separacao",
+      "descricao": "cBenef ausente em saida interestadual beneficiada",
       "severidade": "critico",
       "prioridade_validacao": 2,
-      "acao_sugerida": "Segregar apuracao conforme exigencia SEFAZ-ES"
+      "acao_sugerida": "Incluir cBenef correto na NF-e e no registro EFD"
     },
     {
       "codigo": "ATK-003",
-      "descricao": "Credito aproveitado fora da memoria do beneficio",
-      "severidade": "alto",
+      "descricao": "Credito de entrada acima de 7% ou outros creditos aproveitados na apuracao do beneficio",
+      "severidade": "critico",
       "prioridade_validacao": 3,
-      "acao_sugerida": "Estornar credito e incluir na apuracao separada do beneficio"
+      "acao_sugerida": "Limitar credito de entrada a 7% e estornar excedente — vedado aproveitamento de outros creditos (Art. 16 par. 2, Lei 12.220/2024)"
     },
     {
       "codigo": "ATK-004",
-      "descricao": "CFOP incompativel com a modalidade atacadista",
-      "severidade": "alto",
+      "descricao": "Beneficio aplicado em operacao interna ou em saida nao destinada a comercializacao/industrializacao",
+      "severidade": "critico",
       "prioridade_validacao": 4,
-      "acao_sugerida": "Revisar CFOP utilizado e adequar a operacao"
+      "acao_sugerida": "Verificar natureza da operacao e remover beneficio indevido"
     },
     {
       "codigo": "ATK-005",
-      "descricao": "Memoria de calculo ausente ou incompleta para o periodo",
-      "severidade": "medio",
+      "descricao": "FUNDAP e COMPETE Atacadista cumulados na mesma operacao",
+      "severidade": "critico",
       "prioridade_validacao": 5,
-      "acao_sugerida": "Elaborar memoria de calculo detalhada por operacao beneficiada"
+      "acao_sugerida": "Separar operacoes — coexistencia admitida apenas em operacoes distintas (Parecer 670/2024)"
+    },
+    {
+      "codigo": "ATK-006",
+      "descricao": "Dois estabelecimentos enquadrados no COMPETE operando no mesmo espaco fisico — vedado conforme pareceres GETRI 2025",
+      "severidade": "critico",
+      "prioridade_validacao": 6,
+      "acao_sugerida": "Verificar autonomia fisica dos estabelecimentos — cada um deve ter endereco e operacao independentes"
     }
   ],
-
-  "severidade_enum": ["critico", "alto", "medio", "baixo", "info"],
-
+  "severidade_enum": [
+    "critico",
+    "alto",
+    "medio",
+    "baixo",
+    "info"
+  ],
   "anexos_contexto": {
     "planilha_apuracao_obrigatoria": true,
     "controle_interno_obrigatorio": true,
     "exige_habilitacao_previa": true,
     "vinculo_termo_adesao": true,
-    "dependencias": ["APURACAO_SEPARADA", "MEMORIA_CALCULO"],
-    "modulos_motor_relacionados": ["COMPETE_ATACADISTA"],
-    "observacoes": "SEFAZ/ES exige apuracao em separado com memoria de calculo. O beneficio somente pode ser fruido por contribuinte com Termo de Adesao vigente. Modalidade atacadista restrita a operacoes interestaduais."
+    "dependencias": [
+      "APURACAO_SEPARADA",
+      "MEMORIA_CALCULO"
+    ],
+    "modulos_motor_relacionados": [
+      "COMPETE_ATACADISTA",
+      "FUNDAP"
+    ],
+    "observacoes": "Redacao atualizada pela Lei 12.220/2024 (vigencia 01/10/2024) — carga efetiva de 1,1% com codigo receita 380-8. Credito de entrada limitado a 7% e vedado qualquer outro credito na apuracao. FUNDAP e COMPETE podem coexistir desde que em operacoes distintas (Parecer 670/2024)."
   }
 }

@@ -40,11 +40,11 @@ class RegimeDetector:
     4. Presença de CST Tabela A (00-90) nos C170: indica Normal (moderado)
     """
 
-    CSOSN_VALUES = {"101", "102", "103", "201", "202", "203", "300", "400", "500", "900"}
-    CST_NORMAL_VALUES = {
-        "00", "02", "10", "12", "13", "15", "20", "30", "40", "41",
-        "50", "51", "52", "53", "60", "61", "70", "72", "74", "90",
-    }
+    from .helpers import (
+        CST_DIFERIMENTO, CST_ISENTO_NT, CST_RESIDUAL, CST_TRIBUTADO, CSOSN_VALIDOS,
+    )
+    CSOSN_VALUES = CSOSN_VALIDOS
+    CST_NORMAL_VALUES = CST_TRIBUTADO | CST_ISENTO_NT | CST_DIFERIMENTO | CST_RESIDUAL
 
     @classmethod
     def detect(cls, records: list[SpedRecord]) -> DetectionResult:

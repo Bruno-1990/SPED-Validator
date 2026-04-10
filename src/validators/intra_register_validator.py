@@ -310,11 +310,15 @@ def _validate_c190(
         c170_cfop = get_field(c, "CFOP")
         if c170_cfop != c190_cfop:
             continue
-        # CST: comparar últimos 2 dígitos (tributação) para compatibilidade 2/3 dígitos
+        # CST: comparar o código completo (3 dígitos).
+        # O 1o dígito indica origem (0=nacional, 1=estrangeira-direta, 2=estrangeira-mercado,
+        # 5/6/7=Simples Nacional). CST 000 e 500 têm tributação "00" mas são categorias
+        # distintas e devem gerar C190 separados.
+        # Se CST tem 2 dígitos, normaliza para 3 com padding "0" na frente.
         c170_cst = get_field(c, "CST_ICMS")
-        c170_trib = c170_cst[-2:] if len(c170_cst) >= 2 else c170_cst
-        c190_trib = c190_cst[-2:] if len(c190_cst) >= 2 else c190_cst
-        if c170_trib != c190_trib:
+        c170_norm = c170_cst.zfill(3) if len(c170_cst) == 2 else c170_cst
+        c190_norm = c190_cst.zfill(3) if len(c190_cst) == 2 else c190_cst
+        if c170_norm != c190_norm:
             continue
         # Alíquota: comparar como float para evitar diferença de formatação
         c170_aliq_f = _to_float(get_field(c, "ALIQ_ICMS"))

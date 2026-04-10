@@ -7,7 +7,10 @@ externos parametrizáveis em data/reference/.
 from __future__ import annotations
 
 import json
+import logging
+import re
 import sqlite3
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
@@ -15,6 +18,102 @@ import yaml
 
 _DATA_DIR = Path(__file__).parent.parent.parent / "data" / "reference"
 _DB_DIR = Path(__file__).parent.parent.parent / "db"
+_JSON_BENEFICIOS_DIR = Path(__file__).parent.parent.parent / "data" / "JSON"
+
+_logger = logging.getLogger(__name__)
+
+# Regex para extrair apenas os 4 dígitos numéricos de strings como "1403 — compra para..."
+_RE_CFOP_DIGITOS = re.compile(r"^\d{4}")
+
+
+# ── BeneficioProfile ──
+
+@dataclass
+class BeneficioProfile:
+    """Perfil enxuto de um benefício fiscal, construído a partir do JSON."""
+
+    codigo: str
+    nome: str
+    cfops: set[str]
+    csts: set[str]
+    exige_cbenef: bool
+    cbenef_permitidos: list[str]
+    apto_producao_cbenef: bool
+    apuracao_segregada: bool
+    codigos_receita: dict[str, str]
+    exige_estorno: bool
+    criterio_estorno: str | None
+    limite_credito_entrada: str | None
+    vedacoes: list[str]
+    tipo_beneficio: list[str]
+    registros_afetados: list[str]
+    campos_criticos: list[str]
+    validacoes: list[dict]
+    alertas: list[dict]
+    raw: dict = field(repr=False)
+
+    @classmethod
+    def from_json(cls, data: dict) -> BeneficioProfile:
+        """Constroi BeneficioProfile a partir do JSON carregado."""
+        impactos = data.get("impactos_fiscais", {})
+        regras_doc = data.get("regras_documentais", {})
+        regras_sped = data.get("regras_sped", {})
+        regras_estorno = data.get("regras_estorno", {})
+        elegibilidade = data.get("elegibilidade", {})
+
+        # Normalizar CFOPs — extrair apenas os 4 dígitos iniciais
+        cfops_raw = regras_doc.get("cfops_comuns", [])
+        cfops: set[str] = set()
+        for c in cfops_raw:
+            m = _RE_CFOP_DIGITOS.match(str(c).strip())
+            if m:
+                cfops.add(m.group())
+
+        # CSTs aceitos
+        csts = set(str(c).strip() for c in regras_doc.get("csts_aceitos", []))
+
+        # cBenef
+        cbenef_permitidos = impactos.get("cbenef_permitidos", []) or []
+        cbenef_status = impactos.get("cbenef_status", "")
+        apto_producao = bool(
+            cbenef_permitidos
+            and cbenef_status != "pendente_parametrizacao"
+            and cbenef_status != "nao_aplicavel"
+        )
+
+        # Códigos de receita — montar dict contextual
+        codigos_receita: dict[str, str] = {}
+        # Fonte 1: campo direto (ex: codigo_receita_apuracao)
+        if impactos.get("codigo_receita_apuracao"):
+            codigos_receita["apuracao"] = str(impactos["codigo_receita_apuracao"])
+        # Fonte 2: sub-dict codigos_recolhimento
+        for k, v in (impactos.get("codigos_recolhimento") or {}).items():
+            if k != "observacao" and k != "referencia" and v:
+                # Chave tipo "codigo_industria" -> "industria"
+                chave = k.replace("codigo_", "").replace("codigo_ordinario_", "")
+                codigos_receita[chave] = str(v)
+
+        return cls(
+            codigo=data.get("codigo_beneficio", ""),
+            nome=data.get("nome_beneficio", ""),
+            cfops=cfops,
+            csts=csts,
+            exige_cbenef=bool(impactos.get("exige_cbenef", False)),
+            cbenef_permitidos=cbenef_permitidos,
+            apto_producao_cbenef=apto_producao,
+            apuracao_segregada=bool(impactos.get("apuracao_em_separado", False)),
+            codigos_receita=codigos_receita,
+            exige_estorno=bool(regras_estorno.get("exige_estorno", False)),
+            criterio_estorno=regras_estorno.get("criterio"),
+            limite_credito_entrada=impactos.get("limite_credito_entrada"),
+            vedacoes=elegibilidade.get("vedacoes", []),
+            tipo_beneficio=impactos.get("tipo_beneficio", []),
+            registros_afetados=regras_sped.get("registros_afetados", []),
+            campos_criticos=regras_sped.get("campos_criticos", []),
+            validacoes=regras_sped.get("validacoes", []),
+            alertas=data.get("alertas_motor", []),
+            raw=data,
+        )
 
 
 class ReferenceLoader:
@@ -42,6 +141,9 @@ class ReferenceLoader:
         self._cst_por_tipo: dict[str, dict[str, dict]] | None = None  # tipo -> {codigo -> row}
         self._difal_vigente: dict[str, dict] | None = None  # id -> row
         self._difal_por_tipo: dict[str, list[dict]] | None = None  # tipo -> [rows]
+        self._beneficios: dict[str, BeneficioProfile] | None = None
+        # CST efeitos carregados do JSON (codigo_trib -> set de efeitos)
+        self._cst_efeitos: dict[str, set[str]] | None = None
 
     # ── Carregamento lazy ──
 
@@ -180,11 +282,74 @@ class ReferenceLoader:
     def _ensure_ncm_vigente(self) -> None:
         if self._ncm_vigente is not None:
             return
+
         db_path = _DB_DIR / "sped.db"
-        if not db_path.exists():
-            self._ncm_vigente = {}
-            return
+        _DB_DIR.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(db_path), check_same_thread=False)
+
+        # Criar tabela se nao existir
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS ncm_vigente (
+                codigo TEXT PRIMARY KEY,
+                descricao TEXT,
+                data_inicio TEXT,
+                data_fim TEXT,
+                tipo_ato TEXT,
+                numero_ato TEXT,
+                ano_ato TEXT
+            )
+        """)
+
+        # Verificar se ja tem dados
+        count = conn.execute("SELECT COUNT(*) FROM ncm_vigente").fetchone()[0]
+
+        if count == 0:
+            # Popular a partir do JSON
+            json_dir = (
+                self._data_dir.parent / "JSON"
+                if self._data_dir != _DATA_DIR
+                else _JSON_BENEFICIOS_DIR
+            )
+            # Procurar arquivo NCM (nome pode variar com data)
+            ncm_files = sorted(json_dir.glob("Tabela_NCM_Vigente*.json"))
+            if ncm_files:
+                try:
+                    with open(ncm_files[-1], encoding="utf-8") as f:
+                        data = json.load(f)
+                    noms = data.get("Nomenclaturas", [])
+                    if noms:
+                        conn.executemany(
+                            "INSERT OR IGNORE INTO ncm_vigente "
+                            "(codigo, descricao, data_inicio, data_fim, tipo_ato, numero_ato, ano_ato) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            [
+                                (
+                                    n.get("Codigo", ""),
+                                    n.get("Descricao", ""),
+                                    n.get("Data_Inicio", ""),
+                                    n.get("Data_Fim", ""),
+                                    n.get("Tipo_Ato_Ini", ""),
+                                    n.get("Numero_Ato_Ini", ""),
+                                    n.get("Ano_Ato_Ini", ""),
+                                )
+                                for n in noms
+                                if n.get("Codigo")
+                            ],
+                        )
+                        conn.commit()
+                        # Criar indice para busca por prefixo
+                        conn.execute(
+                            "CREATE INDEX IF NOT EXISTS idx_ncm_codigo ON ncm_vigente(codigo)"
+                        )
+                        conn.commit()
+                        _logger.info(
+                            "NCM vigente: %d registros carregados de %s",
+                            len(noms), ncm_files[-1].name,
+                        )
+                except Exception:
+                    _logger.warning("Erro ao carregar NCM vigente do JSON", exc_info=True)
+
+        # Carregar em memória (dict codigo -> info)
         try:
             rows = conn.execute(
                 "SELECT codigo, descricao, data_inicio, data_fim FROM ncm_vigente"
@@ -193,6 +358,7 @@ class ReferenceLoader:
             self._ncm_vigente = {}
             conn.close()
             return
+
         self._ncm_vigente = {}
         for codigo, descricao, dt_ini, dt_fim in rows:
             self._ncm_vigente[codigo] = {
@@ -345,11 +511,27 @@ class ReferenceLoader:
         assert self._ncm_map is not None
         return self._ncm_map.get(ncm.strip())
 
+    @staticmethod
+    def _ncm_formatar(ncm_raw: str) -> str:
+        """Converte NCM de formato SPED (8 digitos sem pontos) para formato tabela (com pontos).
+
+        SPED: '39011020' → Tabela: '3901.10.20'
+        Se ja tiver pontos, retorna como esta.
+        """
+        ncm = ncm_raw.strip().replace(".", "")
+        if len(ncm) == 8:
+            return f"{ncm[:4]}.{ncm[4:6]}.{ncm[6:8]}"
+        if len(ncm) == 6:
+            return f"{ncm[:4]}.{ncm[4:6]}"
+        if len(ncm) == 4:
+            return f"{ncm[:2]}.{ncm[2:4]}"
+        return ncm_raw.strip()
+
     def ncm_existe(self, ncm: str) -> bool:
         """Retorna True se o NCM existe na tabela oficial vigente.
 
-        Busca exata primeiro, depois por prefixos decrescentes (6, 5, 4 digitos)
-        pois a tabela oficial pode ter apenas o nivel hierarquico superior.
+        Aceita formato SPED (8 digitos: '39011020') ou tabela ('3901.10.20').
+        Busca exata primeiro, depois por prefixos decrescentes.
         NCM '00000000' (placeholder) e ignorado.
         """
         self._ensure_ncm_vigente()
@@ -357,25 +539,45 @@ class ReferenceLoader:
         if not self._ncm_vigente:
             return True  # fallback permissivo se tabela indisponível
         ncm = ncm.strip()
-        if ncm == "00000000":
+        if ncm == "00000000" or ncm == "0":
             return True  # placeholder, nao validar
+
+        # Normalizar para formato com pontos
+        ncm_fmt = self._ncm_formatar(ncm)
+
         # Busca exata
+        if ncm_fmt in self._ncm_vigente:
+            return True
+        # Busca no formato original (caso tabela use formato diferente)
         if ncm in self._ncm_vigente:
             return True
-        # Busca por prefixo (a tabela pode ter apenas o nivel hierarquico)
-        for length in (6, 5, 4):
-            if ncm[:length] in self._ncm_vigente:
+
+        # Busca por prefixo hierarquico (a tabela pode ter apenas nivel superior)
+        ncm_limpo = ncm.replace(".", "")
+        for length in (6, 4, 2):
+            prefixo = self._ncm_formatar(ncm_limpo[:length]) if length >= 4 else ncm_limpo[:length]
+            if prefixo in self._ncm_vigente:
                 return True
         return False
+
+    def _ncm_lookup(self, ncm: str) -> dict | None:
+        """Busca info do NCM normalizando formato SPED→tabela."""
+        self._ensure_ncm_vigente()
+        assert self._ncm_vigente is not None
+        # Tentar formato original
+        info = self._ncm_vigente.get(ncm.strip())
+        if info:
+            return info
+        # Tentar formato com pontos
+        return self._ncm_vigente.get(self._ncm_formatar(ncm))
 
     def ncm_vigente_no_periodo(self, ncm: str, dt_ini: date, dt_fim: date) -> bool | None:
         """Verifica se o NCM estava vigente no período informado.
 
+        Aceita formato SPED ('39011020') ou tabela ('3901.10.20').
         Retorna True se vigente, False se expirado, None se NCM não encontrado.
         """
-        self._ensure_ncm_vigente()
-        assert self._ncm_vigente is not None
-        info = self._ncm_vigente.get(ncm.strip())
+        info = self._ncm_lookup(ncm)
         if info is None:
             return None
         # Parsear datas DD/MM/YYYY
@@ -387,10 +589,11 @@ class ReferenceLoader:
         return d_ini <= dt_fim and d_fim >= dt_ini
 
     def get_ncm_descricao(self, ncm: str) -> str:
-        """Retorna descrição oficial do NCM, ou string vazia se não encontrado."""
-        self._ensure_ncm_vigente()
-        assert self._ncm_vigente is not None
-        info = self._ncm_vigente.get(ncm.strip())
+        """Retorna descrição oficial do NCM, ou string vazia se não encontrado.
+
+        Aceita formato SPED ('39011020') ou tabela ('3901.10.20').
+        """
+        info = self._ncm_lookup(ncm)
         return info["descricao"] if info else ""
 
     def has_ncm_vigente_table(self) -> bool:
@@ -741,6 +944,87 @@ class ReferenceLoader:
         assert self._municipios is not None
         return len(self._municipios) > 0
 
+    # ── Benefícios Fiscais (JSON) ──
+
+    def _ensure_beneficios(self) -> None:
+        if self._beneficios is not None:
+            return
+        self._beneficios = {}
+        # Se o loader usa data_dir customizado (ex: testes), derivar JSON dir dele
+        json_dir = (
+            self._data_dir.parent / "JSON"
+            if self._data_dir != _DATA_DIR
+            else _JSON_BENEFICIOS_DIR
+        )
+        if not json_dir.exists():
+            return
+        for path in sorted(json_dir.glob("*.json")):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    data = json.load(f)
+                # Filtrar: apenas JSONs de benefício (têm codigo_beneficio)
+                codigo = data.get("codigo_beneficio")
+                if not codigo:
+                    continue
+                self._beneficios[codigo] = BeneficioProfile.from_json(data)
+            except Exception:
+                _logger.warning("Erro ao carregar beneficio %s", path.name, exc_info=True)
+
+    def get_beneficio(self, codigo: str) -> BeneficioProfile | None:
+        """Retorna o perfil do benefício pelo codigo_beneficio, ou None."""
+        self._ensure_beneficios()
+        assert self._beneficios is not None
+        return self._beneficios.get(codigo)
+
+    def get_beneficios_do_cliente(self, codigos: list[str]) -> list[BeneficioProfile]:
+        """Retorna lista de perfis para os benefícios declarados do cliente."""
+        self._ensure_beneficios()
+        assert self._beneficios is not None
+        return [self._beneficios[c] for c in codigos if c in self._beneficios]
+
+    # ── CST Efeitos (JSON) ──
+
+    def _ensure_cst_efeitos(self) -> None:
+        if self._cst_efeitos is not None:
+            return
+        self._cst_efeitos = {}
+        json_dir = (
+            self._data_dir.parent / "JSON"
+            if self._data_dir != _DATA_DIR
+            else _JSON_BENEFICIOS_DIR
+        )
+        path = json_dir / "Tabela_CST_Vigente.json"
+        if not path.exists():
+            return
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            tab_b = data.get("blocos", {}).get("CST_ICMS", {}).get("tabela_b_tributacao", [])
+            codigos = tab_b if isinstance(tab_b, list) else tab_b.get("codigos", [])
+            for entry in codigos:
+                codigo = entry.get("codigo", "")
+                efeitos = entry.get("efeitos", [])
+                if codigo:
+                    self._cst_efeitos[codigo] = set(efeitos)
+        except Exception:
+            _logger.warning("Erro ao carregar Tabela_CST_Vigente.json", exc_info=True)
+
+    def get_cst_efeitos(self, cst_trib: str) -> set[str]:
+        """Retorna efeitos do CST (últimos 2 dígitos) a partir do JSON."""
+        self._ensure_cst_efeitos()
+        assert self._cst_efeitos is not None
+        return self._cst_efeitos.get(cst_trib, set())
+
+    def cst_tem_efeito(self, cst_trib: str, efeito: str) -> bool:
+        """Verifica se um CST tem determinado efeito."""
+        return efeito in self.get_cst_efeitos(cst_trib)
+
+    def csts_com_efeito(self, efeito: str) -> set[str]:
+        """Retorna todos os CSTs que têm determinado efeito."""
+        self._ensure_cst_efeitos()
+        assert self._cst_efeitos is not None
+        return {cod for cod, efs in self._cst_efeitos.items() if efeito in efs}
+
     def available_tables(self) -> list[str]:
         """Retorna lista de tabelas disponíveis em data/reference/."""
         tables: list[str] = []
@@ -774,6 +1058,10 @@ class ReferenceLoader:
             for subdir in sorted(vig_dir.iterdir()):
                 if subdir.is_dir() and any(subdir.glob("*.yaml")):
                     tables.append(f"vigencias/{subdir.name}")
+        # Benefícios fiscais (JSON)
+        self._ensure_beneficios()
+        if self._beneficios:
+            tables.append("beneficios_fiscais")
         return tables
 
 

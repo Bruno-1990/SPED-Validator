@@ -1,0 +1,311 @@
+{
+  "codigo_beneficio": "COMPETE_VAREJISTA_ECOMMERCE",
+  "nome_beneficio": "COMPETE-ES Varejista (E-commerce)",
+  "uf": "ES",
+  "status_juridico": "vigente",
+  "versao_modelo": "3.0",
+  "ultima_revisao": "2025-04-09",
+  "fonte_legal_primaria": [
+    "Lei ES 10.568/2016 — Art. 23",
+    "RICMS/ES — Art. 530-L-R-I — Decreto 1.090-R/2002"
+  ],
+  "fonte_orientativa_secundaria": [
+    "Receita Orienta COMPETE-ES/SEFAZ-ES",
+    "Parecer 6/2023 — SEFAZ/ES (armazem em outro estado nao pode fruir do beneficio)",
+    "Portaria 176-R/2025 — Nova norma de procedimento COMPETE v4.0"
+  ],
+  "vigencia_convenio_confaz": {
+    "numero_convenio": null,
+    "validade": null,
+    "renovacao_automatica": false,
+    "observacao": "Beneficio de legislacao estadual propria depositado no CONFAZ em observancia a LC 160/2017 e Convenio ICMS 190/2017 (conforme Portaria 176-R/2025). Vigencia assegurada para os periodos de fruicao anteriores. Monitorar eventuais impugnacoes interestaduais por contribuintes de outros estados."
+  },
+  "ato_concessorio_cliente": {
+    "numero": null,
+    "inicio_vigencia": null,
+    "fim_vigencia": null,
+    "segmento": "ecommerce_venda_nao_presencial",
+    "modalidade": null,
+    "observacao_modalidade": "Preencher com dados do Termo de Adesao. O beneficio aplica-se exclusivamente a estabelecimento no ES que pratique exclusivamente venda nao presencial interestadual para consumidor final."
+  },
+  "pre_requisitos_absolutos": [
+    {
+      "codigo": "PRE-ECO-01",
+      "descricao": "termo_adesao_vigente",
+      "observacao": "Contribuinte deve possuir Termo de Adesao ativo junto a SEFAZ-ES/SEDES",
+      "bloqueia_se_ausente": true,
+      "prioridade": 1
+    },
+    {
+      "codigo": "PRE-ECO-02",
+      "descricao": "estabelecimento_no_es_pratica_exclusivamente_venda_nao_presencial",
+      "observacao": "O beneficio do Art. 23 Lei 10.568/2016 aplica-se unicamente a estabelecimento situado no ES que pratique exclusivamente venda nao presencial interestadual (Art. 530-L-R-I RICMS/ES — Parecer 6/2023)",
+      "bloqueia_se_ausente": true,
+      "prioridade": 2
+    },
+    {
+      "codigo": "PRE-ECO-03",
+      "descricao": "operacao_interestadual_para_consumidor_final",
+      "observacao": "Beneficio restrito a operacoes interestaduais para consumidor final (pessoa fisica ou juridica)",
+      "bloqueia_se_ausente": true,
+      "prioridade": 3
+    },
+    {
+      "codigo": "PRE-ECO-04",
+      "descricao": "estabelecimento_fisicamente_autonomo",
+      "observacao": "Vedado dois estabelecimentos COMPETE no mesmo espaco fisico — pareceres GETRI 2025",
+      "bloqueia_se_ausente": true,
+      "prioridade": 4
+    }
+  ],
+  "bloqueia_fruicao_se": [
+    "sem_termo_adesao_vigente",
+    "estabelecimento_fora_do_es",
+    "venda_presencial_no_mesmo_estabelecimento",
+    "operacao_interna",
+    "sem_cbenef_quando_obrigatorio",
+    "apuracao_nao_segregada",
+    "difal_nao_apurado_em_operacao_b2c_nao_contribuinte"
+  ],
+  "elegibilidade": {
+    "cnaes_permitidos": [
+      "4711-3/02 — comercio varejista de mercadorias em geral com predominancia de produtos alimenticios — lojas de conveniencia ou mercearias",
+      "4789-0/99 — comercio varejista de outros produtos nao especificados anteriormente",
+      "qualquer CNAE varejista — validar no Termo de Adesao"
+    ],
+    "cnaes_observacao": "Estabelecimento deve praticar exclusivamente venda nao presencial. CNAEs varejistas admitidos — confirmar no Termo de Adesao.",
+    "ufs_operacao_permitidas": [
+      "interestadual"
+    ],
+    "tipos_operacao_permitidas": [
+      "venda_nao_presencial_interestadual_para_consumidor_final_pf",
+      "venda_nao_presencial_interestadual_para_consumidor_final_pj"
+    ],
+    "condicoes_especiais": [
+      "estabelecimento deve estar fisicamente no ES — armazem em outro estado nao goza do beneficio (Parecer 6/2023)",
+      "venda deve ser exclusivamente nao presencial no estabelecimento beneficiado",
+      "operacoes B2C exigem apuracao independente de DIFAL"
+    ],
+    "vedacoes": [
+      "operacoes internas",
+      "venda presencial no mesmo estabelecimento beneficiado",
+      "remessa para armazem em outro estado — o beneficio nao acompanha a mercadoria (Parecer 6/2023)",
+      "cumulacao de DIFAL com o beneficio COMPETE na mesma apuracao",
+      "dois_estabelecimentos_compete_mesmo_espaco_fisico — vedado conforme pareceres GETRI 2025"
+    ]
+  },
+  "impactos_fiscais": {
+    "tipo_beneficio": [
+      "credito_presumido"
+    ],
+    "detalhamento_beneficios": {
+      "credito_presumido_venda_nao_presencial": {
+        "carga_efetiva": "1,1%",
+        "hipotese": "operacoes interestaduais destinadas a consumidor final — venda exclusivamente nao presencial por estabelecimento no ES",
+        "referencia_legal": "Art. 23 Lei 10.568/2016 e Art. 530-L-R-I RICMS/ES"
+      }
+    },
+    "exige_cbenef": true,
+    "cbenef_permitidos": [],
+    "cbenef_status": "pendente_parametrizacao",
+    "cbenef_observacao": "Confirmar codigo junto a SEFAZ-ES. Nao utilizar em producao sem preenchimento.",
+    "apuracao_em_separado": true,
+    "permite_compensar_com_saldo_credor_comum": false,
+    "exige_estorno_credito": false,
+    "exige_recolhimento_em_codigo_proprio": true,
+    "exige_memoria_calculo": true,
+    "codigos_recolhimento": {
+      "observacao": "COMPETE Varejista/E-commerce recolhe com codigo proprio especifico",
+      "codigo_ecommerce": "385-9",
+      "referencia": "codigo de recolhimento SEFAZ/ES para COMPETE Varejista/E-commerce"
+    }
+  },
+  "regras_estorno": {
+    "exige_estorno": false,
+    "criterio": null,
+    "registro_sped_estorno": null,
+    "observacao": "Nao ha regra de estorno de credito para esta modalidade. Revisar se houver alteracao legislativa."
+  },
+  "regras_difal": {
+    "aplica_difal": true,
+    "hipotese": "operacao B2C interestadual para nao contribuinte do ICMS — EC 87/2015",
+    "apuracao_independente_do_compete": true,
+    "campos_sped_difal": [
+      "ALIQ_DIFAL",
+      "VL_DIFAL",
+      "UF_DEST",
+      "IND_FINAL"
+    ],
+    "validacoes_difal": [
+      {
+        "codigo": "VAL-ECO-DIFAL-01",
+        "regra": "validar_IND_FINAL_1_quando_consumidor_final_nao_contribuinte",
+        "prioridade_validacao": 1,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ECO-DIFAL-02",
+        "regra": "validar_apuracao_difal_separada_do_beneficio_compete",
+        "prioridade_validacao": 2,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ECO-DIFAL-03",
+        "regra": "validar_recolhimento_difal_para_uf_destino",
+        "prioridade_validacao": 3,
+        "severidade": "alto"
+      }
+    ],
+    "observacao": "COMPETE E-commerce nao isenta o DIFAL — sao apuracoes independentes. Motor deve cruzar com modulo DIFAL."
+  },
+  "regras_sped": {
+    "registros_afetados": [
+      "C100",
+      "C170",
+      "C190",
+      "E110",
+      "E111",
+      "E116"
+    ],
+    "campos_criticos": [
+      "cBenef",
+      "CFOP",
+      "CST",
+      "UF_DEST",
+      "IND_FINAL",
+      "VL_ICMS",
+      "VL_BC_ICMS",
+      "ALIQ_DIFAL",
+      "VL_DIFAL"
+    ],
+    "validacoes": [
+      {
+        "codigo": "VAL-ECO-01",
+        "regra": "validar_cbenef_em_nf_e_efd",
+        "prioridade_validacao": 1,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ECO-02",
+        "regra": "validar_apuracao_separada_do_beneficio",
+        "prioridade_validacao": 2,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ECO-03",
+        "regra": "validar_difal_apurado_independentemente_quando_b2c",
+        "prioridade_validacao": 3,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ECO-04",
+        "regra": "validar_operacao_exclusivamente_interestadual_nao_presencial",
+        "prioridade_validacao": 4,
+        "severidade": "critico"
+      },
+      {
+        "codigo": "VAL-ECO-05",
+        "regra": "validar_ind_final_em_operacoes_b2c",
+        "prioridade_validacao": 5,
+        "severidade": "alto"
+      },
+      {
+        "codigo": "VAL-ECO-06",
+        "regra": "validar_uf_dest_corretamente_preenchida",
+        "prioridade_validacao": 6,
+        "severidade": "medio"
+      }
+    ]
+  },
+  "regras_documentais": {
+    "cfops_comuns": [
+      "6107",
+      "6108",
+      "6109",
+      "6110"
+    ],
+    "csts_aceitos": [
+      "20",
+      "90"
+    ],
+    "csosn_aceitos": [],
+    "aliquotas_referencia": [
+      "interestadual_4",
+      "interestadual_7",
+      "interestadual_12"
+    ],
+    "observacoes_nf": [
+      "cBenef obrigatorio quando houver fruicao do incentivo",
+      "IND_FINAL = 1 em operacoes para consumidor final nao contribuinte",
+      "UF_DEST deve estar corretamente preenchida para calculo do DIFAL",
+      "DIFAL e COMPETE sao apuracoes independentes — nao compensar"
+    ]
+  },
+  "alertas_motor": [
+    {
+      "codigo": "ECO-001",
+      "descricao": "Operacao B2C sem apuracao de DIFAL — IND_FINAL=1 sem registro de DIFAL",
+      "severidade": "critico",
+      "prioridade_validacao": 1,
+      "acao_sugerida": "Apurar DIFAL separadamente do beneficio COMPETE"
+    },
+    {
+      "codigo": "ECO-002",
+      "descricao": "cBenef ausente em operacao beneficiada interestadual",
+      "severidade": "critico",
+      "prioridade_validacao": 2,
+      "acao_sugerida": "Incluir cBenef correto na NF-e e no registro EFD"
+    },
+    {
+      "codigo": "ECO-003",
+      "descricao": "Beneficio aplicado em remessa para armazem em outro estado — vedado (Parecer 6/2023)",
+      "severidade": "critico",
+      "prioridade_validacao": 3,
+      "acao_sugerida": "Remover beneficio da operacao — o beneficio nao acompanha mercadoria para armazem fora do ES"
+    },
+    {
+      "codigo": "ECO-004",
+      "descricao": "Apuracao DIFAL e beneficio COMPETE misturados na mesma apuracao",
+      "severidade": "alto",
+      "prioridade_validacao": 4,
+      "acao_sugerida": "Segregar apuracoes — DIFAL e COMPETE sao independentes"
+    },
+    {
+      "codigo": "ECO-005",
+      "descricao": "Venda presencial realizada no mesmo estabelecimento beneficiado como e-commerce exclusivo",
+      "severidade": "critico",
+      "prioridade_validacao": 5,
+      "acao_sugerida": "Verificar enquadramento — beneficio exige exclusividade na venda nao presencial"
+    },
+    {
+      "codigo": "ECO-006",
+      "descricao": "Dois estabelecimentos enquadrados no COMPETE operando no mesmo espaco fisico — vedado conforme pareceres GETRI 2025",
+      "severidade": "critico",
+      "prioridade_validacao": 6,
+      "acao_sugerida": "Verificar autonomia fisica dos estabelecimentos — cada um deve ter endereco e operacao independentes"
+    }
+  ],
+  "severidade_enum": [
+    "critico",
+    "alto",
+    "medio",
+    "baixo",
+    "info"
+  ],
+  "anexos_contexto": {
+    "planilha_apuracao_obrigatoria": true,
+    "controle_interno_obrigatorio": true,
+    "exige_habilitacao_previa": true,
+    "vinculo_termo_adesao": true,
+    "dependencias": [
+      "DIFAL",
+      "APURACAO_SEPARADA",
+      "MEMORIA_CALCULO"
+    ],
+    "modulos_motor_relacionados": [
+      "COMPETE_VAREJISTA_ECOMMERCE",
+      "DIFAL"
+    ],
+    "observacoes": "Beneficio exclusivo para estabelecimento no ES que pratique exclusivamente venda nao presencial interestadual para consumidor final — carga 1,1% (Art. 23 Lei 10.568/2016 e Art. 530-L-R-I RICMS/ES). Armazem em outro estado nao goza do beneficio (Parecer 6/2023). DIFAL e COMPETE sao apuracoes independentes e nao podem ser compensadas."
+  }
+}
