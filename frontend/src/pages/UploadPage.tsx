@@ -294,23 +294,17 @@ export default function UploadPage() {
     }
   }, [periodoModal, fileId, xmlFiles, processChunks])
 
-  // ── Navegar para validação ──
+  // ── Navegar ──
 
-  const irParaValidacao = useCallback(async () => {
+  const irParaValidacao = useCallback(() => {
     if (!fileId) return
-    // Se ja cruzou XMLs, verificar se SPED ja foi validado
     if (cruzResult) {
-      try {
-        const f = await api.getFile(fileId)
-        if (f.status === 'validated') {
-          // SPED ja validado — ir direto sem revalidar
-          navigate(`/files/${fileId}`)
-          return
-        }
-      } catch { /* fallthrough */ }
+      // Ja cruzou XMLs — ir direto sem revalidar SPED
+      navigate(`/files/${fileId}`)
+    } else {
+      // Sem XMLs — validar SPED normalmente
+      navigate(`/files/${fileId}?validate=1`)
     }
-    // SPED precisa ser validado
-    navigate(`/files/${fileId}?validate=1`)
   }, [fileId, navigate, cruzResult])
 
   // ── Reset ──

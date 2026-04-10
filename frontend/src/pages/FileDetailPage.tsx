@@ -127,14 +127,12 @@ export default function FileDetailPage() {
     return () => { eventSourceRef.current?.close() }
   }, [])
 
-  // Auto-navigate after data loads post-validation
+  // Auto-navigate to errors/alerts tab when data loads
   useEffect(() => {
-    if (!validating && file?.status === 'validated') {
-      if (errorItems.length > 0) setTab('errors')
-      else if (alertItems.length > 0) setTab('alerts')
-      else setTab('summary')
-    }
-  // Only run when items change after validation
+    if (validating) return
+    if (errorItems.length > 0) setTab('errors')
+    else if (alertItems.length > 0) setTab('alerts')
+    else if (file?.status === 'validated') setTab('summary')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [errorItems.length, alertItems.length])
 
@@ -214,6 +212,19 @@ export default function FileDetailPage() {
           <p className={`text-2xl font-bold ${Number(conformidade) >= 95 ? 'text-green-600' : 'text-orange-600'}`}>{conformidade}%</p>
         </div>
       </div>
+
+      {/* Banner: erros XML carregados mas SPED nao validado */}
+      {file.status === 'parsed' && !validating && errorItems.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 flex items-center justify-between">
+          <div>
+            <p className="text-blue-800 font-medium text-sm">Cruzamento XML x SPED concluido</p>
+            <p className="text-blue-600 text-xs mt-0.5">A validacao interna do SPED ainda nao foi executada. Clique em "Validar" para executar a auditoria completa.</p>
+          </div>
+          <button onClick={handleValidateStream} className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 whitespace-nowrap ml-4">
+            Validar SPED
+          </button>
+        </div>
+      )}
 
       {/* Audit Scope — always visible when validated */}
       {file.status === 'validated' && !validating && <AuditScopePanel fileId={id} />}
