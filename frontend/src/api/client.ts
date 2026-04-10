@@ -1,9 +1,12 @@
 import type { AuditScope, AuditScopeRaw, CorrectionSuggestion, CrossValidationItem, ErrorSummary, FileInfo, GeneratedRule, PipelineEvent, RecordInfo, RuleSummary, SearchResult, StructuredReport, ValidationError, ValidationResponse } from '../types/sped'
 
 const BASE = '/api'
+const API_KEY = 'sped-audit-dev-key-2026'
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${url}`, options)
+  const headers = new Headers(options?.headers)
+  headers.set('X-API-Key', API_KEY)
+  const res = await fetch(`${BASE}${url}`, { ...options, headers })
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(error.detail || `HTTP ${res.status}`)
@@ -29,7 +32,7 @@ export const api = {
   validate: (fileId: number) => request<ValidationResponse>(`/files/${fileId}/validate`, { method: 'POST' }),
 
   validateStream: (fileId: number, onEvent: (event: PipelineEvent) => void): EventSource => {
-    const es = new EventSource(`${BASE}/files/${fileId}/validate/stream`)
+    const es = new EventSource(`${BASE}/files/${fileId}/validate/stream?api_key=${API_KEY}`)
 
     es.addEventListener('progress', (e) => {
       onEvent({ type: 'progress', ...JSON.parse(e.data) })
@@ -133,10 +136,41 @@ export const api = {
     const statusMap: Record<string, 'ok' | 'partial' | 'not_run' | 'not_applicable'> = {
       ok: 'ok', parcial: 'partial', nao_executado: 'not_run', nao_aplicavel: 'not_applicable',
     }
+    const nameMap: Record<string, string> = {
+      format_validation: 'Validação de Formato',
+      field_validation: 'Validação de Campos',
+      intra_register: 'Validação Intra-registro',
+      cross_block: 'Cruzamento entre Blocos',
+      tax_recalculation: 'Recálculo Tributário',
+      cst_validation: 'Validação de CST',
+      fiscal_semantics: 'Semântica Fiscal',
+      benefit_audit: 'Auditoria de Benefícios',
+      aliquota_validation: 'Validação de Alíquotas',
+      c190_consolidation: 'Consolidação C190',
+      difal_validation: 'Validação DIFAL',
+      simples_nacional: 'Simples Nacional',
+      apuracao_icms: 'Apuração ICMS',
+      beneficio_cross: 'Cruzamento de Benefícios',
+      base_calculo: 'Base de Cálculo',
+      bloco_d: 'Bloco D (Transporte)',
+      cfop_validation: 'Validação de CFOP',
+      devolucao: 'Devoluções',
+      ipi_validation: 'Validação de IPI',
+      destinatario: 'Destinatário',
+      st_validation: 'Substituição Tributária',
+      parametrizacao: 'Parametrização',
+      ncm_validation: 'Validação de NCM',
+      pis_cofins: 'PIS/COFINS',
+      pendentes: 'Pendentes',
+      bloco_k: 'Bloco K (Produção)',
+      bloco_c_servicos: 'Bloco C (Serviços)',
+      retificador: 'Retificador',
+      xml_crossref: 'Cruzamento NF-e XML',
+    }
     return {
       coverage_pct: raw.cobertura_estimada_pct,
       checks: raw.checks_executados.map(c => ({
-        name: c.id.replace(/_/g, ' '),
+        name: nameMap[c.id] || c.id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
         status: statusMap[c.status] || 'not_run',
         detail: c.motivo_parcial,
       })),
@@ -145,6 +179,20 @@ export const api = {
         .map(([k]) => k),
     }
   },
+
+  // Clientes (MySQL DCTF_WEB)
+  buscarCliente: (cnpj: string) => request<{
+    cnpj: string
+    razao_social: string
+    fantasia: string
+    regime_tributario: string
+    beneficios_fiscais: string[]
+    simples_optante: boolean
+    uf: string
+    tipo_empresa: string
+    porte: string
+    situacao_cadastral: string
+  }>(`/clientes/cnpj/${cnpj.replace(/\D/g, '')}`),
 
   // Search
   searchDocs: (query: string, fieldName?: string, register?: string, topK: number = 5) => {
@@ -161,4 +209,50 @@ export const api = {
     return res.text()
   },
   downloadSped: (fileId: number) => `${BASE}/files/${fileId}/download`,
+
+  // XML NF-e cross-reference
+  uploadXmls: async (fileId: number, files: File[], modoPeriodo?: string): Promise<{
+    status?: string; total: number; autorizadas: number; canceladas: number; duplicadas: number; invalidos: number;
+    fora_periodo?: {filename: string; chave_nfe: string; dh_emissao: string}[];
+    dentro_periodo_count?: number; period_start_fmt?: string; period_end_fmt?: string;
+  }> => {
+    const form = new FormData()
+    files.forEach(f => form.append('files', f))
+    const qs = modoPeriodo ? `?modo_periodo=${modoPeriodo}` : ''
+    return request(`/files/${fileId}/xml/upload${qs}`, { method: 'POST', body: form })
+  },
+  listXmls: (fileId: number) => request<{file_id: number; total: number; autorizadas: number; canceladas: number; xmls: any[]}>(`/files/${fileId}/xml`),
+  cruzarXml: (fileId: number) => request<{file_id: number; xmls_analisados: number; divergencias: number; por_severidade: Record<string, number>}>(`/files/${fileId}/xml/cruzar`, { method: 'POST' }),
+  cruzarXmlStream: (fileId: number, onProgress: (pct: number, msg: string) => void, onDone: (result: {divergencias: number; por_severidade: Record<string, number>}) => void, onError?: (err: string) => void): EventSource => {
+    const es = new EventSource(`${BASE}/files/${fileId}/xml/cruzar/stream?api_key=${API_KEY}`)
+    es.addEventListener('progress', (e) => {
+      const d = JSON.parse(e.data)
+      onProgress(d.pct, d.msg)
+    })
+    es.addEventListener('done', (e) => {
+      const d = JSON.parse(e.data)
+      onDone(d)
+      es.close()
+    })
+    es.addEventListener('error', (e) => {
+      if (e instanceof MessageEvent) {
+        onError?.(JSON.parse(e.data).error)
+      }
+      es.close()
+    })
+    return es
+  },
+  getCruzamento: (fileId: number, ruleId?: string, severity?: string) => {
+    const params = new URLSearchParams()
+    if (ruleId) params.set('rule_id', ruleId)
+    if (severity) params.set('severity', severity)
+    const qs = params.toString() ? `?${params}` : ''
+    return request<{file_id: number; total: number; divergencias: any[]}>(`/files/${fileId}/xml/cruzamento${qs}`)
+  },
+  deleteXml: (fileId: number, xmlId: number) => request<{deleted: boolean}>(`/files/${fileId}/xml/${xmlId}`, { method: 'DELETE' }),
+
+  // AI explanation
+  explainError: (data: {error_type: string; message: string; regime?: string; uf?: string; register?: string; severity?: string; value?: string; expected_value?: string}) =>
+    request<{explicacao: string; sugestao: string; cached: boolean; hits?: number}>('/ai/explain', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) }),
+  aiCacheStats: () => request<{total_entries: number; total_hits: number; model: string}>('/ai/cache/stats'),
 }

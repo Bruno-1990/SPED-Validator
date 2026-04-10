@@ -101,7 +101,7 @@ if not exist "data\reference\aliquotas_internas_uf.yaml" (
 )
 
 echo.
-echo   Iniciando API na porta 8000...
+echo   Iniciando API na porta 8021...
 
 REM --- Salvar caminho atual para os scripts ---
 set "PROJECT_DIR=%CD%"
@@ -115,9 +115,9 @@ REM --- Criar script temporario API usando redirecionamento seguro ---
     echo call ".venv-win\Scripts\activate.bat"
     echo set "PYTHONPATH=%PROJECT_DIR%"
     echo echo.
-    echo echo   [API] Iniciando uvicorn na porta 8000...
+    echo echo   [API] Iniciando uvicorn na porta 8021...
     echo echo.
-    echo python -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
+    echo python -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8021
     echo echo.
     echo echo   [API] Processo encerrado. Verifique erros acima.
     echo pause
@@ -130,7 +130,7 @@ REM --- Criar script temporario Frontend ---
     echo title SPED-Frontend
     echo cd /d "%PROJECT_DIR%\frontend"
     echo echo.
-    echo echo   [FRONTEND] Iniciando Vite na porta 3000...
+    echo echo   [FRONTEND] Iniciando Vite na porta 5175...
     echo echo.
     echo call npm run dev
     echo echo.
@@ -143,7 +143,7 @@ start "SPED-API" /min "_run_api.bat"
 echo   Aguardando API (8s)...
 timeout /t 8 /nobreak >nul
 
-echo   Iniciando Frontend na porta 3000...
+echo   Iniciando Frontend na porta 5175...
 start "SPED-Frontend" /min "_run_frontend.bat"
 
 echo   Aguardando Frontend (5s)...
@@ -151,12 +151,12 @@ timeout /t 5 /nobreak >nul
 
 echo.
 echo ============================================
-echo   App:       http://localhost:3000
-echo   API Docs:  http://localhost:8000/docs
+echo   App:       http://localhost:5175
+echo   API Docs:  http://localhost:8021/docs
 echo ============================================
 echo.
 
-start "" http://localhost:3000
+start "" http://localhost:5175
 
 echo   Pressione qualquer tecla para ENCERRAR tudo.
 echo.

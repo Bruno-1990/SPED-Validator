@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 import warnings
 
@@ -21,6 +22,11 @@ from src.indexer import init_db  # noqa: E402
 from src.models import RegisterField, SpedRecord  # noqa: E402
 from src.parser import parse_sped_file  # noqa: E402
 from src.services.context_builder import TaxRegime, ValidationContext  # noqa: E402
+
+# Desabilitar autenticação nos testes (API_KEY pode estar no .env via load_dotenv)
+# Importar auth primeiro para trigger load_dotenv, depois limpar
+import api.auth  # noqa: E402, F401
+os.environ.pop("API_KEY", None)
 
 # Diretório das fixtures
 FIXTURES_DIR = Path(__file__).parent / "fixtures"

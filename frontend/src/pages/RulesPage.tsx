@@ -16,6 +16,20 @@ const SEVERITY_LABELS: Record<string, string> = {
   info: 'Info',
 }
 
+const CORRIGIVEL_COLORS: Record<string, string> = {
+  automatico: 'bg-green-100 text-green-700',
+  proposta: 'bg-blue-100 text-blue-700',
+  investigar: 'bg-yellow-100 text-yellow-700',
+  impossivel: 'bg-red-100 text-red-700',
+}
+
+const CORRIGIVEL_LABELS: Record<string, string> = {
+  automatico: 'Automatico',
+  proposta: 'Proposta',
+  investigar: 'Investigar',
+  impossivel: 'Impossivel',
+}
+
 export default function RulesPage() {
   const [rules, setRules] = useState<RuleSummary[]>([])
   const [description, setDescription] = useState('')
@@ -165,6 +179,11 @@ export default function RulesPage() {
                 <div>
                   <span className="text-gray-500 font-semibold">Tipo Erro:</span>{' '}
                   <span className="font-mono">{generatedRule.error_type}</span>
+                  {generatedRule.error_type_exists ? (
+                    <span className="ml-1 text-green-600" title="Tipo de erro existe no codigo">&#10003;</span>
+                  ) : (
+                    <span className="ml-1 text-orange-500" title="Tipo de erro nao existe no codigo">&#9888;</span>
+                  )}
                 </div>
                 <div>
                   <span className="text-gray-500 font-semibold">Modulo:</span>{' '}
@@ -178,10 +197,93 @@ export default function RulesPage() {
                 )}
               </div>
 
+              {/* Warning error_type nao existe */}
+              {!generatedRule.error_type_exists && (
+                <div className="bg-orange-50 border border-orange-200 rounded p-2 text-xs text-orange-700">
+                  <span className="font-semibold">Atencao:</span> O tipo de erro <span className="font-mono">{generatedRule.error_type}</span> ainda nao existe no codigo.
+                  {generatedRule.error_type_suggestion && (
+                    <> Tipo similar existente: <span className="font-mono font-semibold">{generatedRule.error_type_suggestion}</span></>
+                  )}
+                  {' '}A regra sera salva como pendente de implementacao.
+                </div>
+              )}
+
+              {/* Objecoes — regras existentes que ja abrangem */}
+              {generatedRule.objections && generatedRule.objections.length > 0 && (
+                <div className="bg-amber-50 border border-amber-300 rounded p-3 text-xs">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="text-amber-700 text-base">&#9888;</span>
+                    <span className="font-semibold text-amber-800">
+                      Objecao: {generatedRule.objections.length === 1
+                        ? '1 regra existente ja abrange este cenario'
+                        : `${generatedRule.objections.length} regras existentes ja abrangem este cenario`}
+                    </span>
+                  </div>
+                  <p className="text-amber-700 mb-2">
+                    Verifique se a nova regra realmente adiciona cobertura que nao existe. Voce ainda pode implementa-la se julgar necessario.
+                  </p>
+                  <div className="space-y-2">
+                    {generatedRule.objections.map((obj, i) => (
+                      <div key={i} className="bg-white border border-amber-200 rounded p-2.5">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs bg-amber-100 px-1.5 py-0.5 rounded font-semibold">{obj.rule_id}</span>
+                            <span className={`px-1.5 py-0.5 rounded text-xs ${SEVERITY_COLORS[obj.severity] || 'bg-gray-100'}`}>
+                              {SEVERITY_LABELS[obj.severity] || obj.severity}
+                            </span>
+                            <span className="text-gray-500">{obj.register}</span>
+                          </div>
+                          <span className="text-amber-600 font-mono text-xs">{Math.round(obj.match_score * 100)}% similar</span>
+                        </div>
+                        <p className="text-gray-700 text-xs mb-1">{obj.description}</p>
+                        <div className="flex flex-wrap gap-1 mb-1">
+                          {obj.fields.map((f, fi) => (
+                            <span key={fi} className="font-mono text-xs bg-gray-100 px-1 rounded">{f}</span>
+                          ))}
+                        </div>
+                        <p className="text-amber-600 text-xs italic">{obj.match_reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Condicao logica */}
               <div className="text-xs">
                 <span className="text-gray-500 font-semibold">Condicao:</span>{' '}
-                <span>{generatedRule.condition}</span>
+                <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">{generatedRule.condition}</span>
               </div>
+
+              {/* Governanca */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs border-t pt-3 mt-1">
+                <div>
+                  <span className="text-gray-500 font-semibold">Corrigivel:</span>{' '}
+                  <span className={`px-2 py-0.5 rounded ${CORRIGIVEL_COLORS[generatedRule.corrigivel] || 'bg-gray-100'}`}>
+                    {CORRIGIVEL_LABELS[generatedRule.corrigivel] || generatedRule.corrigivel}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500 font-semibold">Certeza:</span>{' '}
+                  <span className={generatedRule.certeza === 'objetivo' ? 'text-green-700' : 'text-yellow-700'}>
+                    {generatedRule.certeza === 'objetivo' ? 'Objetivo' : 'Subjetivo'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500 font-semibold">Impacto:</span>{' '}
+                  <span className={generatedRule.impacto === 'relevante' ? 'text-red-700' : 'text-blue-700'}>
+                    {generatedRule.impacto === 'relevante' ? 'Relevante' : 'Informativo'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500 font-semibold">Vigencia:</span>{' '}
+                  <span>{generatedRule.vigencia_de || 'hoje'}</span>
+                </div>
+              </div>
+              {generatedRule.corrigivel_nota && (
+                <div className="text-xs text-gray-500 italic mt-1">
+                  {generatedRule.corrigivel_nota}
+                </div>
+              )}
 
               {/* Base legal encontrada */}
               {generatedRule.legal_sources && generatedRule.legal_sources.length > 0 && (

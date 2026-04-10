@@ -46,13 +46,24 @@ export default function FileDetailPage() {
     const f = await api.getFile(id)
     setFile(f)
     if (f.status === 'validated') {
-      const [s, allErrors] = await Promise.all([
+      const [s, fiscalErrors, xmlErrors] = await Promise.all([
         api.getSummary(id),
         api.getErrors(id, { limit: '2000' }),
+        api.getErrors(id, { limit: '2000', categoria: 'cruzamento_xml' }),
       ])
+      const allErrors = [...fiscalErrors, ...xmlErrors]
       setSummary(s)
       setErrorItems(allErrors.filter(e => e.severity === 'critical' || e.severity === 'error'))
       setAlertItems(allErrors.filter(e => e.severity === 'warning' || e.severity === 'info'))
+    } else if (f.status === 'parsed') {
+      // Carregar erros XML se ja existem (cruzamento feito antes da validacao SPED)
+      try {
+        const xmlErrors = await api.getErrors(id, { limit: '2000', categoria: 'cruzamento_xml' })
+        if (xmlErrors.length > 0) {
+          setErrorItems(xmlErrors.filter(e => e.severity === 'critical' || e.severity === 'error'))
+          setAlertItems(xmlErrors.filter(e => e.severity === 'warning' || e.severity === 'info'))
+        }
+      } catch { /* XML errors may not exist yet */ }
     }
   }, [id])
 
@@ -368,10 +379,13 @@ function SummaryTab({ summary, fileId }: { summary: ErrorSummary; fileId: number
         </div>
       </div>
 
-      {/* Cross-validation link */}
-      <div className="text-center pt-2">
+      {/* Cross-validation links */}
+      <div className="text-center pt-2 flex gap-6 justify-center">
         <Link to={`/files/${fileId}/cross`} className="text-sm text-blue-600 hover:underline">
           Ver cruzamentos entre blocos &rarr;
+        </Link>
+        <Link to={`/files/${fileId}/xml`} className="text-sm text-green-600 hover:underline font-medium">
+          Cruzar com NF-e (XML) &rarr;
         </Link>
       </div>
     </div>
@@ -739,6 +753,11 @@ function ErrorCard({
             <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{error.register}</span>
             {error.field_name && <span className="text-xs text-gray-500">{error.field_name}</span>}
             <SeverityBadge severity={error.severity} />
+            {(error.categoria === 'cruzamento_xml' || error.error_type?.startsWith('XML')) && (
+              <span className="px-2 py-0.5 rounded text-xs bg-emerald-100 text-emerald-700 border border-emerald-300 font-medium">
+                XML
+              </span>
+            )}
             {error.materialidade > 0 && (
               <span className="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800 font-medium" title="Materialidade financeira">
                 R$ {error.materialidade.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

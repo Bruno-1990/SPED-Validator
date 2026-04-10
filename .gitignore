@@ -24,6 +24,9 @@ data/sped_files/
 .vscode/
 .idea/
 
+# Env (contém senhas)
+.env
+
 # OS
 .DS_Store
 Thumbs.db

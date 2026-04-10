@@ -182,6 +182,24 @@ def summary(file_id: int, db: sqlite3.Connection = Depends(get_db)) -> ErrorSumm
     return ErrorSummary(**get_error_summary(db, file_id))
 
 
+def _has_xml_cruzamento(db: sqlite3.Connection, file_id: int) -> bool:
+    """Verifica se o cruzamento XML foi executado (ha resultados persistidos)."""
+    try:
+        cnt = db.execute(
+            "SELECT COUNT(*) FROM nfe_cruzamento WHERE file_id = ?", (file_id,)
+        ).fetchone()[0]
+        if cnt > 0:
+            return True
+        # Pode ter rodado sem divergencias — verifica via validation_errors
+        cnt2 = db.execute(
+            "SELECT COUNT(*) FROM validation_errors WHERE file_id = ? AND categoria = 'cruzamento_xml'",
+            (file_id,),
+        ).fetchone()[0]
+        return cnt2 > 0
+    except Exception:
+        return False
+
+
 @router.get("/audit-scope", response_model=AuditScope)
 def audit_scope(
     file_id: int,
@@ -206,15 +224,41 @@ def audit_scope(
     has_mva_tables = tabelas_externas["mva_por_ncm_uf"] == "disponivel"
     is_simples = context.regime == TaxRegime.SIMPLES_NACIONAL
 
-    # Definir checks executados
+    # Verificar benefícios fiscais ativos
+    has_beneficios = bool(context.beneficios_ativos)
+
+    # Verificar se há XMLs vinculados
+    has_xmls = False
+    try:
+        xml_count = db.execute(
+            "SELECT COUNT(*) FROM nfe_xmls WHERE file_id = ?", (file_id,)
+        ).fetchone()[0]
+        has_xmls = xml_count > 0
+    except Exception:
+        pass  # tabela pode não existir ainda
+
+    # Definir checks executados (30 validators)
     checks: list[AuditCheckInfo] = [
+        # Estágio 1: Estrutural
         AuditCheckInfo(id="format_validation", status="ok", regras=9),
         AuditCheckInfo(id="field_validation", status="ok", regras=4),
         AuditCheckInfo(id="intra_register", status="ok", regras=10),
+        # Estágio 2: Cruzamento
         AuditCheckInfo(id="cross_block", status="ok", regras=7),
         AuditCheckInfo(id="tax_recalculation", status="ok", regras=8),
         AuditCheckInfo(id="cst_validation", status="ok", regras=6),
         AuditCheckInfo(id="fiscal_semantics", status="ok", regras=13),
+        AuditCheckInfo(id="pis_cofins", status="ok", regras=6),
+        AuditCheckInfo(id="parametrizacao", status="ok", regras=3),
+        AuditCheckInfo(id="ncm_validation", status="ok", regras=6),
+        AuditCheckInfo(
+            id="aliquota_validation",
+            status="ok" if has_aliq_tables else "parcial",
+            regras=7,
+            motivo_parcial="Aliquotas por UF nao disponiveis" if not has_aliq_tables else None,
+        ),
+        AuditCheckInfo(id="c190_consolidation", status="ok", regras=2),
+        AuditCheckInfo(id="bloco_d", status="ok", regras=6),
         AuditCheckInfo(
             id="audit_beneficios",
             status="parcial" if tabelas_externas["codigos_ajuste_uf"] == "indisponivel" else "ok",
@@ -224,31 +268,54 @@ def audit_scope(
                 if tabelas_externas["codigos_ajuste_uf"] == "indisponivel" else None
             ),
         ),
+        AuditCheckInfo(id="pendentes", status="ok", regras=5),
+        AuditCheckInfo(id="base_calculo", status="ok", regras=5),
         AuditCheckInfo(
             id="difal_validation",
             status="ok" if has_aliq_tables else "nao_executado",
+            regras=12,
+            motivo_parcial="Tabelas de aliquotas por UF nao disponiveis" if not has_aliq_tables else None,
+        ),
+        AuditCheckInfo(id="beneficio_fiscal", status="ok", regras=3),
+        AuditCheckInfo(
+            id="beneficio_cross",
+            status="ok" if has_beneficios else "nao_aplicavel",
+            regras=9,
+            motivo_parcial="Nenhum beneficio fiscal cadastrado para este contribuinte" if not has_beneficios else None,
+        ),
+        AuditCheckInfo(id="devolucao", status="ok", regras=3),
+        AuditCheckInfo(id="ipi_validation", status="ok", regras=3),
+        AuditCheckInfo(id="destinatario", status="ok", regras=3),
+        AuditCheckInfo(id="cfop_validation", status="ok", regras=3),
+        AuditCheckInfo(
+            id="st_validation",
+            status="ok" if has_mva_tables else "parcial",
             regras=8,
-            motivo_parcial=(
-                "Tabelas de aliquotas internas por UF nao disponiveis"
-                if not has_aliq_tables else None
-            ),
+            motivo_parcial="Tabelas MVA/pauta fiscal nao disponiveis" if not has_mva_tables else None,
         ),
         AuditCheckInfo(
-            id="st_com_mva",
-            status="ok" if has_mva_tables else "nao_executado",
-            regras=8,
-            motivo_parcial=(
-                "Tabelas MVA/pauta fiscal nao disponiveis"
-                if not has_mva_tables else None
-            ),
-        ),
-        AuditCheckInfo(
-            id="simples_nacional_cst",
+            id="simples_nacional",
             status="nao_aplicavel" if not is_simples else "ok",
-            regras=10,
+            regras=12,
+            motivo_parcial="Contribuinte em Regime Normal" if not is_simples else None,
+        ),
+        # Apuração ICMS (RF001-RF009)
+        AuditCheckInfo(id="apuracao_icms", status="ok", regras=11),
+        # Blocos auxiliares
+        AuditCheckInfo(id="bloco_c_servicos", status="ok", regras=4),
+        AuditCheckInfo(id="bloco_k", status="ok", regras=4),
+        AuditCheckInfo(id="retificador", status="ok", regras=2),
+        # Cruzamento NF-e XML — verifica se cruzamento foi executado de fato
+        AuditCheckInfo(
+            id="xml_crossref",
+            status="ok" if _has_xml_cruzamento(db, file_id) else (
+                "parcial" if has_xmls else "nao_executado"
+            ),
+            regras=17,
             motivo_parcial=(
-                "Contribuinte em Regime Normal"
-                if not is_simples else None
+                None if _has_xml_cruzamento(db, file_id)
+                else "XMLs vinculados mas cruzamento nao executado" if has_xmls
+                else "Nenhum XML de NF-e vinculado — envie XMLs na aba de cruzamento"
             ),
         ),
     ]

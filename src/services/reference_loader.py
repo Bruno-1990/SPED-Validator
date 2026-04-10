@@ -970,17 +970,46 @@ class ReferenceLoader:
             except Exception:
                 _logger.warning("Erro ao carregar beneficio %s", path.name, exc_info=True)
 
+    @staticmethod
+    def _normalizar_codigo_beneficio(codigo: str) -> str:
+        """Normaliza código de benefício para match flexível.
+
+        'COMPETE ATACADISTA' → 'COMPETE_ATACADISTA'
+        'compete atacadista' → 'COMPETE_ATACADISTA'
+        'COMPETE-ATACADISTA' → 'COMPETE_ATACADISTA'
+        """
+        return codigo.strip().upper().replace(" ", "_").replace("-", "_")
+
     def get_beneficio(self, codigo: str) -> BeneficioProfile | None:
-        """Retorna o perfil do benefício pelo codigo_beneficio, ou None."""
+        """Retorna o perfil do benefício pelo codigo_beneficio, ou None.
+
+        Faz match normalizado (espaço/hífen → underscore, case insensitive).
+        """
         self._ensure_beneficios()
         assert self._beneficios is not None
-        return self._beneficios.get(codigo)
+        # Match exato primeiro
+        if codigo in self._beneficios:
+            return self._beneficios[codigo]
+        # Match normalizado
+        norm = self._normalizar_codigo_beneficio(codigo)
+        for key, profile in self._beneficios.items():
+            if self._normalizar_codigo_beneficio(key) == norm:
+                return profile
+        return None
 
     def get_beneficios_do_cliente(self, codigos: list[str]) -> list[BeneficioProfile]:
-        """Retorna lista de perfis para os benefícios declarados do cliente."""
+        """Retorna lista de perfis para os benefícios declarados do cliente.
+
+        Faz match normalizado para tolerar diferenças MySQL vs JSON.
+        """
         self._ensure_beneficios()
         assert self._beneficios is not None
-        return [self._beneficios[c] for c in codigos if c in self._beneficios]
+        result = []
+        for c in codigos:
+            profile = self.get_beneficio(c)  # usa match normalizado
+            if profile:
+                result.append(profile)
+        return result
 
     # ── CST Efeitos (JSON) ──
 

@@ -5,25 +5,38 @@ from __future__ import annotations
 import logging
 import os
 
-from fastapi import Header, HTTPException
+from dotenv import load_dotenv
+from fastapi import Header, HTTPException, Query
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
+_dev_mode_logged = False
 
 
-def verify_api_key(x_api_key: str | None = Header(None)) -> str:
-    """Valida API Key enviada no header X-API-Key.
+def verify_api_key(
+    x_api_key: str | None = Header(None),
+    api_key: str | None = Query(None, alias="api_key"),
+) -> str:
+    """Valida API Key via header X-API-Key ou query param ?api_key=.
 
-    - Se API_KEY não está configurada no ambiente: modo dev, aceita qualquer key.
-    - Se API_KEY está configurada: exige match exato.
-    - Retorna a key validada.
+    O fallback por query param e necessario para EventSource (SSE),
+    que nao suporta headers customizados.
+
+    - Se API_KEY nao esta configurada no ambiente: modo dev, aceita qualquer key.
+    - Se API_KEY esta configurada: exige match exato.
     """
+    key = x_api_key or api_key
     expected = os.getenv("API_KEY")
 
     if not expected:
-        logger.warning("API_KEY não configurada — modo desenvolvimento (qualquer key aceita)")
-        return x_api_key or "dev"
+        global _dev_mode_logged  # noqa: PLW0603
+        if not _dev_mode_logged:
+            logger.warning("API_KEY nao configurada — modo desenvolvimento (qualquer key aceita)")
+            _dev_mode_logged = True
+        return key or "dev"
 
-    if not x_api_key or x_api_key != expected:
-        raise HTTPException(status_code=401, detail="API Key inválida ou ausente")
+    if not key or key != expected:
+        raise HTTPException(status_code=401, detail="API Key invalida ou ausente")
 
-    return x_api_key
+    return key

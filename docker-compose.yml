@@ -6,14 +6,14 @@ services:
       context: .
       target: backend
     ports:
-      - "8020:8020"
+      - "8021:8021"
     volumes:
       - db-data:/app/db
       - ./src:/app/src
       - ./api:/app/api
     environment:
       - PYTHONUNBUFFERED=1
-    command: uvicorn api.main:app --host 0.0.0.0 --port 8020 --reload
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8021 --reload
 
   frontend:
     build:
@@ -21,10 +21,10 @@ services:
       dockerfile: ../Dockerfile.frontend
     ports:
       - "5175:5175"
+    environment:
+      - VITE_API_URL=http://api:8021
     depends_on:
       - api
-    environment:
-      - VITE_API_URL=http://api:8020
 
 volumes:
   db-data:

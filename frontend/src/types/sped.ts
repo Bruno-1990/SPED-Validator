@@ -125,6 +125,17 @@ export interface RuleSummary {
   implemented: boolean
 }
 
+export interface RuleCoverageMatch {
+  rule_id: string
+  description: string
+  register: string
+  fields: string[]
+  error_type: string
+  severity: string
+  match_reason: string
+  match_score: number
+}
+
 export interface GeneratedRule {
   id: string
   block: string
@@ -143,6 +154,16 @@ export interface GeneratedRule {
     register: string | null
     score: number
   }> | null
+  corrigivel: string
+  corrigivel_nota: string | null
+  certeza: string
+  impacto: string
+  vigencia_de: string | null
+  version: string
+  last_updated: string | null
+  error_type_exists: boolean
+  error_type_suggestion: string | null
+  objections: RuleCoverageMatch[]
 }
 
 export interface CrossValidationItem {

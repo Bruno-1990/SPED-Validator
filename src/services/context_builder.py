@@ -149,9 +149,12 @@ def build_context(file_id: int, db: sqlite3.Connection) -> ValidationContext:
     if ctx.cliente and ctx.cliente.beneficios_fiscais and loader:
         resolvidos = loader.get_beneficios_do_cliente(ctx.cliente.beneficios_fiscais)
         ctx.beneficios_ativos = resolvidos
-        codigos_json = {b.codigo for b in resolvidos}
+        # Verificar códigos não resolvidos (match normalizado)
+        codigos_resolvidos = {
+            loader._normalizar_codigo_beneficio(b.codigo) for b in resolvidos
+        }
         for cod in ctx.cliente.beneficios_fiscais:
-            if cod not in codigos_json:
+            if loader._normalizar_codigo_beneficio(cod) not in codigos_resolvidos:
                 logger.warning(
                     "Beneficio '%s' declarado no MySQL sem JSON correspondente", cod
                 )

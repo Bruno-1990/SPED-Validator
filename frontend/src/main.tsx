@@ -7,6 +7,7 @@ import FilesPage from './pages/FilesPage'
 import FileDetailPage from './pages/FileDetailPage'
 import RulesPage from './pages/RulesPage'
 import CrossValidationPage from './pages/CrossValidationPage'
+import XMLCrossPage from './pages/XMLCrossPage'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -18,6 +19,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/files" element={<FilesPage />} />
           <Route path="/files/:fileId" element={<FileDetailPage />} />
           <Route path="/files/:fileId/cross" element={<CrossValidationPage />} />
+          <Route path="/files/:fileId/xml" element={<XMLCrossPage />} />
           <Route path="/rules" element={<RulesPage />} />
         </Route>
       </Routes>

@@ -141,8 +141,8 @@ class TestAuditScope:
         assert "intra_register" in check_ids
         assert "audit_beneficios" in check_ids
         assert "difal_validation" in check_ids
-        assert "st_com_mva" in check_ids
-        assert "simples_nacional_cst" in check_ids
+        assert "st_validation" in check_ids
+        assert "simples_nacional" in check_ids
 
         # Cada check tem campos obrigatorios
         for check in data["checks_executados"]:
@@ -161,10 +161,10 @@ class TestAuditScope:
         assert 0 <= data["cobertura_estimada_pct"] <= 100
 
     def test_simples_nacional_check_not_applicable_for_normal(self, client: TestClient) -> None:
-        """Para Regime Normal, simples_nacional_cst deve ser nao_aplicavel."""
+        """Para Regime Normal, simples_nacional deve ser nao_aplicavel."""
         resp = client.get("/api/files/1/audit-scope")
         data = resp.json()
-        sn_check = next(c for c in data["checks_executados"] if c["id"] == "simples_nacional_cst")
+        sn_check = next(c for c in data["checks_executados"] if c["id"] == "simples_nacional")
         assert sn_check["status"] == "nao_aplicavel"
 
 

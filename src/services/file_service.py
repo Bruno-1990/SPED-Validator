@@ -160,6 +160,22 @@ def delete_file(db: sqlite3.Connection, file_id: int) -> bool:
     db.execute("DELETE FROM cross_validations WHERE file_id = ?", (file_id,))
     db.execute("DELETE FROM validation_errors WHERE file_id = ?", (file_id,))
     db.execute("DELETE FROM sped_records WHERE file_id = ?", (file_id,))
+    # NF-e XMLs e cruzamento (migration 12)
+    try:
+        nfe_ids = [r[0] for r in db.execute(
+            "SELECT id FROM nfe_xmls WHERE file_id = ?", (file_id,)
+        ).fetchall()]
+        for nfe_id in nfe_ids:
+            db.execute("DELETE FROM nfe_itens WHERE nfe_id = ?", (nfe_id,))
+        db.execute("DELETE FROM nfe_cruzamento WHERE file_id = ?", (file_id,))
+        db.execute("DELETE FROM nfe_xmls WHERE file_id = ?", (file_id,))
+    except Exception:
+        pass  # tabelas podem não existir em DBs antigos
+    # Finding resolutions
+    try:
+        db.execute("DELETE FROM finding_resolutions WHERE file_id = ?", (file_id,))
+    except Exception:
+        pass
     db.execute("DELETE FROM sped_files WHERE id = ?", (file_id,))
     db.commit()
     return True
