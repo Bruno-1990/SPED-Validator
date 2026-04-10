@@ -212,37 +212,24 @@ export default function UploadPage() {
       setXmlProgress({ enviados, total: totalFiles })
     }
 
-    // Upload completo — executar cruzamento automatico via SSE
+    // Upload completo — executar cruzamento automatico
     setXmlStats(statsAccum)
     setXmlUploading(false)
 
     if (statsAccum.autorizadas + statsAccum.canceladas > 0) {
       setCruzandoXml(true)
       setCruzPct(0)
-      setCruzLog([])
+      setCruzLog(['Iniciando cruzamento XML x SPED...'])
 
-      await new Promise<void>((resolve) => {
-        api.cruzarXmlStream(
-          fileId!,
-          (pct, msg) => {
-            setCruzPct(pct)
-            setCruzLog(prev => {
-              // Evitar duplicatas consecutivas
-              if (prev.length > 0 && prev[prev.length - 1] === msg) return prev
-              return [...prev.slice(-8), msg] // manter ultimas 9 linhas
-            })
-          },
-          (result) => {
-            setCruzResult(result)
-            setCruzandoXml(false)
-            resolve()
-          },
-          () => {
-            setCruzandoXml(false)
-            resolve()
-          },
-        )
-      })
+      try {
+        const result = await api.cruzarXml(fileId!)
+        setCruzPct(100)
+        setCruzLog(prev => [...prev, `Concluido: ${result.divergencias} divergencias encontradas.`])
+        setCruzResult(result)
+      } catch {
+        setCruzLog(prev => [...prev, 'Erro no cruzamento.'])
+      }
+      setCruzandoXml(false)
     }
   }, [fileId])
 
