@@ -426,16 +426,29 @@ def _persist_stage_errors(
                 continue
 
         record_id = line_to_record.get(err.line_number) if err.line_number > 0 else None
+
+        # Certeza/impacto: YAML é fonte primária
+        certeza = err.certeza
+        impacto = err.impacto
+        if rule_index:
+            ci = rule_index.get_certeza_impacto(err.error_type)
+            if ci:
+                certeza, impacto = ci
+        if err.certeza != "objetivo":
+            certeza = err.certeza
+        if err.impacto != "relevante":
+            impacto = err.impacto
+
         db.execute(
             """INSERT INTO validation_errors
                (file_id, record_id, line_number, register, field_no, field_name, value,
-                error_type, severity, message, expected_value, categoria)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                error_type, severity, message, expected_value, categoria, certeza, impacto)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 file_id, record_id, err.line_number, err.register, err.field_no,
                 err.field_name, err.value, err.error_type,
                 _severity_for(err.error_type, rule_index), err.message,
-                err.expected_value, err.categoria,
+                err.expected_value, err.categoria, certeza, impacto,
             ),
         )
     db.commit()
