@@ -13,13 +13,18 @@ def load_field_definitions(db_path: str | Path) -> dict[str, list[RegisterField]
     """Carrega todas as definições de campos do banco em memória.
 
     Retorna dict[register_code] → lista de RegisterField ordenada por field_no.
+    Retorna dict vazio se a tabela register_fields nao existir no banco.
     """
     conn = sqlite3.connect(str(db_path))
-    rows = conn.execute(
-        """SELECT register, field_no, field_name, field_type, field_size,
-                  decimals, required, valid_values, description
-           FROM register_fields ORDER BY register, field_no"""
-    ).fetchall()
+    try:
+        rows = conn.execute(
+            """SELECT register, field_no, field_name, field_type, field_size,
+                      decimals, required, valid_values, description
+               FROM register_fields ORDER BY register, field_no"""
+        ).fetchall()
+    except sqlite3.OperationalError:
+        conn.close()
+        return {}
     conn.close()
 
     defs: dict[str, list[RegisterField]] = {}
