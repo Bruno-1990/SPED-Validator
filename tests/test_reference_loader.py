@@ -103,9 +103,9 @@ class TestFCP:
         """BA tem FCP de 2%."""
         assert loader.get_fcp("BA") == 2.0
 
-    def test_pi_fcp_1(self, loader: ReferenceLoader) -> None:
-        """PI tem FCP de 1%."""
-        assert loader.get_fcp("PI") == 1.0
+    def test_pi_fcp_2(self, loader: ReferenceLoader) -> None:
+        """PI tem FCP de 2% (atualizado 2026)."""
+        assert loader.get_fcp("PI") == 2.0
 
     def test_sp_fcp_zero(self, loader: ReferenceLoader) -> None:
         """SP não tem FCP."""
@@ -124,8 +124,9 @@ class TestAliquotaInterna:
     def test_sp_18(self, loader: ReferenceLoader) -> None:
         assert loader.get_aliquota_interna("SP") == 18.0
 
-    def test_rj_20(self, loader: ReferenceLoader) -> None:
-        assert loader.get_aliquota_interna("RJ") == 20.0
+    def test_rj_22(self, loader: ReferenceLoader) -> None:
+        """RJ aliquota interna 22% (atualizado 2026)."""
+        assert loader.get_aliquota_interna("RJ") == 22.0
 
     def test_uf_inexistente_none(self, loader: ReferenceLoader) -> None:
         assert loader.get_aliquota_interna("XX") is None

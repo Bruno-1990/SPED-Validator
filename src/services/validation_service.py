@@ -34,21 +34,34 @@ def _load_certeza_impacto() -> dict[str, tuple[str, str]]:
     _CERTEZA_IMPACTO_CACHE = mapping
     return mapping
 from ..validators.aliquota_validator import validate_aliquotas  # noqa: E402
+from ..validators.apuracao_validator import validate_apuracao  # noqa: E402
 from ..validators.audit_rules import validate_audit_rules  # noqa: E402
+from ..validators.base_calculo_validator import validate_base_calculo  # noqa: E402
 from ..validators.beneficio_audit_validator import validate_beneficio_audit  # noqa: E402
+from ..validators.beneficio_cross_validator import validate_beneficio_cross  # noqa: E402
+from ..validators.beneficio_validator import validate_beneficio  # noqa: E402
 from ..validators.bloco_c_servicos_validator import validate_bloco_c_servicos  # noqa: E402
+from ..validators.bloco_d_validator import validate_bloco_d  # noqa: E402
 from ..validators.bloco_k_validator import validate_bloco_k  # noqa: E402
 from ..validators.c190_validator import validate_c190  # noqa: E402
+from ..validators.cfop_validator import validate_cfop  # noqa: E402
 from ..validators.correction_hypothesis import validate_with_hypotheses  # noqa: E402
 from ..validators.cross_block_validator import validate_cross_blocks  # noqa: E402
 from ..validators.cst_hypothesis import validate_cst_hypotheses  # noqa: E402
 from ..validators.cst_validator import validate_cst_and_exemptions  # noqa: E402
+from ..validators.destinatario_validator import validate_destinatario  # noqa: E402
+from ..validators.devolucao_validator import validate_devolucao  # noqa: E402
 from ..validators.difal_validator import validate_difal  # noqa: E402
 from ..validators.fiscal_semantics import validate_fiscal_semantics  # noqa: E402
 from ..validators.intra_register_validator import validate_intra_register  # noqa: E402
+from ..validators.ipi_validator import validate_ipi  # noqa: E402
+from ..validators.ncm_validator import validate_ncm  # noqa: E402
+from ..validators.parametrizacao_validator import validate_parametrizacao  # noqa: E402
 from ..validators.pendentes_validator import validate_pendentes  # noqa: E402
+from ..validators.pis_cofins_validator import validate_pis_cofins  # noqa: E402
 from ..validators.retificador_validator import validate_retificador  # noqa: E402
-from ..validators.st_validator import validate_st  # noqa: E402
+from ..validators.simples_validator import validate_simples  # noqa: E402
+from ..validators.st_validator import validate_st, validate_st_mva  # noqa: E402
 from ..validators.tax_recalc import recalculate_taxes  # noqa: E402
 
 
@@ -105,6 +118,7 @@ def run_full_validation(
 
     # 5b. ICMS-ST (ST_001-ST_004)
     all_errors.extend(validate_st(records, context=context))
+    all_errors.extend(validate_st_mva(records, context=context))
 
     # 6. CST + isenções + Bloco H
     all_errors.extend(validate_cst_and_exemptions(records, context=context))
@@ -112,14 +126,26 @@ def run_full_validation(
     # 7. Validação semântica fiscal (CST x alíquota zero, CST x CFOP)
     all_errors.extend(validate_fiscal_semantics(records, context=context))
 
+    # 7b. PIS/COFINS
+    all_errors.extend(validate_pis_cofins(records, context=context))
+
     # 8. Regras de auditoria fiscal (cruzamentos avançados)
     all_errors.extend(validate_audit_rules(records, context=context))
+
+    # 8b. Parametrização sistemica
+    all_errors.extend(validate_parametrizacao(records, context=context))
 
     # 9. Validação de alíquotas
     all_errors.extend(validate_aliquotas(records, context=context))
 
+    # 9b. NCM vigente
+    all_errors.extend(validate_ncm(records, context=context))
+
     # 10. Consolidação C190
     all_errors.extend(validate_c190(records, context=context))
+
+    # 10b. Bloco D
+    all_errors.extend(validate_bloco_d(records, context=context))
 
     # 11. Auditoria de benefícios fiscais
     all_errors.extend(validate_beneficio_audit(records, context=context))
@@ -127,17 +153,44 @@ def run_full_validation(
     # 12. Regras pendentes
     all_errors.extend(validate_pendentes(records, context=context))
 
+    # 12b. Base de cálculo
+    all_errors.extend(validate_base_calculo(records, context=context))
+
     # 14. DIFAL (Diferencial de Aliquota Interestadual)
     all_errors.extend(validate_difal(records, context=context))
 
-    # 13. Hipoteses de correcao inteligente (aliquota e CST)
+    # 14b. Benefícios fiscais (BENE_001-003)
+    all_errors.extend(validate_beneficio(records, context=context))
+
+    # 14c. Cruzamento benefícios x JSON
+    all_errors.extend(validate_beneficio_cross(records, context=context))
+
+    # 14d. Devoluções
+    all_errors.extend(validate_devolucao(records, context=context))
+
+    # 14e. IPI
+    all_errors.extend(validate_ipi(records, context=context))
+
+    # 14f. Destinatário
+    all_errors.extend(validate_destinatario(records, context=context))
+
+    # 14g. CFOP
+    all_errors.extend(validate_cfop(records, context=context))
+
+    # 14h. Simples Nacional
+    all_errors.extend(validate_simples(records, context=context))
+
+    # 15. Apuração ICMS (RF001-RF009)
+    all_errors.extend(validate_apuracao(records, context=context))
+
+    # 16. Hipoteses de correcao inteligente (aliquota e CST)
     all_errors.extend(validate_with_hypotheses(records, context=context))
     all_errors.extend(validate_cst_hypotheses(records, context=context))
 
-    # 15. Retificadores (MOD-16)
+    # 17. Retificadores (MOD-16)
     all_errors.extend(validate_retificador(records, db=db, file_id=file_id))
 
-    # 16. Bloco C Servicos — C400/C490/C500/C590 (MOD-17)
+    # 18. Bloco C Servicos — C400/C490/C500/C590 (MOD-17)
     all_errors.extend(validate_bloco_c_servicos(records, context=context))
     all_errors.extend(validate_bloco_k(records, context=context))
 

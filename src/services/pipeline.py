@@ -8,13 +8,17 @@ from dataclasses import dataclass, field
 
 from ..models import ValidationError
 from ..validator import load_field_definitions, validate_records
+from ..validators.apuracao_validator import validate_apuracao
 from ..validators.aliquota_validator import validate_aliquotas
 from ..validators.audit_rules import validate_audit_rules
 from ..validators.base_calculo_validator import validate_base_calculo
 from ..validators.beneficio_audit_validator import validate_beneficio_audit
 from ..validators.beneficio_cross_validator import validate_beneficio_cross
 from ..validators.beneficio_validator import validate_beneficio
+from ..validators.bloco_c_servicos_validator import validate_bloco_c_servicos
 from ..validators.bloco_d_validator import validate_bloco_d
+from ..validators.bloco_k_validator import validate_bloco_k
+from ..validators.retificador_validator import validate_retificador
 from ..validators.c190_validator import validate_c190
 from ..validators.cfop_validator import validate_cfop
 from ..validators.correction_hypothesis import validate_with_hypotheses
@@ -237,6 +241,14 @@ def run_pipeline(
         progress.detail = "Simples Nacional: CSOSN, credito, PIS/COFINS"
         cross_errors.extend(validate_simples(records, context=context))
         progress.stage_progress = 98
+
+        progress.detail = "Apuracao ICMS: reconciliacao C190 x E110 x E111 x E116"
+        cross_errors.extend(validate_apuracao(records, context=context))
+
+        progress.detail = "Bloco C Servicos (C400/C490/C500/C590), Bloco K e Retificadores"
+        cross_errors.extend(validate_bloco_c_servicos(records, context=context))
+        cross_errors.extend(validate_bloco_k(records, context=context))
+        cross_errors.extend(validate_retificador(records, db=db, file_id=file_id))
 
         progress.detail = "Hipoteses de correcao inteligente (aliquota e CST)"
         cross_errors.extend(validate_with_hypotheses(records, context=context))
