@@ -529,9 +529,12 @@ def _calc_materialidade(err: ValidationError) -> float:
 
 def _persist_errors(db: sqlite3.Connection, file_id: int, errors: list[ValidationError], rule_index=None) -> None:
     """Persiste erros de validação no banco."""
-    # Limpar correções e erros anteriores (corrections referencia validation_errors)
+    # Limpar correções e erros anteriores (preservar erros de cruzamento XML)
     db.execute("DELETE FROM corrections WHERE file_id = ?", (file_id,))
-    db.execute("DELETE FROM validation_errors WHERE file_id = ?", (file_id,))
+    db.execute(
+        "DELETE FROM validation_errors WHERE file_id = ? AND COALESCE(categoria, 'fiscal') != 'cruzamento_xml'",
+        (file_id,),
+    )
 
     # Cache line_number -> record_id
     line_to_record: dict[int, int] = {}

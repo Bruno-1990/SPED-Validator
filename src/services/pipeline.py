@@ -107,9 +107,12 @@ def run_pipeline(
         )
         db.commit()
 
-        # Limpar correções e erros anteriores (corrections referencia validation_errors)
+        # Limpar correções e erros anteriores (preservar erros de cruzamento XML)
         db.execute("DELETE FROM corrections WHERE file_id = ?", (file_id,))
-        db.execute("DELETE FROM validation_errors WHERE file_id = ?", (file_id,))
+        db.execute(
+            "DELETE FROM validation_errors WHERE file_id = ? AND COALESCE(categoria, 'fiscal') != 'cruzamento_xml'",
+            (file_id,),
+        )
         db.commit()
 
         # Construir contexto de validação (regime, caches)
