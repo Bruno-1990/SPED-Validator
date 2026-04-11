@@ -1,4 +1,8 @@
-"""Testes para RegimeDetector — detecção multi-sinal de regime tributário."""
+"""Testes para RegimeDetector — deteccao por CSTs reais (BUG-001 fix).
+
+BUG-001: IND_PERFIL NAO e mais usado para determinar regime.
+Regime e detectado exclusivamente pelos CSTs encontrados em C170/C190.
+"""
 
 import pytest
 from src.models import SpedRecord
@@ -16,15 +20,12 @@ def _make_record(register: str, fields_list: list[str], line: int = 1) -> SpedRe
 
 
 def _make_0000(ind_perfil: str = "A") -> SpedRecord:
-    # 0000 tem 15 campos: REG, COD_VER, COD_FIN, DT_INI, DT_FIN, NOME, CNPJ, CPF,
-    # UF, IE, COD_MUN, IM, SUFRAMA, IND_PERFIL, IND_ATIV
     fields = ["0000", "017", "0", "01012024", "31012024", "EMPRESA LTDA",
               "12345678000190", "", "SP", "1234567890", "351880", "", "", ind_perfil, "1"]
     return _make_record("0000", fields)
 
 
 def _make_c170(cst_icms: str = "00") -> SpedRecord:
-    # Campos mínimos do C170 com CST_ICMS na posição correta
     fields = ["C170", "1", "ITEM01", "DESC", "10", "UN", "100.00", "0", "0",
               cst_icms, "5101", "", "100.00", "18.00", "18.00",
               "", "", "", "", "", "", "", "", "",
@@ -34,51 +35,60 @@ def _make_c170(cst_icms: str = "00") -> SpedRecord:
 
 
 class TestRegimeDetector:
-    def test_perfil_c_simples_nacional(self):
-        records = [_make_0000("C")]
+    """BUG-001 fix: Regime detectado pelos CSTs, nao por IND_PERFIL."""
+
+    def test_csosn_detecta_simples_nacional(self):
+        """CSOSN 400 em C170 → Simples Nacional, independente de IND_PERFIL."""
+        records = [_make_0000("A"), _make_c170("400")]
         result = RegimeDetector.detect(records)
         assert result.regime == RegimeTributario.SIMPLES_NACIONAL
-        assert result.confidence >= 0.7
+        assert result.confidence == 1.0
 
-    def test_perfil_a_regime_normal(self):
+    def test_csosn_101_detecta_simples(self):
+        records = [_make_0000("A"), _make_c170("101")]
+        result = RegimeDetector.detect(records)
+        assert result.regime == RegimeTributario.SIMPLES_NACIONAL
+
+    def test_cst_normal_detecta_normal(self):
+        """CST 00 (Tabela A) em C170 → Regime Normal."""
+        records = [_make_0000("C"), _make_c170("00")]
+        result = RegimeDetector.detect(records)
+        assert result.regime == RegimeTributario.REGIME_NORMAL
+        assert result.confidence == 1.0
+
+    def test_ind_perfil_c_sem_csosn_nao_e_simples(self):
+        """IND_PERFIL=C mas CST 00 em C170 → Normal (IND_PERFIL ignorado)."""
+        records = [_make_0000("C"), _make_c170("00")]
+        result = RegimeDetector.detect(records)
+        assert result.regime == RegimeTributario.REGIME_NORMAL
+
+    def test_ind_perfil_a_com_csosn_e_simples(self):
+        """IND_PERFIL=A mas CSOSN em C170 → Simples (CST prevalece)."""
+        records = [_make_0000("A"), _make_c170("102")]
+        result = RegimeDetector.detect(records)
+        assert result.regime == RegimeTributario.SIMPLES_NACIONAL
+
+    def test_sem_c170_unknown(self):
+        """Sem registros C170/C190 → DESCONHECIDO."""
         records = [_make_0000("A")]
-        result = RegimeDetector.detect(records)
-        assert result.regime == RegimeTributario.REGIME_NORMAL
-        assert result.confidence >= 0.7
-
-    def test_perfil_b_regime_normal(self):
-        records = [_make_0000("B")]
-        result = RegimeDetector.detect(records)
-        assert result.regime == RegimeTributario.REGIME_NORMAL
-
-    def test_csosn_in_c170_indicates_sn(self):
-        records = [_make_0000("C"), _make_c170("400")]
-        result = RegimeDetector.detect(records)
-        assert result.regime == RegimeTributario.SIMPLES_NACIONAL
-        assert result.confidence >= 0.7
-
-    def test_no_signals_unknown(self):
-        records = [_make_0000("")]  # IND_PERFIL vazio
         result = RegimeDetector.detect(records)
         assert result.regime == RegimeTributario.DESCONHECIDO
         assert result.needs_confirmation is True
-
-    def test_mixed_signals(self):
-        # Perfil C + CST normal (ambíguo mas SN domina)
-        records = [_make_0000("C"), _make_c170("00")]
-        result = RegimeDetector.detect(records)
-        # IND_PERFIL=C gives sn_score=0.7, CST normal without CSOSN gives normal_score=0.5
-        # SN score >= 0.6 so should be SIMPLES_NACIONAL
-        assert result.regime == RegimeTributario.SIMPLES_NACIONAL
 
     def test_empty_records(self):
         result = RegimeDetector.detect([])
         assert result.regime == RegimeTributario.DESCONHECIDO
-        assert result.needs_confirmation is True
 
-    def test_high_confidence_no_confirmation(self):
-        # IND_PERFIL=C + CSOSN gives score 0.7 + 0.6 = 1.3 capped at 1.0
-        records = [_make_0000("C"), _make_c170("400")]
+    def test_regime_source_is_cst(self):
+        """regime_source deve ser 'CST'."""
+        records = [_make_0000("A"), _make_c170("00")]
         result = RegimeDetector.detect(records)
-        assert result.confidence >= 0.8
-        assert result.needs_confirmation is False
+        assert result.regime_source == "CST"
+
+    def test_ind_perfil_logged_but_not_used(self):
+        """IND_PERFIL aparece nos signals mas nao determina regime."""
+        records = [_make_0000("C"), _make_c170("00")]
+        result = RegimeDetector.detect(records)
+        assert any("IND_PERFIL" in s for s in result.signals)
+        assert any("NAO indica regime" in s for s in result.signals)
+        assert result.regime == RegimeTributario.REGIME_NORMAL  # CST prevalece

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from pathlib import Path
 from unittest.mock import patch
@@ -30,7 +31,7 @@ def client(tmp_path: Path) -> TestClient:
 
     from api.deps import get_db
     app.dependency_overrides[get_db] = override_get_db
-    yield TestClient(app)
+    yield TestClient(app, headers={"X-API-Key": os.environ.get("API_KEY", "test-api-key-for-pytest-minimum-32-chars!")})
     app.dependency_overrides.pop(get_db, None)
 
 

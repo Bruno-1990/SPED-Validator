@@ -71,15 +71,16 @@ class TestAuthEnforced:
 # ── Modo desenvolvimento (API_KEY não configurada) ────────────────
 
 
-class TestDevMode:
-    """Sem API_KEY no ambiente, qualquer request é aceito."""
+class TestDevModeEliminated:
+    """BUG-004 fix: Sem API_KEY → HTTP 500, nao aceita requests."""
 
     @pytest.mark.usefixtures("_clear_api_key")
-    def test_no_key_accepted(self, client: TestClient):
+    def test_no_key_returns_500(self, client: TestClient):
         resp = client.get("/api/files")
-        assert resp.status_code == 200
+        assert resp.status_code == 500
+        assert "API_KEY" in resp.json().get("detail", "")
 
     @pytest.mark.usefixtures("_clear_api_key")
-    def test_any_key_accepted(self, client: TestClient):
+    def test_any_key_returns_500(self, client: TestClient):
         resp = client.get("/api/files", headers={"X-API-Key": "qualquer-coisa"})
-        assert resp.status_code == 200
+        assert resp.status_code == 500

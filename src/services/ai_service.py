@@ -36,9 +36,16 @@ def _build_cache_key(
     beneficio_codigo: str = "",
     ind_oper: str = "",
     campo_principal: str = "",
+    valor_encontrado: str = "",
 ) -> str:
-    """Gera hash SHA256 da chave ampliada."""
-    raw = f"{rule_id}|{error_type}|{regime}|{uf}|{beneficio_codigo}|{ind_oper}|{campo_principal}"
+    """Gera hash SHA256 da chave ampliada (Fase 6 fix: inclui valor_encontrado).
+
+    Correcao: sem valor_encontrado, CST 040 e CST 090 no mesmo campo
+    compartilhavam a mesma explicacao (cache hit incorreto).
+    """
+    # Hash parcial do valor para discriminar sem expor dado sensivel
+    valor_hash = hashlib.md5(str(valor_encontrado).encode()).hexdigest()[:8] if valor_encontrado else ""
+    raw = f"{rule_id}|{error_type}|{regime}|{uf}|{beneficio_codigo}|{ind_oper}|{campo_principal}|{valor_hash}"
     return hashlib.sha256(raw.encode()).hexdigest()
 
 

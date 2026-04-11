@@ -170,7 +170,15 @@ def validate_st_mva(
 
         mva = ref.get_mva(ncm)
         if mva is None:
-            # NCM nao catalogado na tabela MVA — pular
+            # ST_MVA_NAO_MAPEADO: NCM sem MVA na tabela de referencia
+            if is_st_debito and vl_bc_st > 0:
+                errors.append(make_error(
+                    rec, "VL_BC_ICMS_ST", "ST_MVA_NAO_MAPEADO",
+                    f"NCM {ncm} sem MVA mapeado na tabela de referencia. "
+                    f"Recalculo de ST nao executado para este item. "
+                    f"Atualize mva_por_ncm_uf.yaml.",
+                    field_no=16, value=f"{vl_bc_st:.2f}",
+                ))
             continue
 
         # ST_MVA_003: NCM sujeito a ST mas sem BC_ICMS_ST
@@ -187,46 +195,83 @@ def validate_st_mva(
                     value="0",
                 ))
 
-        # Validar calculo da BC_ST e ICMS_ST quando ST esta presente
-        if is_st_debito and vl_bc_st > 0 and vl_item > 0:
-            # Obter aliquota interna da UF destino
+        # BUG-002 fix: Formula completa ICMS-ST com MVA em 4 etapas
+        if is_st_debito and vl_item > 0:
             aliq_interna = ref.get_aliquota_interna(uf_contrib)
             if aliq_interna is None:
                 continue
 
-            # Calcular BC_ST esperada: (VL_ITEM + frete/seg/etc) * (1 + MVA/100)
-            # Simplificacao: usar vl_bc_icms como base, ou vl_item
-            base = vl_bc_icms if vl_bc_icms > 0 else vl_item
-            bc_st_esperada = base * (1 + mva / 100)
+            # Etapa 1: Base ST com MVA original
+            # BC_ST = (VL_ITEM + VL_FRT + VL_SEG + VL_OUT_DA - VL_DESC) * (1 + MVA/100)
+            vl_frt = to_float(get_field(rec, "VL_FRT")) if get_field(rec, "VL_FRT") else 0.0
+            vl_seg = to_float(get_field(rec, "VL_SEG")) if get_field(rec, "VL_SEG") else 0.0
+            vl_out_da = to_float(get_field(rec, "VL_OUT_DA")) if get_field(rec, "VL_OUT_DA") else 0.0
+            vl_desc = to_float(get_field(rec, "VL_DESC")) if get_field(rec, "VL_DESC") else 0.0
+            base_operacao = vl_item + vl_frt + vl_seg + vl_out_da - vl_desc
+            if base_operacao <= 0:
+                continue
+            bc_st_esperada = base_operacao * (1 + mva / 100)
 
-            # ST_MVA_001: BC_ICMS_ST diverge do esperado
-            tolerancia = bc_st_esperada * 0.05  # 5% de tolerancia
-            if abs(vl_bc_st - bc_st_esperada) > max(tolerancia, 1.0):
-                errors.append(make_error(
-                    rec, "VL_BC_ICMS_ST", "ST_MVA_BC_DIVERGENTE",
-                    f"ST_MVA_001: BC_ICMS_ST={vl_bc_st:.2f} diverge do esperado "
-                    f"com MVA {mva:.1f}% (BC esperada={bc_st_esperada:.2f}). "
-                    f"Base={base:.2f} x (1 + {mva:.1f}%) = {bc_st_esperada:.2f}.",
-                    field_no=16,
-                    value=f"{vl_bc_st:.2f}",
-                    expected_value=f"{bc_st_esperada:.2f}",
-                ))
+            # Etapa 2: Ajuste MVA para remetente Simples Nacional
+            # Se emitente e SN (CRT=1), aplicar MVA ajustado
+            cod_part = get_field(rec, "COD_PART") if get_field(rec, "COD_PART") else ""
+            participante = context.participantes.get(cod_part, {})
+            # Heuristica: se UF do participante != UF contribuinte, verificar aliq interestadual
+            uf_part = participante.get("uf", "")
+            if uf_part and uf_part != uf_contrib:
+                # Operacao interestadual — aplicar aliquota interestadual
+                aliq_inter = 12.0  # Default; 4% para importados, 7% para S/SE→N/NE/CO
+                bc_st_esperada = base_operacao * (1 + mva / 100)
+                # Ajuste para SN nao implementado aqui (requer CRT do emitente — Fase 2)
 
-            # ST_MVA_004: VL_ICMS_ST diverge do recalculo
-            # ICMS_ST = (BC_ST * aliq_interna/100) - ICMS_proprio
-            icms_st_esperado = (vl_bc_st * aliq_interna / 100) - vl_icms
+            # Etapa 3: ICMS-ST esperado
+            vl_icms_proprio = vl_icms if vl_icms > 0 else (vl_bc_icms * aliq_interna / 100 if vl_bc_icms > 0 else 0)
+            icms_st_esperado = (bc_st_esperada * aliq_interna / 100) - vl_icms_proprio
             if icms_st_esperado < 0:
                 icms_st_esperado = 0.0
 
-            tol_icms = max(abs(icms_st_esperado) * 0.05, 1.0)
+            # Etapa 4: Divergencia com tolerancia proporcional
+            from .tolerance import tolerancia_proporcional
+            tol_bc = tolerancia_proporcional(bc_st_esperada)
+            tol_icms = tolerancia_proporcional(icms_st_esperado)
+
+            # ST_MVA_AUSENTE: Item com ST mas BC_ST zerada
+            if vl_bc_st == 0 and bc_st_esperada > 0:
+                errors.append(make_error(
+                    rec, "VL_BC_ICMS_ST", "ST_MVA_AUSENTE",
+                    f"Produto com NCM {ncm} sujeito a ST (MVA {mva:.1f}%) "
+                    f"mas BC_ICMS_ST esta zerada. BC esperada: R${bc_st_esperada:.2f}.",
+                    field_no=16, value="0",
+                    expected_value=f"{bc_st_esperada:.2f}",
+                ))
+            # ST_MVA_DIVERGENTE: BC_ST diverge do esperado
+            elif vl_bc_st > 0 and abs(vl_bc_st - bc_st_esperada) > tol_bc:
+                errors.append(make_error(
+                    rec, "VL_BC_ICMS_ST", "ST_MVA_DIVERGENTE",
+                    f"BC_ICMS_ST={vl_bc_st:.2f} diverge do esperado R${bc_st_esperada:.2f} "
+                    f"(MVA {mva:.1f}%, base operacao R${base_operacao:.2f}).",
+                    field_no=16, value=f"{vl_bc_st:.2f}",
+                    expected_value=f"{bc_st_esperada:.2f}",
+                ))
+
+            # ST_ALIQ_INCORRETA: Aliquota ST diverge da tabela
+            if aliq_st > 0 and abs(aliq_st - aliq_interna) > 0.01:
+                errors.append(make_error(
+                    rec, "ALIQ_ST", "ST_ALIQ_INCORRETA",
+                    f"Aliquota ST {aliq_st:.1f}% diverge da aliquota interna {aliq_interna:.1f}% "
+                    f"da UF {uf_contrib} para NCM {ncm}.",
+                    field_no=17, value=f"{aliq_st:.1f}",
+                    expected_value=f"{aliq_interna:.1f}",
+                ))
+
+            # VL_ICMS_ST diverge do recalculo
             if vl_icms_st > 0 and abs(vl_icms_st - icms_st_esperado) > tol_icms:
                 errors.append(make_error(
-                    rec, "VL_ICMS_ST", "ST_MVA_ICMS_DIVERGENTE",
-                    f"ST_MVA_004: VL_ICMS_ST={vl_icms_st:.2f} diverge do esperado "
-                    f"{icms_st_esperado:.2f}. Calculo: (BC_ST {vl_bc_st:.2f} x "
-                    f"aliq {aliq_interna:.1f}%) - ICMS_proprio {vl_icms:.2f}.",
-                    field_no=18,
-                    value=f"{vl_icms_st:.2f}",
+                    rec, "VL_ICMS_ST", "ST_MVA_DIVERGENTE",
+                    f"VL_ICMS_ST={vl_icms_st:.2f} diverge do esperado R${icms_st_esperado:.2f}. "
+                    f"Calculo: (BC_ST R${bc_st_esperada:.2f} x {aliq_interna:.1f}%) "
+                    f"- ICMS proprio R${vl_icms_proprio:.2f}.",
+                    field_no=18, value=f"{vl_icms_st:.2f}",
                     expected_value=f"{icms_st_esperado:.2f}",
                 ))
 

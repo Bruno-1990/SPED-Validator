@@ -1,0 +1,159 @@
+# Mapeamento SPED <-> XML NF-e (ICMS/IPI)
+# Fase 5: Configuracao externalizada para FieldComparator
+# Foco: ICMS e IPI exclusivamente. PIS/COFINS apenas como reflexo.
+version: "2.0"
+namespace_nfe: "http://www.portalfiscal.inf.br/nfe"
+
+# Tipos de comparacao:
+#   EXACT: string apos normalizacao
+#   MONETARY: decimal com tolerancia proporcional
+#   PERCENTAGE: decimal com tolerancia 0.001%
+#   DATE: normaliza para AAAA-MM-DD
+#   CST_AWARE: CST ou CSOSN conforme CRT emitente
+#   DERIVED: campo calculado (regra especifica)
+
+c100_header:
+  - sped_campo: CHV_NFE
+    xml_xpath: ".//protNFe/infProt/chNFe"
+    tipo: EXACT
+    join_key: true
+
+  - sped_campo: NUM_DOC
+    xml_xpath: ".//ide/nNF"
+    tipo: EXACT
+
+  - sped_campo: SER
+    xml_xpath: ".//ide/serie"
+    tipo: EXACT
+
+  - sped_campo: DT_DOC
+    xml_xpath: ".//ide/dhEmi"
+    tipo: DATE
+    regra_id: XML015
+    severidade: medium
+
+  - sped_campo: VL_DOC
+    xml_xpath: ".//total/ICMSTot/vNF"
+    tipo: MONETARY
+    regra_id: XML004
+    severidade: high
+
+  - sped_campo: VL_ICMS
+    xml_xpath: ".//total/ICMSTot/vICMS"
+    tipo: MONETARY
+    regra_id: XML_C100_VL_ICMS
+    severidade: high
+
+  - sped_campo: VL_BC_ICMS
+    xml_xpath: ".//total/ICMSTot/vBC"
+    tipo: MONETARY
+    regra_id: XML_C100_VL_BC
+    severidade: high
+
+  - sped_campo: VL_ICMS_ST
+    xml_xpath: ".//total/ICMSTot/vST"
+    tipo: MONETARY
+    regra_id: XML_C100_VL_ST
+    severidade: high
+
+  - sped_campo: VL_IPI
+    xml_xpath: ".//total/ICMSTot/vIPI"
+    tipo: MONETARY
+    regra_id: XML_C100_VL_IPI
+    severidade: high
+    opcional: true
+
+  - sped_campo: VL_DESC
+    xml_xpath: ".//total/ICMSTot/vDesc"
+    tipo: MONETARY
+    severidade: medium
+
+  - sped_campo: VL_FRT
+    xml_xpath: ".//total/ICMSTot/vFrete"
+    tipo: MONETARY
+    severidade: medium
+
+  - sped_campo: COD_SIT
+    xml_xpath: ".//protNFe/infProt/cStat"
+    tipo: DERIVED
+    mapeamento:
+      "100": "00"
+      "101": "02"
+      "135": "02"
+      "110": "05"
+      "301": "05"
+    regra_id: XML003_B
+    severidade: critical
+
+c170_items:
+  - sped_campo: NUM_ITEM
+    xml_xpath: "./@nItem"
+    tipo: EXACT
+    join_key: true
+
+  - sped_campo: NCM
+    xml_xpath: "./prod/NCM"
+    tipo: EXACT
+    regra_id: XML009
+    severidade: medium
+
+  - sped_campo: CFOP
+    xml_xpath: "./prod/CFOP"
+    tipo: EXACT
+    regra_id: XML007
+    severidade: high
+
+  - sped_campo: VL_ITEM
+    xml_xpath: "./prod/vProd"
+    tipo: MONETARY
+    regra_id: XML011_A
+    severidade: high
+
+  - sped_campo: CST_ICMS
+    xml_xpath: "./imposto/ICMS/*/CST"
+    xml_xpath_alt: "./imposto/ICMS/*/CSOSN"
+    tipo: CST_AWARE
+    regra_id: XML008
+    severidade: high
+
+  - sped_campo: VL_BC_ICMS
+    xml_xpath: "./imposto/ICMS/*/vBC"
+    tipo: MONETARY
+    regra_id: XML_C170_VL_BC
+    severidade: high
+
+  - sped_campo: ALIQ_ICMS
+    xml_xpath: "./imposto/ICMS/*/pICMS"
+    tipo: PERCENTAGE
+    regra_id: XML010
+    severidade: high
+
+  - sped_campo: VL_ICMS
+    xml_xpath: "./imposto/ICMS/*/vICMS"
+    tipo: MONETARY
+    regra_id: XML011
+    severidade: high
+
+  - sped_campo: VL_BC_ICMS_ST
+    xml_xpath: "./imposto/ICMS/*/vBCST"
+    tipo: MONETARY
+    severidade: high
+    opcional: true
+
+  - sped_campo: VL_ICMS_ST
+    xml_xpath: "./imposto/ICMS/*/vICMSST"
+    tipo: MONETARY
+    severidade: high
+    opcional: true
+
+  - sped_campo: CST_IPI
+    xml_xpath: "./imposto/IPI/*/CST"
+    tipo: EXACT
+    severidade: medium
+    opcional: true
+
+  - sped_campo: VL_IPI
+    xml_xpath: "./imposto/IPI/*/vIPI"
+    tipo: MONETARY
+    severidade: high
+    opcional: true

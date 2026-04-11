@@ -139,9 +139,41 @@ class ToleranceResolver:
 
 
 # ──────────────────────────────────────────────────────────
-# Compatibilidade retroativa — mantém a API antiga
+# BUG-005 fix: Tolerancia proporcional por magnitude
 # ──────────────────────────────────────────────────────────
 
+from decimal import Decimal
+
+# Faixas proporcionais: (limite_superior, tol_absoluta, tol_relativa)
+# Criterio: o MENOR entre absoluto e relativo
+TOLERANCE_TIERS = [
+    (Decimal("100"),    Decimal("0.02"), Decimal("0.0002")),   # Ate R$ 100
+    (Decimal("10000"),  Decimal("0.05"), Decimal("0.0001")),   # R$ 100-10.000
+    (Decimal("500000"), Decimal("0.10"), Decimal("0.00005")),  # R$ 10.000-500.000
+    (None,              Decimal("0.50"), Decimal("0.00001")),  # Acima de R$ 500.000
+]
+
+
+def tolerancia_proporcional(valor: float) -> float:
+    """Calcula tolerancia proporcional a magnitude do valor (BUG-005 fix).
+
+    Substitui a tolerancia global fixa de R$ 0,02.
+    Usa o MENOR entre tolerancia absoluta e relativa para a faixa.
+
+    Args:
+        valor: Valor de referencia (ex: VL_ITEM, VL_ICMS).
+
+    Returns:
+        Tolerancia em reais.
+    """
+    v = abs(Decimal(str(valor))) if valor else Decimal("0")
+    for limite, abs_tol, rel_tol in TOLERANCE_TIERS:
+        if limite is None or v <= limite:
+            return float(min(abs_tol, v * rel_tol))
+    return 0.50
+
+
+# Compatibilidade retroativa
 TOLERANCES: dict[str, ToleranceValue] = {
     "item_icms": 0.01,
     "item_ipi": 0.01,
@@ -157,14 +189,14 @@ CALCULATION_TOLERANCE = 0.02
 
 
 def get_tolerance(comparison_type: str, n_items: int = 1) -> float:
-    """Retorna a tolerância adequada para o tipo de comparação.
+    """Retorna a tolerancia adequada para o tipo de comparacao.
 
     Args:
-        comparison_type: Chave do dicionário TOLERANCES.
-        n_items: Número de itens (usado apenas para tipos callable como 'consolidacao').
+        comparison_type: Chave do dicionario TOLERANCES.
+        n_items: Numero de itens (usado apenas para tipos callable como 'consolidacao').
 
     Returns:
-        Tolerância em reais.
+        Tolerancia em reais.
     """
     tol = TOLERANCES[comparison_type]
     return tol(n_items) if callable(tol) else tol

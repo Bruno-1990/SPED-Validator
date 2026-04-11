@@ -180,8 +180,16 @@ def _build_section3(db: sqlite3.Connection, file_id: int) -> dict:
     ).fetchall()
     top10_list = [{"tipo": r[0], "quantidade": r[1]} for r in top10]
 
+    # Score de risco e cobertura (Fase 6)
+    from .risk_score import calculate_coverage_score, calculate_risk_score, get_risk_label
+    risk = calculate_risk_score(db, file_id)
+    coverage = calculate_coverage_score(db, file_id)
+
     return {
-        "titulo": "SUMÁRIO DE ACHADOS",
+        "titulo": "SUMARIO DE ACHADOS",
+        "risk_score": risk,
+        "risk_label": get_risk_label(risk),
+        "coverage_score": coverage,
         "por_severidade": {
             "critical": por_severidade.get("critical", 0),
             "error": por_severidade.get("error", 0),

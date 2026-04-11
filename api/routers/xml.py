@@ -213,8 +213,23 @@ def get_cruzamento(
     rows = db.execute(query, params).fetchall()
 
     # Mapear colunas
-    cols = [d[0] for d in db.execute(f"SELECT * FROM nfe_cruzamento LIMIT 0").description]
+    cols = [d[0] for d in db.execute("SELECT * FROM nfe_cruzamento LIMIT 0").description]
     items = [dict(zip(cols, r)) for r in rows]
+
+    # Enriquecer com numero_nfe de cada NF-e (para exibicao no frontend)
+    nfe_numeros: dict[str, str] = {}
+    try:
+        nfe_rows = db.execute(
+            "SELECT chave_nfe, numero_nfe FROM nfe_xmls WHERE file_id = ?",
+            (file_id,),
+        ).fetchall()
+        for r in nfe_rows:
+            nfe_numeros[r["chave_nfe"]] = str(r["numero_nfe"] or "")
+    except Exception:
+        pass
+
+    for item in items:
+        item["numero_nfe"] = nfe_numeros.get(item.get("chave_nfe", ""), "")
 
     return {
         "file_id": file_id,

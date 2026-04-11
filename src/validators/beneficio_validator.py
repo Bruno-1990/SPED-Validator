@@ -259,3 +259,76 @@ def _check_base_beneficio_nao_elegivel(
             ))
 
     return errors
+
+
+# ──────────────────────────────────────────────
+# Novas regras de beneficio (Fase 3 — BeneficioEngine)
+# ──────────────────────────────────────────────
+
+def validate_beneficio_engine(
+    records: list[SpedRecord],
+    context: "ValidationContext | None" = None,
+) -> list[ValidationError]:
+    """Valida beneficios usando o BeneficioEngine do contexto.
+
+    Regras novas:
+    - SPED_CST_BENEFICIO: CST incompativel com beneficio ativo
+    - SPED_ALIQ_BENEFICIO: Aliquota incompativel com beneficio
+    - BENEFICIO_SEM_AJUSTE_E111: Beneficio ativo sem E111 correspondente
+    """
+    errors: list[ValidationError] = []
+    if not context or not getattr(context, "beneficio_engine", None):
+        return errors
+
+    engine = context.beneficio_engine
+    if not engine.has_beneficios:
+        return errors
+
+    groups = group_by_register(records)
+
+    # -- SPED_CST_BENEFICIO / SPED_ALIQ_BENEFICIO --
+    for rec in groups.get("C170", []):
+        cfop = get_field(rec, F_C170_CFOP)
+        if not cfop or cfop[0] not in ("5", "6"):
+            continue  # Apenas saidas
+
+        cst = get_field(rec, F_C170_CST_ICMS)
+        aliq = to_float(get_field(rec, F_C170_ALIQ_ICMS))
+
+        # SPED_CST_BENEFICIO
+        cst_validos = engine.get_cst_validos_saida(cfop)
+        if cst_validos and cst and cst not in cst_validos:
+            errors.append(make_error(
+                rec, "CST_ICMS", "SPED_CST_BENEFICIO",
+                f"CST {cst} incompativel com beneficios ativos para CFOP {cfop}. "
+                f"CSTs validos: {sorted(cst_validos)}.",
+                value=cst,
+                expected_value=",".join(sorted(cst_validos)),
+            ))
+
+        # SPED_ALIQ_BENEFICIO (debito integral COMPETE)
+        if engine.get_debito_integral(cfop) and aliq > 0 and aliq < 10.0:
+            errors.append(make_error(
+                rec, "ALIQ_ICMS", "SPED_ALIQ_BENEFICIO",
+                f"Aliquota {aliq:.1f}% em saida com beneficio que exige debito integral. "
+                f"COMPETE exige aliquota cheia (17% para ES). Credito presumido "
+                f"deve ser via E111, nao por reducao de aliquota em C170.",
+                value=f"{aliq:.1f}",
+                expected_value="17.0",
+            ))
+
+    # -- BENEFICIO_SEM_AJUSTE_E111 --
+    e111_records = groups.get("E111", [])
+    has_e111_beneficio = any(_is_e111_beneficio(r) for r in e111_records)
+    if engine.has_beneficios and not has_e111_beneficio:
+        for b in context.beneficios_ativos:
+            rec_ref = e111_records[0] if e111_records else records[0]
+            errors.append(make_error(
+                rec_ref,
+                "COD_AJ_APUR", "BENEFICIO_SEM_AJUSTE_E111",
+                f"Beneficio '{b.codigo}' ativo no periodo mas nenhum E111 "
+                f"corresponde a ajuste de beneficio fiscal.",
+                value="ausente",
+            ))
+
+    return errors

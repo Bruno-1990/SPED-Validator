@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -68,7 +69,7 @@ def rules_yaml(tmp_path: Path) -> Path:
 def client(rules_yaml: Path) -> TestClient:
     """TestClient que aponta _get_rules_path para o YAML temporario."""
     with patch("api.routers.rules._get_rules_path", return_value=rules_yaml):
-        yield TestClient(app)
+        yield TestClient(app, headers={"X-API-Key": os.environ.get("API_KEY", "test-api-key-for-pytest-minimum-32-chars!")})
 
 
 @pytest.fixture
@@ -76,7 +77,7 @@ def client_no_rules(tmp_path: Path) -> TestClient:
     """TestClient cujo rules.yaml nao existe."""
     missing = tmp_path / "nonexistent" / "rules.yaml"
     with patch("api.routers.rules._get_rules_path", return_value=missing):
-        yield TestClient(app)
+        yield TestClient(app, headers={"X-API-Key": os.environ.get("API_KEY", "test-api-key-for-pytest-minimum-32-chars!")})
 
 
 # ── list_rules ──

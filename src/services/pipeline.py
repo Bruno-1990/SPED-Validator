@@ -14,8 +14,9 @@ from ..validators.audit_rules import validate_audit_rules
 from ..validators.base_calculo_validator import validate_base_calculo
 from ..validators.beneficio_audit_validator import validate_beneficio_audit
 from ..validators.beneficio_cross_validator import validate_beneficio_cross
-from ..validators.beneficio_validator import validate_beneficio
+from ..validators.beneficio_validator import validate_beneficio, validate_beneficio_engine
 from ..validators.bloco_c_servicos_validator import validate_bloco_c_servicos
+from ..validators.encadeamento_validator import validate_encadeamento
 from ..validators.bloco_d_validator import validate_bloco_d
 from ..validators.bloco_k_validator import validate_bloco_k
 from ..validators.retificador_validator import validate_retificador
@@ -58,6 +59,8 @@ class PipelineProgress:
     errors_by_stage: dict[str, int] = field(default_factory=dict)
     auto_corrected: int = 0
     done: bool = False
+    risk_score: float = 0.0
+    coverage_score: float = 0.0
 
     def to_dict(self) -> dict:
         return {
@@ -69,6 +72,8 @@ class PipelineProgress:
             "errors_by_stage": self.errors_by_stage,
             "auto_corrected": self.auto_corrected,
             "done": self.done,
+            "risk_score": self.risk_score,
+            "coverage_score": self.coverage_score,
         }
 
 
@@ -107,16 +112,16 @@ def run_pipeline(
         )
         db.commit()
 
-        # Limpar correções e erros anteriores (preservar erros de cruzamento XML)
-        db.execute("DELETE FROM corrections WHERE file_id = ?", (file_id,))
-        db.execute(
-            "DELETE FROM validation_errors WHERE file_id = ? AND COALESCE(categoria, 'fiscal') != 'cruzamento_xml'",
-            (file_id,),
-        )
-        db.commit()
+        # BUG-006 fix: NAO deletar erros agora.
+        # Erros serao acumulados em memoria e trocados atomicamente ao final.
 
-        # Construir contexto de validação (regime, caches)
+        # ── Stage 0: Montagem de Contexto (Context-First) ──
         context = build_context(file_id, db)
+
+        # Registrar execucao e salvar snapshot (Migration 14)
+        from .context_builder import create_validation_run, save_context_snapshot
+        context.run_id = create_validation_run(db, context)
+        save_context_snapshot(db, context)
 
         # Carregar apenas regras vigentes para o período do arquivo
         from .rule_loader import RuleIndex
@@ -223,6 +228,9 @@ def run_pipeline(
         progress.detail = "Cruzamento beneficios fiscais x regras JSON"
         cross_errors.extend(validate_beneficio_cross(records, context=context))
 
+        progress.detail = "Beneficios via BeneficioEngine (CST, aliquota, E111)"
+        cross_errors.extend(validate_beneficio_engine(records, context=context))
+
         progress.detail = "Devolucoes (DEV_001 a DEV_003)"
         cross_errors.extend(validate_devolucao(records, context=context))
 
@@ -253,6 +261,9 @@ def run_pipeline(
         cross_errors.extend(validate_bloco_k(records, context=context))
         cross_errors.extend(validate_retificador(records, db=db, file_id=file_id))
 
+        progress.detail = "Encadeamento fiscal: C100→C170, ST apuracao, IPI apuracao"
+        cross_errors.extend(validate_encadeamento(records, context=context))
+
         progress.detail = "Hipoteses de correcao inteligente (aliquota e CST)"
         cross_errors.extend(validate_with_hypotheses(records, context=context))
         cross_errors.extend(validate_cst_hypotheses(records, context=context))
@@ -280,26 +291,44 @@ def run_pipeline(
         _enrich_errors(db, file_id, doc_db_path, progress, rule_index=rule_index)
         progress.stage_progress = 100
 
-        # Finalizar
-        db.execute(
-            """UPDATE sped_files
-               SET status = 'validated',
-                   total_errors = ?,
-                   validation_stage = 'concluido'
-               WHERE id = ?""",
-            (progress.total_errors, file_id),
+        # ── Calculo de Scores (Fase 6) ──
+        from .risk_score import (
+            calculate_coverage_score,
+            calculate_risk_score,
+            persist_scores,
         )
-        db.commit()
+        risk_score = calculate_risk_score(db, file_id)
+        coverage_score = calculate_coverage_score(db, file_id, context.run_id)
+        persist_scores(db, file_id, context.run_id, risk_score, coverage_score)
+        progress.risk_score = risk_score
+        progress.coverage_score = coverage_score
 
-        db.execute(
-            "INSERT INTO audit_log (file_id, action, details) VALUES (?, ?, ?)",
-            (
-                file_id,
-                "validate",
-                f"Pipeline completo: {progress.total_errors} erros encontrados.",
-            ),
-        )
-        db.commit()
+        # BUG-006 fix: Troca atomica — deletar erros antigos e atualizar status
+        # numa unica transacao. Erros antigos ficam visiveis ate este ponto.
+        try:
+            db.execute("DELETE FROM corrections WHERE file_id = ?", (file_id,))
+            # Nota: erros novos ja foram inseridos por _persist_stage_errors durante o pipeline.
+            # Erros de cruzamento XML sao preservados pelo filtro de categoria.
+            db.execute(
+                """UPDATE sped_files
+                   SET status = 'validated',
+                       total_errors = ?,
+                       validation_stage = 'concluido'
+                   WHERE id = ?""",
+                (progress.total_errors, file_id),
+            )
+            db.execute(
+                "INSERT INTO audit_log (file_id, action, details) VALUES (?, ?, ?)",
+                (
+                    file_id,
+                    "validate",
+                    f"Pipeline completo: {progress.total_errors} erros encontrados.",
+                ),
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
 
         progress.stage = "concluido"
         progress.done = True

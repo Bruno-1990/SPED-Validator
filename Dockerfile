@@ -30,13 +30,17 @@ COPY pyproject.toml .
 COPY src/ src/
 COPY api/ api/
 COPY cli.py config.py ./
-RUN pip install --no-cache-dir ".[dev]" fastapi uvicorn python-multipart
+RUN pip install --no-cache-dir ".[dev]" fastapi uvicorn python-multipart \
+    && apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Frontend build estático
+# Frontend build estatico
 COPY --from=frontend-build /app/dist /app/static
 
 # Volumes
 VOLUME /app/db
 
 EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

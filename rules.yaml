@@ -8,7 +8,8 @@ formato:
   error_type: FORMATO_INVALIDO
   severity: error
   corrigivel: investigar
-  corrigivel_nota: 'CNPJ com DV inválido não pode ser corrigido automaticamente — o sistema não conhece o valor correto. Consulte o documento fiscal original.'
+  corrigivel_nota: CNPJ com DV inválido não pode ser corrigido automaticamente — o sistema não conhece o valor correto. Consulte
+    o documento fiscal original.
   description: CNPJ deve ter 14 digitos numericos com digitos verificadores validos (modulo 11)
   condition: len(CNPJ) != 14 OR digitos iguais OR DV invalido
   implemented: true
@@ -19,6 +20,7 @@ formato:
   last_updated: '2026-04-07'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI — Regras de formato por registro
 - id: FMT_CPF
   register: '*'
   fields:
@@ -26,7 +28,8 @@ formato:
   error_type: FORMATO_INVALIDO
   severity: error
   corrigivel: investigar
-  corrigivel_nota: 'CPF com DV inválido não pode ser corrigido automaticamente — o sistema não conhece o valor correto. Consulte o documento fiscal original.'
+  corrigivel_nota: CPF com DV inválido não pode ser corrigido automaticamente — o sistema não conhece o valor correto. Consulte
+    o documento fiscal original.
   description: CPF deve ter 11 digitos numericos com digitos verificadores validos (modulo 11)
   condition: len(CPF) != 11 OR digitos iguais OR DV invalido
   implemented: true
@@ -37,6 +40,7 @@ formato:
   last_updated: '2026-04-07'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI — Regras de formato por registro
 - id: FMT_DATA
   register: '*'
   fields:
@@ -57,6 +61,7 @@ formato:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI — Regras de formato por registro
 - id: FMT_DATA_PERIODO
   register: C100, C170
   fields:
@@ -75,6 +80,7 @@ formato:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI — Regras de formato por registro
 - id: FMT_CEP
   register: '*'
   fields:
@@ -92,6 +98,7 @@ formato:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI — Regras de formato por registro
 - id: FMT_CFOP
   register: C170, D100
   fields:
@@ -109,6 +116,7 @@ formato:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI — Regras de formato por registro
 - id: FMT_NCM
   register: C170
   fields:
@@ -126,6 +134,7 @@ formato:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI — Regras de formato por registro
 - id: FMT_CHAVE_NFE
   register: C100
   fields:
@@ -143,6 +152,7 @@ formato:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI — Regras de formato por registro
 - id: FMT_COD_MUNICIPIO
   register: '*'
   fields:
@@ -160,6 +170,7 @@ formato:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI — Regras de formato por registro
 campo_a_campo:
 - id: CAMPO_OBRIGATORIO
   register: '*'
@@ -178,6 +189,7 @@ campo_a_campo:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: CAMPO_TIPO_NUMERICO
   register: '*'
   fields:
@@ -195,6 +207,7 @@ campo_a_campo:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: CAMPO_TAMANHO
   register: '*'
   fields:
@@ -212,6 +225,7 @@ campo_a_campo:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: CAMPO_VALOR_VALIDO
   register: '*'
   fields:
@@ -229,6 +243,7 @@ campo_a_campo:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 intra_registro:
 - id: C100_DT_ES_OBRIGATORIA_ENTRADA
   register: C100
@@ -249,6 +264,7 @@ intra_registro:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: C100_CANCELADA_VALOR_ZERO
   register: C100
   fields:
@@ -267,6 +283,7 @@ intra_registro:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: C100_ORDEM_DATAS
   register: C100
   fields:
@@ -285,6 +302,7 @@ intra_registro:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: C170_CFOP_VS_OPERACAO
   register: C170
   fields:
@@ -303,6 +321,7 @@ intra_registro:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: Convenio s/n 1970; Ajuste SINIEF
 - id: C190_SOMA_VL_OPR
   register: C190
   fields:
@@ -321,6 +340,7 @@ intra_registro:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: Guia Pratico EFD — Registro C190
 - id: C190_SOMA_VL_BC_ICMS
   register: C190
   fields:
@@ -339,6 +359,7 @@ intra_registro:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: Guia Pratico EFD — Registro C190
 - id: C190_SOMA_VL_ICMS
   register: C190
   fields:
@@ -357,6 +378,7 @@ intra_registro:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: Guia Pratico EFD — Registro C190
 - id: E110_SALDO_APURADO
   register: E110
   fields:
@@ -377,6 +399,7 @@ intra_registro:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: RICMS-ES Arts. 78-95; Guia Pratico EFD E110
 - id: E110_ICMS_RECOLHER
   register: E110
   fields:
@@ -397,6 +420,7 @@ intra_registro:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: RICMS-ES Arts. 78-95; Guia Pratico EFD E110
 - id: E110_SALDO_CREDOR
   register: E110
   fields:
@@ -416,6 +440,7 @@ intra_registro:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: RICMS-ES Arts. 78-95; Guia Pratico EFD E110
 cruzamento:
 - id: REF_COD_PART_C100
   register: C100
@@ -434,6 +459,7 @@ cruzamento:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD — Referencias ao Bloco 0
 - id: REF_COD_ITEM_C170
   register: C170
   fields:
@@ -451,6 +477,7 @@ cruzamento:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD — Referencias ao Bloco 0
 - id: REF_COD_PART_D100
   register: D100
   fields:
@@ -468,6 +495,7 @@ cruzamento:
   last_updated: '2026-04-06'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD — Referencias ao Bloco 0
 - id: E110_VS_C190_DEBITOS
   register: E110
   fields:
@@ -486,6 +514,7 @@ cruzamento:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: RICMS-ES Arts. 78-95; Guia Pratico EFD E110
 - id: E110_VS_C190_CREDITOS
   register: E110
   fields:
@@ -504,6 +533,7 @@ cruzamento:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: RICMS-ES Arts. 78-95; Guia Pratico EFD E110
 - id: BLOCO9_CONTAGEM_REGISTROS
   register: '9900'
   fields:
@@ -522,6 +552,7 @@ cruzamento:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD — Bloco 9
 - id: BLOCO9_TOTAL_LINHAS
   register: '9999'
   fields:
@@ -539,7 +570,7 @@ cruzamento:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
-# ── Bloco D — CT-e e Documentos de Transporte (MOD-08) ──
+  base_legal: Guia Pratico EFD — Bloco 9
 - id: D_001
   register: D100
   fields:
@@ -557,6 +588,7 @@ cruzamento:
   last_updated: '2026-04-06'
   certeza: objetivo
   impacto: relevante
+  base_legal: Convenio SINIEF 06/89; CT-e Manual v3.0
 - id: D_002
   register: D190
   fields:
@@ -574,6 +606,7 @@ cruzamento:
   last_updated: '2026-04-06'
   certeza: objetivo
   impacto: critico
+  base_legal: Convenio SINIEF 06/89; CT-e Manual v3.0
 - id: D_003
   register: D190
   fields:
@@ -593,6 +626,7 @@ cruzamento:
   last_updated: '2026-04-06'
   certeza: objetivo
   impacto: critico
+  base_legal: Convenio SINIEF 06/89; CT-e Manual v3.0
 - id: D_004
   register: E110
   fields:
@@ -611,6 +645,7 @@ cruzamento:
   last_updated: '2026-04-06'
   certeza: objetivo
   impacto: critico
+  base_legal: Convenio SINIEF 06/89; CT-e Manual v3.0
 - id: D_005
   register: D190
   fields:
@@ -628,6 +663,7 @@ cruzamento:
   last_updated: '2026-04-06'
   certeza: objetivo
   impacto: relevante
+  base_legal: Convenio SINIEF 06/89; CT-e Manual v3.0
 - id: D_006
   register: D100
   fields:
@@ -645,6 +681,7 @@ cruzamento:
   last_updated: '2026-04-06'
   certeza: objetivo
   impacto: critico
+  base_legal: Convenio SINIEF 06/89; CT-e Manual v3.0
 recalculo:
 - id: RECALC_ICMS_BC
   register: C170
@@ -666,6 +703,7 @@ recalculo:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: LC 87/1996 Art. 13-14; Guia Pratico EFD
 - id: RECALC_ICMS_VALOR
   register: C170
   fields:
@@ -686,6 +724,7 @@ recalculo:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: LC 87/1996 Art. 13-14; Guia Pratico EFD
 - id: RECALC_ICMS_ST_FALTANTE
   register: C170
   fields:
@@ -706,6 +745,7 @@ recalculo:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: LC 87/1996 Art. 13-14; Guia Pratico EFD
 - id: RECALC_ICMS_ST_VALOR
   register: C170
   fields:
@@ -726,6 +766,7 @@ recalculo:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: LC 87/1996 Art. 13-14; Guia Pratico EFD
 - id: RECALC_IPI
   register: C170
   fields:
@@ -746,6 +787,7 @@ recalculo:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: LC 87/1996 Art. 13-14; Guia Pratico EFD
 - id: RECALC_PIS
   register: C170
   fields:
@@ -766,6 +808,7 @@ recalculo:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: LC 87/1996 Art. 13-14; Guia Pratico EFD
 - id: RECALC_COFINS
   register: C170
   fields:
@@ -786,6 +829,7 @@ recalculo:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: LC 87/1996 Art. 13-14; Guia Pratico EFD
 - id: RECALC_E110_TOTAIS
   register: E110
   fields:
@@ -805,6 +849,7 @@ recalculo:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: LC 87/1996 Art. 13-14; Guia Pratico EFD
 cst_isencoes:
 - id: CST_ICMS_CODIGO_INVALIDO
   register: C170
@@ -823,6 +868,7 @@ cst_isencoes:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: RICMS-ES Dec. 1.090-R/2002; Convenio s/n 1970 (Tabela A/B)
 - id: CST_ICMS_ISENCAO_COM_VALOR
   register: C170
   fields:
@@ -842,6 +888,7 @@ cst_isencoes:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: RICMS-ES Dec. 1.090-R/2002; Convenio s/n 1970 (Tabela A/B)
 - id: CST_ICMS_TRIBUTADO_SEM_ICMS
   register: C170
   fields:
@@ -861,6 +908,7 @@ cst_isencoes:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: RICMS-ES Dec. 1.090-R/2002; Convenio s/n 1970 (Tabela A/B)
 - id: H010_ITEM_INEXISTENTE
   register: H010
   fields:
@@ -878,6 +926,7 @@ cst_isencoes:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD — Referencias ao Bloco 0
 - id: H010_QTD_NEGATIVA
   register: H010
   fields:
@@ -895,6 +944,7 @@ cst_isencoes:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: H010_VALOR_NEGATIVO
   register: H010
   fields:
@@ -912,6 +962,7 @@ cst_isencoes:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 semantica_aliquota_zero:
 - id: ICMS_CST_TRIBUTADO_BC_ALIQ_ZERO
   register: C170
@@ -932,6 +983,7 @@ semantica_aliquota_zero:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: RICMS-ES Dec. 1.090-R/2002; Convenio s/n 1970 (Tabela A/B)
 - id: ICMS_CST_TRIBUTADO_TUDO_ZERO
   register: C170
   fields:
@@ -952,6 +1004,7 @@ semantica_aliquota_zero:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: informativo
+  base_legal: RICMS-ES Dec. 1.090-R/2002; Convenio s/n 1970 (Tabela A/B)
 - id: IPI_CST_TRIBUTADO_TUDO_ZERO
   register: C170
   fields:
@@ -972,6 +1025,7 @@ semantica_aliquota_zero:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: informativo
+  base_legal: RIPI Dec. 7.212/2010; TIPI
 - id: PIS_CST_TRIBUTAVEL_TUDO_ZERO
   register: C170
   fields:
@@ -992,6 +1046,7 @@ semantica_aliquota_zero:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: informativo
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: COFINS_CST_TRIBUTAVEL_TUDO_ZERO
   register: C170
   fields:
@@ -1012,6 +1067,7 @@ semantica_aliquota_zero:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: informativo
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 semantica_cst_cfop:
 - id: CFOP_VENDA_CST_ISENTO
   register: C170
@@ -1031,6 +1087,7 @@ semantica_cst_cfop:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: Convenio s/n 1970; Ajuste SINIEF
 - id: CFOP_INTERESTADUAL_ALIQ_ZERO
   register: C170
   fields:
@@ -1050,6 +1107,7 @@ semantica_cst_cfop:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: Convenio s/n 1970; Ajuste SINIEF
 - id: CFOP_EXPORTACAO_CST_TRIBUTADO
   register: C170
   fields:
@@ -1069,6 +1127,7 @@ semantica_cst_cfop:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: Convenio s/n 1970; Ajuste SINIEF
 monofasicos:
 - id: MONO_ALIQ_INVALIDA
   register: C170
@@ -1091,6 +1150,7 @@ monofasicos:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: LC 192/2022; LC 87/1996
 - id: MONO_VALOR_INDEVIDO
   register: C170
   fields:
@@ -1112,6 +1172,7 @@ monofasicos:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: LC 192/2022; LC 87/1996
 - id: MONO_NCM_INCOMPATIVEL
   register: C170
   fields:
@@ -1132,6 +1193,7 @@ monofasicos:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: LC 192/2022; LC 87/1996
 - id: MONO_CST_INCORRETO
   register: C170
   fields:
@@ -1153,6 +1215,7 @@ monofasicos:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: LC 192/2022; LC 87/1996
 - id: MONO_ENTRADA_CST04
   register: C170
   fields:
@@ -1173,6 +1236,7 @@ monofasicos:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: informativo
+  base_legal: LC 192/2022; LC 87/1996
 pendentes:
 - id: PEND_BENEFICIO_FISCAL
   register: C170
@@ -1192,6 +1256,7 @@ pendentes:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: Dec. COMPETE-ES 1.663-R/2005; INVEST-ES; FUNDAP
 - id: PEND_DESONERACAO_MOTIVO
   register: C170
   fields:
@@ -1210,6 +1275,7 @@ pendentes:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: PEND_DEVOLUCAO_VS_ORIGEM
   register: C170
   fields:
@@ -1229,6 +1295,7 @@ pendentes:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: PEND_PERFIL_HISTORICO
   register: C170
   fields:
@@ -1248,6 +1315,7 @@ pendentes:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: informativo
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: PEND_ALIQ_INTERESTADUAL
   register: C170
   fields:
@@ -1268,6 +1336,7 @@ pendentes:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: Resolucao SF 22/1989; RICMS-ES
 - id: PEND_NCM_VS_TIPI_ALIQ
   register: C170
   fields:
@@ -1287,6 +1356,7 @@ pendentes:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: RIPI Dec. 7.212/2010; TIPI
 auditoria_beneficios:
 - id: AUD_COMPETE_DEBITO_INTEGRAL
   register: E110, E111, C190
@@ -1311,6 +1381,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: Dec. COMPETE-ES 1.663-R/2005; INVEST-ES; FUNDAP
 - id: AUD_BENEFICIO_REDUZIDO_NA_NOTA
   register: C170, C190
   fields:
@@ -1331,6 +1402,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: critico
+  base_legal: Dec. COMPETE-ES 1.663-R/2005; INVEST-ES; FUNDAP
 - id: AUD_E111_SEM_RASTREABILIDADE
   register: E111, E112, E113
   fields:
@@ -1354,6 +1426,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_E111_SOMA_VS_E110
   register: E110, E111
   fields:
@@ -1374,6 +1447,7 @@ auditoria_beneficios:
   certeza: objetivo
   impacto: critico
   tolerance_type: absolute
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_DEVOLUCAO_SEM_REVERSAO_BENEFICIO
   register: C170, C190, E111
   fields:
@@ -1396,6 +1470,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_CFOP_INTERESTADUAL_UF_INTERNA
   register: C170, 0150
   fields:
@@ -1415,6 +1490,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: critico
+  base_legal: Convenio s/n 1970; Ajuste SINIEF
 - id: AUD_SALDO_CREDOR_RECORRENTE
   register: E110
   fields:
@@ -1436,6 +1512,7 @@ auditoria_beneficios:
   certeza: indicio
   impacto: relevante
   tolerance_type: none
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_CREDITO_ENTRADA_USO_CONSUMO
   register: C170, 0200
   fields:
@@ -1457,6 +1534,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_SOBREPOSICAO_BENEFICIOS
   register: C170, E111
   fields:
@@ -1479,6 +1557,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_BENEFICIO_DESPROPORCIONAL
   register: E111, C190
   fields:
@@ -1498,6 +1577,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: Dec. COMPETE-ES 1.663-R/2005; INVEST-ES; FUNDAP
 - id: AUD_CST_VOLUME_ISENTO_ATIPICO
   register: C190
   fields:
@@ -1517,6 +1597,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_REMESSA_SEM_RETORNO
   register: C170
   fields:
@@ -1538,6 +1619,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_CST051_DEBITO_INDEVIDO
   register: C170, C190
   fields:
@@ -1557,6 +1639,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_ST_NOTA_OK_APURACAO_ERRADA
   register: C170, C190, E200, E210
   fields:
@@ -1577,6 +1660,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: Convenio ICMS 142/2018; RICMS-ES
 - id: AUD_INVENTARIO_ITEM_SEM_MOVIMENTO
   register: H010, C170
   fields:
@@ -1597,6 +1681,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: informativo
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_E111_CODIGO_GENERICO
   register: E111
   fields:
@@ -1616,6 +1701,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_PARAMETRIZACAO_SISTEMICA
   register: C170, 0200
   fields:
@@ -1637,6 +1723,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_XML_SPED_DIVERGENCIA
   register: C170, C100
   fields:
@@ -1661,6 +1748,7 @@ auditoria_beneficios:
   certeza: provavel
   impacto: critico
   tolerance_type: relative
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_CHECKLIST_AUDITORIA_MINIMA
   register: 0150, 0200, C170, C190, E110, E111, H010, 9900
   fields:
@@ -1680,6 +1768,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: informativo
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_TRILHA_BENEFICIO_INCOMPLETA
   register: C190, E110, E111, E112, E113
   fields:
@@ -1703,6 +1792,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_ICMS_EFETIVO_SEM_TRILHA
   register: C170, C190, E110, E111
   fields:
@@ -1725,6 +1815,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_CFOP_OK_CST_ERRADO
   register: C170, C190
   fields:
@@ -1744,6 +1835,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: Convenio s/n 1970; Ajuste SINIEF
 - id: AUD_CFOP_6XXX_DESTINO_MESMO_UF
   register: C170, 0150
   fields:
@@ -1763,6 +1855,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: critico
+  base_legal: Convenio s/n 1970; Ajuste SINIEF
 - id: AUD_REGISTROS_ESSENCIAIS_AUSENTES
   register: C100, C170, C190, E110, E111, 0150, 0200, H010
   fields:
@@ -1781,6 +1874,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: informativo
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_CST_ESPECIAIS_VOLUME_ATIPICO
   register: C190
   fields:
@@ -1800,6 +1894,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_BENEFICIO_FORA_ESCOPO
   register: C170, C190, 0150, E111, 0200
   fields:
@@ -1822,6 +1917,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: Dec. COMPETE-ES 1.663-R/2005; INVEST-ES; FUNDAP
 - id: AUD_DIAGNOSTICO_CAUSA_RAIZ
   register: C170, C190, E110, E111
   fields:
@@ -1843,6 +1939,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: informativo
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_AJUSTE_SEM_LASTRO
   register: E111, E112, E113
   fields:
@@ -1864,6 +1961,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_CST051_TRATAMENTO_INCORRETO
   register: C170, C190, E110
   fields:
@@ -1883,6 +1981,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_ST_APURACAO_DIVERGE
   register: C170, C190, E200, E210
   fields:
@@ -1903,6 +2002,7 @@ auditoria_beneficios:
   certeza: provavel
   impacto: critico
   tolerance_type: absolute
+  base_legal: Convenio ICMS 142/2018; RICMS-ES
 - id: AUD_C190_MISTURA_CST
   register: C170, C190
   fields:
@@ -1925,6 +2025,7 @@ auditoria_beneficios:
   certeza: objetivo
   impacto: critico
   tolerance_type: absolute
+  base_legal: Guia Pratico EFD — Registro C190
 - id: AUD_CREDITO_SEM_SAIDA
   register: C170, H010, 0200
   fields:
@@ -1944,6 +2045,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_INVENTARIO_REFLEXO_TRIBUTARIO
   register: H005, H010, H020, 0200
   fields:
@@ -1964,6 +2066,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_OPERACAO_ESPECIAL_CONTAMINACAO
   register: C170, C190
   fields:
@@ -1982,6 +2085,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_BENEFICIO_SEM_GOVERNANCA
   register: E111, E112, E113
   fields:
@@ -2002,6 +2106,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: Dec. COMPETE-ES 1.663-R/2005; INVEST-ES; FUNDAP
 - id: AUD_TOTALIZACAO_BENEFICIADA
   register: C190, E110, 0150
   fields:
@@ -2022,6 +2127,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_MISTURA_INSTITUTOS
   register: C170, C190, E111
   fields:
@@ -2042,6 +2148,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_PERFIL_OPERACIONAL_BENEFICIO
   register: 0000, 0200, C170, C190, E111
   fields:
@@ -2063,6 +2170,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: relevante
+  base_legal: Dec. COMPETE-ES 1.663-R/2005; INVEST-ES; FUNDAP
 - id: AUD_BENEFICIO_PARAMETRIZACAO_ERRADA
   register: C170, C190, E111
   fields:
@@ -2083,6 +2191,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: Dec. COMPETE-ES 1.663-R/2005; INVEST-ES; FUNDAP
 - id: AUD_DESTINATARIO_SEGREGACAO
   register: C170, 0150, E111
   fields:
@@ -2103,6 +2212,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: relevante
+  base_legal: Dec. COMPETE-ES 1.663-R/2005; INVEST-ES; FUNDAP
 - id: AUD_BASE_BENEFICIO_INFLADA
   register: C100, C170, C190, E111
   fields:
@@ -2123,6 +2233,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: LC 87/1996 Art. 13
 - id: AUD_SPED_VS_CONTRIBUICOES
   register: C170, C190
   fields:
@@ -2146,6 +2257,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_FORMA_VS_SUBSTANCIA
   register: C170, 0200
   fields:
@@ -2166,6 +2278,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: indicio
   impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_E111_NUMERICO_JURIDICO
   register: E111, E112, E113
   fields:
@@ -2185,6 +2298,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_IPI_REFLEXO_CUSTO_BC
   register: C170
   fields:
@@ -2205,6 +2319,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: RIPI Dec. 7.212/2010; TIPI
 - id: AUD_CODIGO_AJUSTE_INCOMPATIVEL
   register: E111, E112
   fields:
@@ -2223,6 +2338,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_TRILHA_BENEFICIO_AUSENTE
   register: C190, E110, E111, E112, E113
   fields:
@@ -2243,6 +2359,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: critico
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_CLASSIFICACAO_ERRO
   register: '*'
   fields:
@@ -2261,6 +2378,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: informativo
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_ESCOPO_APENAS_SPED
   register: C170, C190, E110, E111, 0150, 0200, H010, 9900
   fields:
@@ -2279,6 +2397,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: informativo
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AUD_CHECKLIST_MESTRE
   register: 0150, 0200, C170, C190, E110, E111, H010, 9900
   fields:
@@ -2298,6 +2417,7 @@ auditoria_beneficios:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: informativo
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 aliquotas:
 - id: ALIQ_001
   register: C170
@@ -2318,6 +2438,7 @@ aliquotas:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: Resolucao SF 22/1989; RICMS-ES
 - id: ALIQ_002
   register: C170
   fields:
@@ -2336,6 +2457,7 @@ aliquotas:
   last_updated: '2026-04-06'
   certeza: provavel
   impacto: critico
+  base_legal: Resolucao SF 22/1989; RICMS-ES
 - id: ALIQ_003
   register: C170
   fields:
@@ -2355,6 +2477,7 @@ aliquotas:
   last_updated: '2026-04-05'
   certeza: provavel
   impacto: relevante
+  base_legal: Resolucao SF 22/1989; RICMS-ES
 - id: ALIQ_004
   register: C170
   fields:
@@ -2376,6 +2499,7 @@ aliquotas:
   last_updated: '2026-04-06'
   certeza: objetivo
   impacto: critico
+  base_legal: Resolucao SF 22/1989; RICMS-ES
 - id: ALIQ_005
   register: C170
   fields:
@@ -2398,6 +2522,7 @@ aliquotas:
   last_updated: '2026-04-06'
   certeza: provavel
   impacto: relevante
+  base_legal: Resolucao SF 22/1989; RICMS-ES
 - id: ALIQ_006
   register: C170
   fields:
@@ -2418,6 +2543,7 @@ aliquotas:
   last_updated: '2026-04-06'
   certeza: indicio
   impacto: relevante
+  base_legal: Resolucao SF 22/1989; RICMS-ES
 - id: ALIQ_007
   register: C190
   fields:
@@ -2437,6 +2563,7 @@ aliquotas:
   last_updated: '2026-04-05'
   certeza: objetivo
   impacto: critico
+  base_legal: Resolucao SF 22/1989; RICMS-ES
 c190_consolidacao:
 - id: C190_001
   register: C190
@@ -2458,6 +2585,7 @@ c190_consolidacao:
   certeza: objetivo
   impacto: critico
   tolerance_type: absolute
+  base_legal: Guia Pratico EFD — Registro C190
 - id: C190_002
   register: C190
   fields:
@@ -2478,569 +2606,7 @@ c190_consolidacao:
   certeza: provavel
   impacto: relevante
   tolerance_type: none
-cst_expandido:
-- id: CST_003
-  register: C170
-  fields:
-  - CST_ICMS
-  - VL_BC_ICMS
-  - VL_ITEM
-  error_type: CST_020_SEM_REDUCAO
-  severity: warning
-  description: CST 020 sem reducao real de base de calculo
-  condition: CST 020 AND VL_BC_ICMS >= 95% de VL_ITEM
-  implemented: true
-  module: cst_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-05'
-  certeza: provavel
-  impacto: relevante
-- id: IPI_003
-  register: C170
-  fields:
-  - CST_IPI
-  - VL_BC_IPI
-  - ALIQ_IPI
-  - VL_IPI
-  error_type: IPI_CST_INCOMPATIVEL
-  severity: error
-  corrigivel: proposta
-  description: CST IPI incompativel com campos monetarios
-  condition: CST tributado com tudo zero OU CST isento com valores > 0
-  implemented: true
-  module: cst_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-05'
-  certeza: objetivo
-  impacto: relevante
-difal:
-- id: DIFAL_001
-  register: C170, 0150
-  fields:
-  - CFOP
-  - ALIQ_ICMS
-  - IND_IE
-  - UF
-  error_type: DIFAL_FALTANTE_CONSUMO_FINAL
-  severity: critical
-  corrigivel: investigar
-  description: DIFAL faltante em operacao interestadual para consumidor final
-  condition: CFOP 6xxx + IND_IE=9 + ALIQ == interestadual (sem DIFAL embutido)
-  implemented: true
-  module: difal_validator.py
-  depende_validacao_externa: true
-  validar_externamente: aliquotas_internas_uf.yaml
-  vigencia_de: '2016-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-05'
-  certeza: provavel
-  impacto: critico
-- id: DIFAL_002
-  register: C170, 0150
-  fields:
-  - CFOP
-  - ALIQ_ICMS
-  - IND_IE
-  error_type: DIFAL_INDEVIDO_REVENDA
-  severity: warning
-  corrigivel: investigar
-  description: DIFAL aplicado indevidamente em operacao de revenda ou industrializacao
-  condition: IND_IE=1 + CFOP revenda/industria + ALIQ > 12%
-  implemented: true
-  module: difal_validator.py
-  vigencia_de: '2016-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-05'
-  certeza: provavel
-  impacto: relevante
-- id: DIFAL_003
-  register: C170, 0150, 0000
-  fields:
-  - CFOP
-  - UF
-  error_type: DIFAL_UF_DESTINO_INCONSISTENTE
-  severity: warning
-  corrigivel: investigar
-  description: UF destino inconsistente com CFOP interestadual
-  condition: CFOP 6xxx + UF_DEST == UF_DECLARANTE
-  implemented: true
-  module: difal_validator.py
-  vigencia_de: '2016-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-05'
-  certeza: objetivo
-  impacto: relevante
-- id: DIFAL_004
-  register: C170, 0150, 0000
-  fields:
-  - CFOP
-  - ALIQ_ICMS
-  - UF
-  error_type: DIFAL_ALIQ_INTERNA_INCORRETA
-  severity: critical
-  corrigivel: investigar
-  description: Aliquota interna do destino incorreta no calculo do DIFAL
-  condition: CFOP 6xxx + consumo final + ALIQ != aliquota interna oficial UF destino
-  implemented: true
-  module: difal_validator.py
-  depende_validacao_externa: true
-  validar_externamente: aliquotas_internas_uf.yaml
-  vigencia_de: '2016-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-05'
-  certeza: provavel
-  impacto: critico
-- id: DIFAL_005
-  register: C170, 0150, 0000
-  fields:
-  - VL_BC_ICMS
-  - ALIQ_ICMS
-  - VL_ICMS
-  error_type: DIFAL_BASE_INCONSISTENTE
-  severity: warning
-  corrigivel: investigar
-  description: Base de calculo DIFAL inconsistente com operacao
-  condition: BC x ALIQ diverge de VL_ICMS alem da tolerancia
-  implemented: true
-  module: difal_validator.py
-  vigencia_de: '2016-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-05'
-  certeza: provavel
-  impacto: relevante
-- id: DIFAL_006
-  register: C170, 0150
-  fields:
-  - CFOP
-  - UF
-  error_type: DIFAL_FCP_AUSENTE
-  severity: warning
-  corrigivel: investigar
-  description: FCP ausente ou incoerente em operacao com DIFAL
-  condition: UF destino cobra FCP + operacao consumo final interestadual + sem destaque FCP
-  implemented: true
-  module: difal_validator.py
-  depende_validacao_externa: true
-  validar_externamente: fcp_por_uf.yaml
-  vigencia_de: '2016-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-05'
-  certeza: provavel
-  impacto: relevante
-- id: DIFAL_007
-  register: C170, 0150
-  fields:
-  - CFOP
-  - IND_IE
-  error_type: DIFAL_PERFIL_INCOMPATIVEL
-  severity: warning
-  corrigivel: investigar
-  description: Perfil destinatario incompativel com tratamento DIFAL
-  condition: IND_IE=1 + CFOP consumo final OU IND_IE=9 + CFOP revenda
-  implemented: true
-  module: difal_validator.py
-  vigencia_de: '2016-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-05'
-  certeza: provavel
-  impacto: relevante
-- id: DIFAL_008
-  register: C170, 0150
-  fields:
-  - CFOP
-  - IND_IE
-  error_type: DIFAL_CONSUMO_FINAL_SEM_MARCADOR
-  severity: info
-  corrigivel: investigar
-  description: Consumo final sem marcadores consistentes para rastreio do DIFAL
-  condition: IND_IE=9 + CFOP generico interestadual (nao usa CFOP de consumo final)
-  implemented: true
-  module: difal_validator.py
-  vigencia_de: '2016-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-05'
-  certeza: indicio
-  impacto: informativo
-
-# ──────────────────────────────────────────────
-# MOD-17: Bloco C Servicos (C400/C490/C500/C590)
-# ──────────────────────────────────────────────
-- id: CS_001
-  register: C490
-  fields:
-  - VL_BC_ICMS
-  - ALIQ_ICMS
-  - VL_ICMS
-  error_type: CS_C490_SOMA_DIVERGENTE
-  severity: error
-  corrigivel: proposta
-  description: C490 - VL_BC_ICMS x ALIQ_ICMS diverge de VL_ICMS declarado
-  condition: VL_BC_ICMS * ALIQ_ICMS / 100 difere de VL_ICMS alem da tolerancia
-  implemented: true
-  module: bloco_c_servicos_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: objetivo
-  impacto: relevante
-- id: CS_002
-  register: C405
-  fields:
-  - DT_DOC
-  error_type: DATE_OUT_OF_PERIOD
-  severity: warning
-  corrigivel: proposta
-  description: C405 - DT_DOC fora do periodo informado no 0000
-  condition: DT_DOC < DT_INI ou DT_DOC > DT_FIN do registro 0000
-  implemented: true
-  module: bloco_c_servicos_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: objetivo
-  impacto: relevante
-- id: CS_003
-  register: C500
-  fields:
-  - COD_PART
-  error_type: REF_INEXISTENTE
-  severity: warning
-  corrigivel: proposta
-  description: C500 - COD_PART referenciado nao existe no cadastro 0150
-  condition: COD_PART informado no C500 nao encontrado entre os registros 0150
-  implemented: true
-  module: bloco_c_servicos_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: objetivo
-  impacto: relevante
-- id: CS_004
-  register: C590, C510
-  fields:
-  - VL_ICMS
-  - CST_ICMS
-  - CFOP
-  - ALIQ_ICMS
-  error_type: CS_C590_DIVERGE_C510
-  severity: error
-  corrigivel: proposta
-  description: C590 - VL_ICMS diverge da soma dos C510 para mesma combinacao CST+CFOP+ALIQ
-  condition: Soma VL_ICMS dos C510 por CST+CFOP+ALIQ difere do C590 correspondente
-  implemented: true
-  module: bloco_c_servicos_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: objetivo
-  impacto: relevante
-base_calculo:
-- id: BASE_001
-  register: C170
-  fields:
-  - VL_BC_ICMS
-  - ALIQ_ICMS
-  - VL_ICMS
-  error_type: CALCULO_DIVERGENTE
-  severity: error
-  corrigivel: proposta
-  description: Recalculo ICMS divergente - BC x ALIQ difere de VL_ICMS declarado
-  condition: '|VL_BC_ICMS * ALIQ_ICMS / 100 - VL_ICMS| > tolerance[item_icms]'
-  implemented: true
-  module: base_calculo_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: objetivo
-  impacto: critico
-- id: BASE_002
-  register: C170
-  fields:
-  - VL_BC_ICMS
-  - VL_ITEM
-  - CST_ICMS
-  error_type: BASE_MENOR_SEM_JUSTIFICATIVA
-  severity: error
-  corrigivel: proposta
-  description: Base de calculo ICMS menor que 50% do valor do item sem CST de reducao (020, 070)
-  condition: VL_BC_ICMS < (VL_ITEM * 0.5) AND CST not in (020, 070)
-  implemented: true
-  module: base_calculo_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: provavel
-  impacto: relevante
-- id: BASE_003
-  register: C170
-  fields:
-  - VL_BC_ICMS
-  - VL_ITEM
-  error_type: BASE_SUPERIOR_RAZOAVEL
-  severity: warning
-  corrigivel: investigar
-  description: Base de calculo ICMS superior a 150% do valor do item
-  condition: VL_BC_ICMS > VL_ITEM * 1.5
-  implemented: true
-  module: base_calculo_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: indicio
-  impacto: relevante
-- id: BASE_004
-  register: C170, C100
-  fields:
-  - VL_BC_ICMS
-  - VL_FRT
-  - IND_FRT
-  error_type: FRETE_CIF_FORA_BASE
-  severity: error
-  corrigivel: proposta
-  description: Frete CIF (IND_FRT=0) nao incluido na base de calculo do ICMS
-  condition: VL_FRT > 0 AND IND_FRT=0 AND VL_BC_ICMS <= VL_ITEM
-  implemented: true
-  module: base_calculo_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: provavel
-  impacto: relevante
-  base_legal: Art. 13, par.1, II, LC 87/1996
-- id: BASE_005
-  register: C170, C100
-  fields:
-  - VL_BC_ICMS
-  - VL_FRT
-  - IND_FRT
-  error_type: FRETE_FOB_NA_BASE
-  severity: warning
-  corrigivel: investigar
-  description: Frete FOB (IND_FRT=1) possivelmente incluido na base de calculo do ICMS
-  condition: VL_FRT > 0 AND IND_FRT=1 AND VL_BC_ICMS > VL_ITEM
-  implemented: true
-  module: base_calculo_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: indicio
-  impacto: relevante
-- id: BASE_006
-  register: C170, C100
-  fields:
-  - VL_BC_ICMS
-  - VL_OUT_DA
-  error_type: DESPESAS_ACESSORIAS_FORA_BASE
-  severity: warning
-  corrigivel: proposta
-  description: Despesas acessorias (VL_OUT_DA) nao incluidas na base de calculo para CST tributado
-  condition: VL_OUT_DA > 0 AND VL_BC_ICMS <= VL_ITEM AND CST tributado
-  implemented: true
-  module: base_calculo_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: objetivo
-  impacto: relevante
-  base_legal: Art. 13, LC 87/1996
-# ──────────────────────────────────────────────
-# GRUPO IPI
-# ──────────────────────────────────────────────
-- id: IPI_001
-  register: C170
-  fields:
-  - VL_BC_ICMS
-  - VL_IPI
-  error_type: IPI_REFLEXO_BC_ICMS
-  severity: warning
-  corrigivel: proposta
-  description: IPI reflexo incorreto na base ICMS — destinatario nao-contribuinte deve incluir IPI na BC; contribuinte nao
-  condition: nao-contribuinte AND IPI fora da BC ICMS, ou contribuinte AND IPI na BC ICMS
-  implemented: true
-  module: ipi_validator.py
-  legislation: Art. 13, §2º, LC 87/1996
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: provavel
-  impacto: critico
-  base_legal: Art. 13, §2º, LC 87/1996
-- id: IPI_002
-  register: C170
-  fields:
-  - VL_BC_IPI
-  - ALIQ_IPI
-  - VL_IPI
-  error_type: CALCULO_DIVERGENTE
-  severity: error
-  corrigivel: proposta
-  description: Recalculo IPI divergente — VL_BC_IPI * ALIQ_IPI / 100 != VL_IPI
-  condition: "|VL_BC_IPI * ALIQ_IPI / 100 - VL_IPI| > tolerancia"
-  implemented: true
-  module: tax_recalc.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: objetivo
-  impacto: critico
-- id: IPI_003
-  register: C170
-  fields:
-  - CST_IPI
-  - VL_BC_IPI
-  - VL_IPI
-  error_type: IPI_CST_MONETARIO_INCOMPATIVEL
-  severity: error
-  corrigivel: proposta
-  description: CST IPI incompativel com campos monetarios — tributado sem valor, isento com valor, ou NT com valor
-  condition: CST tributado (00/49/50) com VL_IPI=0 e BC>0, ou CST isento (01-05/51-55) com VL_IPI>0, ou CST 99 com valores
-  implemented: true
-  module: ipi_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: objetivo
-  impacto: critico
-# ──────────────────────────────────────────────
-# GRUPO DESTINATARIO
-# ──────────────────────────────────────────────
-- id: DEST_001
-  register: C170
-  fields:
-  - CST_ICMS
-  - CFOP
-  error_type: DEST_IE_INCONSISTENTE
-  severity: warning
-  corrigivel: proposta
-  description: IE ativa no 0150 mas CST indica isencao em operacao interestadual — tratamento fiscal inconsistente
-  condition: IE ativa AND CST 40/41 AND CFOP 6xxx
-  implemented: true
-  module: destinatario_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: provavel
-  impacto: critico
-- id: DEST_002
-  register: '0150'
-  fields:
-  - IE
-  - UF
-  error_type: DEST_UF_IE_INCOMPATIVEL
-  severity: error
-  corrigivel: proposta
-  description: Prefixo da IE nao corresponde a UF do participante no 0150
-  condition: prefixo IE nao bate com padrao da UF
-  implemented: true
-  module: destinatario_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: objetivo
-  impacto: relevante
-- id: DEST_003
-  register: 0150, 0005
-  fields:
-  - CEP
-  - COD_MUN
-  - UF
-  error_type: DEST_UF_CEP_INCOMPATIVEL
-  severity: error
-  corrigivel: proposta
-  description: CEP ou COD_MUN pertence a faixa de outra UF — endereco inconsistente
-  condition: faixa CEP ou prefixo COD_MUN IBGE difere da UF informada
-  implemented: true
-  module: destinatario_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: objetivo
-  impacto: informativo
-# ──────────────────────────────────────────────
-# GRUPO CFOP
-# ──────────────────────────────────────────────
-- id: CFOP_001
-  register: C170
-  fields:
-  - CFOP
-  error_type: CFOP_INTERESTADUAL_MESMA_UF
-  severity: error
-  corrigivel: proposta
-  description: CFOP interestadual (6xxx) com destinatario na mesma UF do contribuinte
-  condition: CFOP 6xxx AND UF_DEST == UF_CONTRIBUINTE (0000)
-  implemented: true
-  module: cfop_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: objetivo
-  impacto: critico
-  base_legal: RICMS, Convênio s/nº 1970
-- id: CFOP_002
-  register: C170
-  fields:
-  - CFOP
-  error_type: CFOP_INTERNO_OUTRA_UF
-  severity: error
-  corrigivel: proposta
-  description: CFOP interno (5xxx) com destinatario em outra UF
-  condition: CFOP 5xxx AND UF_DEST != UF_CONTRIBUINTE (0000)
-  implemented: true
-  module: cfop_validator.py
-  vigencia_de: '2000-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: objetivo
-  impacto: critico
-  base_legal: RICMS, Convênio s/nº 1970
-- id: CFOP_003
-  register: C170
-  fields:
-  - CFOP
-  error_type: CFOP_DIFAL_INCOMPATIVEL
-  severity: warning
-  corrigivel: proposta
-  description: CFOP de remessa/retorno incompativel com tratamento DIFAL (E300 preenchido)
-  condition: E300 preenchido AND CFOP 6xxx de remessa/retorno
-  implemented: true
-  module: cfop_validator.py
-  vigencia_de: '2016-01-01'
-  vigencia_ate: null
-  version: '1.0'
-  last_updated: '2026-04-06'
-  certeza: provavel
-  impacto: critico
-  base_legal: EC 87/2015
+  base_legal: Guia Pratico EFD — Registro C190
 cst_expandido:
 - id: CST_001
   register: C170
@@ -3051,8 +2617,7 @@ cst_expandido:
   error_type: CST_TRIBUTADO_ALIQ_ZERO
   severity: error
   corrigivel: proposta
-  description: CST tributado (00,10,20,70,90) com aliquota ICMS zero e valor de item
-    positivo
+  description: CST tributado (00,10,20,70,90) com aliquota ICMS zero e valor de item positivo
   condition: CST in (00,10,20,70,90) AND ALIQ_ICMS = 0 AND VL_ITEM > 0
   implemented: true
   module: cst_validator.py
@@ -3125,6 +2690,538 @@ cst_expandido:
   impacto: relevante
   automatizavel: true
   base_legal: RICMS, art. diferimento
+difal:
+- id: DIFAL_001
+  register: C170, 0150
+  fields:
+  - CFOP
+  - ALIQ_ICMS
+  - IND_IE
+  - UF
+  error_type: DIFAL_FALTANTE_CONSUMO_FINAL
+  severity: critical
+  corrigivel: investigar
+  description: DIFAL faltante em operacao interestadual para consumidor final
+  condition: CFOP 6xxx + IND_IE=9 + ALIQ == interestadual (sem DIFAL embutido)
+  implemented: true
+  module: difal_validator.py
+  depende_validacao_externa: true
+  validar_externamente: aliquotas_internas_uf.yaml
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
+  base_legal: EC 87/2015; LC 190/2022; RICMS-ES Arts. 102-109
+- id: DIFAL_002
+  register: C170, 0150
+  fields:
+  - CFOP
+  - ALIQ_ICMS
+  - IND_IE
+  error_type: DIFAL_INDEVIDO_REVENDA
+  severity: warning
+  corrigivel: investigar
+  description: DIFAL aplicado indevidamente em operacao de revenda ou industrializacao
+  condition: IND_IE=1 + CFOP revenda/industria + ALIQ > 12%
+  implemented: true
+  module: difal_validator.py
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
+  base_legal: EC 87/2015; LC 190/2022; RICMS-ES Arts. 102-109
+- id: DIFAL_003
+  register: C170, 0150, 0000
+  fields:
+  - CFOP
+  - UF
+  error_type: DIFAL_UF_DESTINO_INCONSISTENTE
+  severity: warning
+  corrigivel: investigar
+  description: UF destino inconsistente com CFOP interestadual
+  condition: CFOP 6xxx + UF_DEST == UF_DECLARANTE
+  implemented: true
+  module: difal_validator.py
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: objetivo
+  impacto: relevante
+  base_legal: EC 87/2015; LC 190/2022; RICMS-ES Arts. 102-109
+- id: DIFAL_004
+  register: C170, 0150, 0000
+  fields:
+  - CFOP
+  - ALIQ_ICMS
+  - UF
+  error_type: DIFAL_ALIQ_INTERNA_INCORRETA
+  severity: critical
+  corrigivel: investigar
+  description: Aliquota interna do destino incorreta no calculo do DIFAL
+  condition: CFOP 6xxx + consumo final + ALIQ != aliquota interna oficial UF destino
+  implemented: true
+  module: difal_validator.py
+  depende_validacao_externa: true
+  validar_externamente: aliquotas_internas_uf.yaml
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: critico
+  base_legal: EC 87/2015; LC 190/2022; RICMS-ES Arts. 102-109
+- id: DIFAL_005
+  register: C170, 0150, 0000
+  fields:
+  - VL_BC_ICMS
+  - ALIQ_ICMS
+  - VL_ICMS
+  error_type: DIFAL_BASE_INCONSISTENTE
+  severity: warning
+  corrigivel: investigar
+  description: Base de calculo DIFAL inconsistente com operacao
+  condition: BC x ALIQ diverge de VL_ICMS alem da tolerancia
+  implemented: true
+  module: difal_validator.py
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
+  base_legal: EC 87/2015; LC 190/2022; RICMS-ES Arts. 102-109
+- id: DIFAL_006
+  register: C170, 0150
+  fields:
+  - CFOP
+  - UF
+  error_type: DIFAL_FCP_AUSENTE
+  severity: warning
+  corrigivel: investigar
+  description: FCP ausente ou incoerente em operacao com DIFAL
+  condition: UF destino cobra FCP + operacao consumo final interestadual + sem destaque FCP
+  implemented: true
+  module: difal_validator.py
+  depende_validacao_externa: true
+  validar_externamente: fcp_por_uf.yaml
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
+  base_legal: EC 87/2015; LC 190/2022; RICMS-ES Arts. 102-109
+- id: DIFAL_007
+  register: C170, 0150
+  fields:
+  - CFOP
+  - IND_IE
+  error_type: DIFAL_PERFIL_INCOMPATIVEL
+  severity: warning
+  corrigivel: investigar
+  description: Perfil destinatario incompativel com tratamento DIFAL
+  condition: IND_IE=1 + CFOP consumo final OU IND_IE=9 + CFOP revenda
+  implemented: true
+  module: difal_validator.py
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: provavel
+  impacto: relevante
+  base_legal: EC 87/2015; LC 190/2022; RICMS-ES Arts. 102-109
+- id: DIFAL_008
+  register: C170, 0150
+  fields:
+  - CFOP
+  - IND_IE
+  error_type: DIFAL_CONSUMO_FINAL_SEM_MARCADOR
+  severity: info
+  corrigivel: investigar
+  description: Consumo final sem marcadores consistentes para rastreio do DIFAL
+  condition: IND_IE=9 + CFOP generico interestadual (nao usa CFOP de consumo final)
+  implemented: true
+  module: difal_validator.py
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-05'
+  certeza: indicio
+  impacto: informativo
+  base_legal: EC 87/2015; LC 190/2022; RICMS-ES Arts. 102-109
+- id: CS_001
+  register: C490
+  fields:
+  - VL_BC_ICMS
+  - ALIQ_ICMS
+  - VL_ICMS
+  error_type: CS_C490_SOMA_DIVERGENTE
+  severity: error
+  corrigivel: proposta
+  description: C490 - VL_BC_ICMS x ALIQ_ICMS diverge de VL_ICMS declarado
+  condition: VL_BC_ICMS * ALIQ_ICMS / 100 difere de VL_ICMS alem da tolerancia
+  implemented: true
+  module: bloco_c_servicos_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
+- id: CS_002
+  register: C405
+  fields:
+  - DT_DOC
+  error_type: DATE_OUT_OF_PERIOD
+  severity: warning
+  corrigivel: proposta
+  description: C405 - DT_DOC fora do periodo informado no 0000
+  condition: DT_DOC < DT_INI ou DT_DOC > DT_FIN do registro 0000
+  implemented: true
+  module: bloco_c_servicos_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
+- id: CS_003
+  register: C500
+  fields:
+  - COD_PART
+  error_type: REF_INEXISTENTE
+  severity: warning
+  corrigivel: proposta
+  description: C500 - COD_PART referenciado nao existe no cadastro 0150
+  condition: COD_PART informado no C500 nao encontrado entre os registros 0150
+  implemented: true
+  module: bloco_c_servicos_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  base_legal: Guia Pratico EFD — Referencias ao Bloco 0
+- id: CS_004
+  register: C590, C510
+  fields:
+  - VL_ICMS
+  - CST_ICMS
+  - CFOP
+  - ALIQ_ICMS
+  error_type: CS_C590_DIVERGE_C510
+  severity: error
+  corrigivel: proposta
+  description: C590 - VL_ICMS diverge da soma dos C510 para mesma combinacao CST+CFOP+ALIQ
+  condition: Soma VL_ICMS dos C510 por CST+CFOP+ALIQ difere do C590 correspondente
+  implemented: true
+  module: bloco_c_servicos_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
+base_calculo:
+- id: BASE_001
+  register: C170
+  fields:
+  - VL_BC_ICMS
+  - ALIQ_ICMS
+  - VL_ICMS
+  error_type: CALCULO_DIVERGENTE
+  severity: error
+  corrigivel: proposta
+  description: Recalculo ICMS divergente - BC x ALIQ difere de VL_ICMS declarado
+  condition: '|VL_BC_ICMS * ALIQ_ICMS / 100 - VL_ICMS| > tolerance[item_icms]'
+  implemented: true
+  module: base_calculo_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
+  base_legal: LC 87/1996 Art. 13
+- id: BASE_002
+  register: C170
+  fields:
+  - VL_BC_ICMS
+  - VL_ITEM
+  - CST_ICMS
+  error_type: BASE_MENOR_SEM_JUSTIFICATIVA
+  severity: error
+  corrigivel: proposta
+  description: Base de calculo ICMS menor que 50% do valor do item sem CST de reducao (020, 070)
+  condition: VL_BC_ICMS < (VL_ITEM * 0.5) AND CST not in (020, 070)
+  implemented: true
+  module: base_calculo_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: relevante
+  base_legal: LC 87/1996 Art. 13
+- id: BASE_003
+  register: C170
+  fields:
+  - VL_BC_ICMS
+  - VL_ITEM
+  error_type: BASE_SUPERIOR_RAZOAVEL
+  severity: warning
+  corrigivel: investigar
+  description: Base de calculo ICMS superior a 150% do valor do item
+  condition: VL_BC_ICMS > VL_ITEM * 1.5
+  implemented: true
+  module: base_calculo_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: indicio
+  impacto: relevante
+  base_legal: LC 87/1996 Art. 13
+- id: BASE_004
+  register: C170, C100
+  fields:
+  - VL_BC_ICMS
+  - VL_FRT
+  - IND_FRT
+  error_type: FRETE_CIF_FORA_BASE
+  severity: error
+  corrigivel: proposta
+  description: Frete CIF (IND_FRT=0) nao incluido na base de calculo do ICMS
+  condition: VL_FRT > 0 AND IND_FRT=0 AND VL_BC_ICMS <= VL_ITEM
+  implemented: true
+  module: base_calculo_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: relevante
+  base_legal: Art. 13, par.1, II, LC 87/1996
+- id: BASE_005
+  register: C170, C100
+  fields:
+  - VL_BC_ICMS
+  - VL_FRT
+  - IND_FRT
+  error_type: FRETE_FOB_NA_BASE
+  severity: warning
+  corrigivel: investigar
+  description: Frete FOB (IND_FRT=1) possivelmente incluido na base de calculo do ICMS
+  condition: VL_FRT > 0 AND IND_FRT=1 AND VL_BC_ICMS > VL_ITEM
+  implemented: true
+  module: base_calculo_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: indicio
+  impacto: relevante
+  base_legal: LC 87/1996 Art. 13
+- id: BASE_006
+  register: C170, C100
+  fields:
+  - VL_BC_ICMS
+  - VL_OUT_DA
+  error_type: DESPESAS_ACESSORIAS_FORA_BASE
+  severity: warning
+  corrigivel: proposta
+  description: Despesas acessorias (VL_OUT_DA) nao incluidas na base de calculo para CST tributado
+  condition: VL_OUT_DA > 0 AND VL_BC_ICMS <= VL_ITEM AND CST tributado
+  implemented: true
+  module: base_calculo_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  base_legal: Art. 13, LC 87/1996
+- id: IPI_001
+  register: C170
+  fields:
+  - VL_BC_ICMS
+  - VL_IPI
+  error_type: IPI_REFLEXO_BC_ICMS
+  severity: warning
+  corrigivel: proposta
+  description: IPI reflexo incorreto na base ICMS — destinatario nao-contribuinte deve incluir IPI na BC; contribuinte nao
+  condition: nao-contribuinte AND IPI fora da BC ICMS, ou contribuinte AND IPI na BC ICMS
+  implemented: true
+  module: ipi_validator.py
+  legislation: Art. 13, §2º, LC 87/1996
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: critico
+  base_legal: Art. 13, §2º, LC 87/1996
+- id: IPI_002
+  register: C170
+  fields:
+  - VL_BC_IPI
+  - ALIQ_IPI
+  - VL_IPI
+  error_type: CALCULO_DIVERGENTE
+  severity: error
+  corrigivel: proposta
+  description: Recalculo IPI divergente — VL_BC_IPI * ALIQ_IPI / 100 != VL_IPI
+  condition: '|VL_BC_IPI * ALIQ_IPI / 100 - VL_IPI| > tolerancia'
+  implemented: true
+  module: tax_recalc.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
+  base_legal: RIPI Dec. 7.212/2010; TIPI
+- id: IPI_003
+  register: C170
+  fields:
+  - CST_IPI
+  - VL_BC_IPI
+  - VL_IPI
+  error_type: IPI_CST_MONETARIO_INCOMPATIVEL
+  severity: error
+  corrigivel: proposta
+  description: CST IPI incompativel com campos monetarios — tributado sem valor, isento com valor, ou NT com valor
+  condition: CST tributado (00/49/50) com VL_IPI=0 e BC>0, ou CST isento (01-05/51-55) com VL_IPI>0, ou CST 99 com valores
+  implemented: true
+  module: ipi_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
+  base_legal: RIPI Dec. 7.212/2010; TIPI
+- id: DEST_001
+  register: C170
+  fields:
+  - CST_ICMS
+  - CFOP
+  error_type: DEST_IE_INCONSISTENTE
+  severity: warning
+  corrigivel: proposta
+  description: IE ativa no 0150 mas CST indica isencao em operacao interestadual — tratamento fiscal inconsistente
+  condition: IE ativa AND CST 40/41 AND CFOP 6xxx
+  implemented: true
+  module: destinatario_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: critico
+  base_legal: Guia Pratico EFD — Registro 0150
+- id: DEST_002
+  register: '0150'
+  fields:
+  - IE
+  - UF
+  error_type: DEST_UF_IE_INCOMPATIVEL
+  severity: error
+  corrigivel: proposta
+  description: Prefixo da IE nao corresponde a UF do participante no 0150
+  condition: prefixo IE nao bate com padrao da UF
+  implemented: true
+  module: destinatario_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: relevante
+  base_legal: Guia Pratico EFD — Registro 0150
+- id: DEST_003
+  register: 0150, 0005
+  fields:
+  - CEP
+  - COD_MUN
+  - UF
+  error_type: DEST_UF_CEP_INCOMPATIVEL
+  severity: error
+  corrigivel: proposta
+  description: CEP ou COD_MUN pertence a faixa de outra UF — endereco inconsistente
+  condition: faixa CEP ou prefixo COD_MUN IBGE difere da UF informada
+  implemented: true
+  module: destinatario_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: informativo
+  base_legal: Guia Pratico EFD — Registro 0150
+- id: CFOP_001
+  register: C170
+  fields:
+  - CFOP
+  error_type: CFOP_INTERESTADUAL_MESMA_UF
+  severity: error
+  corrigivel: proposta
+  description: CFOP interestadual (6xxx) com destinatario na mesma UF do contribuinte
+  condition: CFOP 6xxx AND UF_DEST == UF_CONTRIBUINTE (0000)
+  implemented: true
+  module: cfop_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
+  base_legal: RICMS, Convênio s/nº 1970
+- id: CFOP_002
+  register: C170
+  fields:
+  - CFOP
+  error_type: CFOP_INTERNO_OUTRA_UF
+  severity: error
+  corrigivel: proposta
+  description: CFOP interno (5xxx) com destinatario em outra UF
+  condition: CFOP 5xxx AND UF_DEST != UF_CONTRIBUINTE (0000)
+  implemented: true
+  module: cfop_validator.py
+  vigencia_de: '2000-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: objetivo
+  impacto: critico
+  base_legal: RICMS, Convênio s/nº 1970
+- id: CFOP_003
+  register: C170
+  fields:
+  - CFOP
+  error_type: CFOP_DIFAL_INCOMPATIVEL
+  severity: warning
+  corrigivel: proposta
+  description: CFOP de remessa/retorno incompativel com tratamento DIFAL (E300 preenchido)
+  condition: E300 preenchido AND CFOP 6xxx de remessa/retorno
+  implemented: true
+  module: cfop_validator.py
+  vigencia_de: '2016-01-01'
+  vigencia_ate: null
+  version: '1.0'
+  last_updated: '2026-04-06'
+  certeza: provavel
+  impacto: critico
+  base_legal: EC 87/2015
 beneficio_fiscal:
 - id: BENE_001
   register: C190, E111
@@ -3135,8 +3232,7 @@ beneficio_fiscal:
   severity: error
   corrigivel: investigar
   description: Beneficio fiscal no E111 contaminando aliquota do documento (C190)
-  condition: E111 com ajuste de beneficio AND C190 com ALIQ_ICMS atipica em operacao
-    interna
+  condition: E111 com ajuste de beneficio AND C190 com ALIQ_ICMS atipica em operacao interna
   implemented: true
   module: beneficio_validator.py
   vigencia_de: '2000-01-01'
@@ -3176,8 +3272,7 @@ beneficio_fiscal:
   error_type: BENEFICIO_BASE_NAO_ELEGIVEL
   severity: warning
   corrigivel: investigar
-  description: Base do beneficio fiscal inclui operacoes nao elegiveis (devolucao,
-    cancelamento, remessa)
+  description: Base do beneficio fiscal inclui operacoes nao elegiveis (devolucao, cancelamento, remessa)
   condition: E111 beneficio AND C190 com CFOPs nao elegiveis > 5% do total
   implemented: true
   module: beneficio_validator.py
@@ -3198,8 +3293,7 @@ devolucoes:
   error_type: DEVOLUCAO_SEM_ESPELHAMENTO
   severity: warning
   corrigivel: proposta
-  description: Devolucao sem NF original correspondente (mesmo COD_PART, operacao
-    inversa)
+  description: Devolucao sem NF original correspondente (mesmo COD_PART, operacao inversa)
   condition: CFOP devolucao AND sem C100 com mesmo COD_PART e operacao inversa
   implemented: true
   module: devolucao_validator.py
@@ -3238,8 +3332,7 @@ devolucoes:
   error_type: DEVOLUCAO_ALIQ_DIVERGENTE
   severity: warning
   corrigivel: investigar
-  description: Devolucao interestadual com aliquota diferente das faixas interestaduais
-    validas
+  description: Devolucao interestadual com aliquota diferente das faixas interestaduais validas
   condition: CFOP devolucao interestadual AND ALIQ_ICMS not in (4, 7, 12)
   implemented: true
   module: devolucao_validator.py
@@ -3273,6 +3366,7 @@ parametrizacao:
   certeza: objetivo
   impacto: informativo
   automatizavel: true
+  base_legal: Analise estatistica
 - id: PARAM_002
   register: C170, 0150
   fields:
@@ -3282,8 +3376,7 @@ parametrizacao:
   severity: warning
   corrigivel: proposta
   description: Mesmo tipo de erro em mais de 80% das operacoes para mesma UF destino
-  condition: Erro concentrado por UF destino (>80%) indica regra fiscal incorreta para
-    a UF
+  condition: Erro concentrado por UF destino (>80%) indica regra fiscal incorreta para a UF
   implemented: true
   module: parametrizacao_validator.py
   tipo_achado: metarregra
@@ -3294,6 +3387,7 @@ parametrizacao:
   certeza: objetivo
   impacto: informativo
   automatizavel: true
+  base_legal: Analise estatistica
 - id: PARAM_003
   register: C170, C100
   fields:
@@ -3314,6 +3408,7 @@ parametrizacao:
   certeza: objetivo
   impacto: informativo
   automatizavel: true
+  base_legal: Analise estatistica
 ncm:
 - id: NCM_001
   register: C170, 0200
@@ -3356,6 +3451,7 @@ ncm:
   certeza: indicio
   impacto: relevante
   automatizavel: false
+  base_legal: TIPI Dec. 11.158/2022
 - id: NCM_003
   register: '0200'
   fields:
@@ -3404,8 +3500,7 @@ governanca:
   error_type: CLASSIFICACAO_TIPO_ERRO
   severity: info
   corrigivel: investigar
-  description: 'Governanca: classificar achado como erro material, parametrizacao ou
-    tese fiscal'
+  description: 'Governanca: classificar achado como erro material, parametrizacao ou tese fiscal'
   condition: Padrao do erro indica natureza pontual, sistemica ou interpretativa
   implemented: true
   module: beneficio_audit_validator.py
@@ -3417,6 +3512,7 @@ governanca:
   certeza: objetivo
   impacto: informativo
   categoria: governance
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: GOV_002
   register: '*'
   fields:
@@ -3424,8 +3520,7 @@ governanca:
   error_type: GRAU_CONFIANCA_ACHADOS
   severity: info
   corrigivel: investigar
-  description: 'Governanca: explicitar grau de confianca (objetivo/provavel/indicio)
-    dos achados'
+  description: 'Governanca: explicitar grau de confianca (objetivo/provavel/indicio) dos achados'
   condition: Distribuicao dos achados por grau de certeza
   implemented: true
   module: beneficio_audit_validator.py
@@ -3437,6 +3532,7 @@ governanca:
   certeza: objetivo
   impacto: informativo
   categoria: governance
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: GOV_003
   register: C170, C190, E110, E111, 0150, 0200, H010, 9900
   fields:
@@ -3444,8 +3540,7 @@ governanca:
   error_type: ACHADO_LIMITADO_AO_SPED
   severity: info
   corrigivel: investigar
-  description: 'Governanca: explicitar que achados dependem exclusivamente do SPED
-    sem documentos externos'
+  description: 'Governanca: explicitar que achados dependem exclusivamente do SPED sem documentos externos'
   condition: Regra sustentavel apenas por dados internos do arquivo
   implemented: true
   module: beneficio_audit_validator.py
@@ -3457,6 +3552,7 @@ governanca:
   certeza: objetivo
   impacto: informativo
   categoria: governance
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: GOV_004
   register: 0150, 0200, C170, C190, E110, E111, H010, 9900
   fields:
@@ -3476,6 +3572,7 @@ governanca:
   certeza: objetivo
   impacto: informativo
   categoria: governance
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 - id: AMOSTRA_001
   register: C170, C190
   fields:
@@ -3495,10 +3592,12 @@ governanca:
   certeza: objetivo
   impacto: informativo
   categoria: governance
+  base_legal: Guia Pratico EFD ICMS/IPI; Ajuste SINIEF 02/2009
 simples_nacional:
 - id: SN_001
   register: C170
-  fields: [CST_ICMS]
+  fields:
+  - CST_ICMS
   error_type: SN_CST_TABELA_A
   severity: error
   corrigivel: investigar
@@ -3506,7 +3605,7 @@ simples_nacional:
   condition: regime == SIMPLES_NACIONAL AND CST_ICMS in {00,10,20,30,40,41,50,51,60,70,90}
   implemented: true
   module: simples_validator.py
-  legislation: 'Ajuste SINIEF 07/2005 - Tabela B'
+  legislation: Ajuste SINIEF 07/2005 - Tabela B
   vigencia_de: '2018-01-01'
   vigencia_ate: null
   version: '2.0'
@@ -3514,9 +3613,11 @@ simples_nacional:
   certeza: objetivo
   impacto: relevante
   categoria: simples_nacional
+  base_legal: LC 123/2006; Res. CGSN 140/2018
 - id: SN_002
   register: C170
-  fields: [CST_ICMS]
+  fields:
+  - CST_ICMS
   error_type: SN_CSOSN_INVALIDO
   severity: error
   corrigivel: investigar
@@ -3524,7 +3625,7 @@ simples_nacional:
   condition: regime == SIMPLES_NACIONAL AND CSOSN not in CSOSN_VALIDOS
   implemented: true
   module: simples_validator.py
-  legislation: 'Ajuste SINIEF 07/2005 - Tabela B'
+  legislation: Ajuste SINIEF 07/2005 - Tabela B
   vigencia_de: '2018-01-01'
   vigencia_ate: null
   version: '2.0'
@@ -3532,52 +3633,56 @@ simples_nacional:
   certeza: objetivo
   impacto: relevante
   categoria: simples_nacional
+  base_legal: LC 123/2006; Res. CGSN 140/2018
 - id: SN_003
   register: C170
-  fields: [CST_ICMS, ALIQ_ICMS, VL_ICMS]
+  fields:
+  - CST_ICMS
+  - ALIQ_ICMS
+  - VL_ICMS
   error_type: SN_CREDITO_ZERADO_OU_FORA_RANGE
   severity: warning
-  description: >
-    CSOSN 101/201 com aliquota de credito zerada (erro provavel) ou acima de 3.95%
-    (acima do teto maximo da LC 123, Anexo I-V, todas as faixas, LC 155/2016).
-    Sem o RBT12 no arquivo SPED nao e possivel determinar a faixa exata — portanto
+  description: 'CSOSN 101/201 com aliquota de credito zerada (erro provavel) ou acima de 3.95% (acima do teto maximo da LC
+    123, Anexo I-V, todas as faixas, LC 155/2016). Sem o RBT12 no arquivo SPED nao e possivel determinar a faixa exata — portanto
     o sistema sinaliza como indicio, nao como erro objetivo.
-  condition: >
-    CSOSN in {101,201}
-    AND (
-      (ALIQ_ICMS == 0 AND VL_ICMS != 0) OR
-      (ALIQ_ICMS == 0 AND VL_BC_ICMS > 0) OR
-      (ALIQ_ICMS > 3.95)
-    )
+
+    '
+  condition: "CSOSN in {101,201} AND (\n  (ALIQ_ICMS == 0 AND VL_ICMS != 0) OR\n  (ALIQ_ICMS == 0 AND VL_BC_ICMS > 0) OR\n\
+    \  (ALIQ_ICMS > 3.95)\n)\n"
   certeza: indicio
   impacto: relevante
   implemented: true
   module: simples_validator.py
-  legislation: 'LC 123/2006 art. 23 + LC 155/2016 — Tabelas Anexos I-V'
-  mensagem_padrao: >
-    CSOSN {CSOSN}: aliquota de credito ({ALIQ_ICMS}%) fora do range esperado para
-    o Simples Nacional (max 3.95% conforme LC 155/2016, Anexos I-V).
-    Verificar faixa de RBT12 e Anexo aplicavel ao contribuinte.
-  acao_recomendada: >
-    Consultar o DAS do periodo para verificar o Anexo e a faixa de RBT12.
-    O pCredSN correto esta no proprio documento de apuracao do Simples Nacional.
+  legislation: LC 123/2006 art. 23 + LC 155/2016 — Tabelas Anexos I-V
+  mensagem_padrao: 'CSOSN {CSOSN}: aliquota de credito ({ALIQ_ICMS}%) fora do range esperado para o Simples Nacional (max
+    3.95% conforme LC 155/2016, Anexos I-V). Verificar faixa de RBT12 e Anexo aplicavel ao contribuinte.
+
+    '
+  acao_recomendada: 'Consultar o DAS do periodo para verificar o Anexo e a faixa de RBT12. O pCredSN correto esta no proprio
+    documento de apuracao do Simples Nacional.
+
+    '
   corrigivel: investigar
   depende_externo: true
-  fontes_externas: [DAS, PGDAS-D]
-  notas_tecnicas: >
-    Teto de 3.95% derivado de: Anexo I faixa 6 (3.95%), Anexo II faixa 6 (3.30%),
-    Anexo III faixa 6 (3.50%), Anexo IV sem credito, Anexo V faixa 6 (3.02%).
-    O teto absoluto de qualquer faixa de qualquer Anexo e 3.95%.
-    Aliquota zero + VL_BC preenchido = erro provavel (credito nao exercido ou
-    empresa optou por nao segregar — requer confirmacao).
+  fontes_externas:
+  - DAS
+  - PGDAS-D
+  notas_tecnicas: 'Teto de 3.95% derivado de: Anexo I faixa 6 (3.95%), Anexo II faixa 6 (3.30%), Anexo III faixa 6 (3.50%),
+    Anexo IV sem credito, Anexo V faixa 6 (3.02%). O teto absoluto de qualquer faixa de qualquer Anexo e 3.95%. Aliquota zero
+    + VL_BC preenchido = erro provavel (credito nao exercido ou empresa optou por nao segregar — requer confirmacao).
+
+    '
   vigencia_de: '2018-01-01'
   vigencia_ate: null
   version: '3.0'
   last_updated: '2026-04-06'
   categoria: simples_nacional
+  base_legal: LC 123/2006; Res. CGSN 140/2018
 - id: SN_004
   register: C170
-  fields: [VL_BC_ICMS_ST, VL_ICMS_ST]
+  fields:
+  - VL_BC_ICMS_ST
+  - VL_ICMS_ST
   error_type: SN_ST_NAO_PREENCHIDA
   severity: error
   corrigivel: investigar
@@ -3585,7 +3690,7 @@ simples_nacional:
   condition: CSOSN in {201,202,203} AND VL_BC_ICMS_ST == 0 AND VL_ICMS_ST == 0
   implemented: true
   module: simples_validator.py
-  legislation: 'Ajuste SINIEF 07/2005'
+  legislation: Ajuste SINIEF 07/2005
   vigencia_de: '2018-01-01'
   vigencia_ate: null
   version: '2.0'
@@ -3593,9 +3698,12 @@ simples_nacional:
   certeza: objetivo
   impacto: relevante
   categoria: simples_nacional
+  base_legal: LC 123/2006; Res. CGSN 140/2018
 - id: SN_005
   register: C170
-  fields: [VL_BC_ICMS, VL_ICMS]
+  fields:
+  - VL_BC_ICMS
+  - VL_ICMS
   error_type: SN_CSOSN_300_COM_ICMS
   severity: warning
   corrigivel: investigar
@@ -3610,9 +3718,12 @@ simples_nacional:
   certeza: objetivo
   impacto: relevante
   categoria: simples_nacional
+  base_legal: LC 123/2006; Res. CGSN 140/2018
 - id: SN_006
   register: C170
-  fields: [VL_BC_ICMS, VL_ICMS]
+  fields:
+  - VL_BC_ICMS
+  - VL_ICMS
   error_type: SN_CSOSN_400_COM_ICMS
   severity: warning
   corrigivel: investigar
@@ -3627,9 +3738,11 @@ simples_nacional:
   certeza: objetivo
   impacto: relevante
   categoria: simples_nacional
+  base_legal: LC 123/2006; Res. CGSN 140/2018
 - id: SN_007
   register: C170
-  fields: [VL_BC_ICMS_ST]
+  fields:
+  - VL_BC_ICMS_ST
   error_type: SN_500_SEM_BC_ST
   severity: warning
   corrigivel: investigar
@@ -3644,19 +3757,23 @@ simples_nacional:
   certeza: objetivo
   impacto: relevante
   categoria: simples_nacional
+  base_legal: LC 123/2006; Res. CGSN 140/2018
 - id: SN_009
   register: C170
-  fields: [CST_PIS, CST_COFINS]
+  fields:
+  - CST_PIS
+  - CST_COFINS
   error_type: SN_PIS_CST_PROIBIDO
   severity: error
   corrigivel: investigar
-  description: >
-    CST PIS/COFINS proibido para Simples Nacional. CSTs 01/02/03 exclusivos
-    do regime nao-cumulativo; CST 05 reservado a substitutos tributarios.
+  description: 'CST PIS/COFINS proibido para Simples Nacional. CSTs 01/02/03 exclusivos do regime nao-cumulativo; CST 05 reservado
+    a substitutos tributarios.
+
+    '
   condition: regime == SIMPLES_NACIONAL AND CST_PIS not in {04,06,07,08,09,49,50,70,98,99}
   implemented: true
   module: simples_validator.py
-  legislation: 'Tabela 4.3.3 EFD-Contribuicoes / IN RFB 1.252/2012'
+  legislation: Tabela 4.3.3 EFD-Contribuicoes / IN RFB 1.252/2012
   vigencia_de: '2018-01-01'
   vigencia_ate: null
   version: '2.0'
@@ -3664,9 +3781,11 @@ simples_nacional:
   certeza: objetivo
   impacto: relevante
   categoria: simples_nacional
+  base_legal: LC 123/2006; Res. CGSN 140/2018
 - id: SN_010
   register: '0000'
-  fields: [IND_PERFIL]
+  fields:
+  - IND_PERFIL
   error_type: SN_PERFIL_INVALIDO
   severity: warning
   corrigivel: investigar
@@ -3681,19 +3800,23 @@ simples_nacional:
   certeza: objetivo
   impacto: relevante
   categoria: simples_nacional
+  base_legal: LC 123/2006; Res. CGSN 140/2018
 - id: SN_011
   register: C170
-  fields: [CST_PIS, COD_NCM]
+  fields:
+  - CST_PIS
+  - COD_NCM
   error_type: SN_CST_MONOFASICO_NCM_INVALIDO
   severity: warning
   corrigivel: investigar
-  description: >
-    CST PIS 04 (monofasico) em produto cujo NCM nao consta na lista
-    de monofasicos da RFB. Possivel erro de classificacao fiscal.
+  description: 'CST PIS 04 (monofasico) em produto cujo NCM nao consta na lista de monofasicos da RFB. Possivel erro de classificacao
+    fiscal.
+
+    '
   condition: CST_PIS == '04' AND NCM not in NCM_MONOFASICOS
   implemented: true
   module: simples_validator.py
-  legislation: 'Lei 10.147/2000, Lei 10.485/2002'
+  legislation: Lei 10.147/2000, Lei 10.485/2002
   vigencia_de: '2018-01-01'
   vigencia_ate: null
   version: '2.0'
@@ -3701,44 +3824,50 @@ simples_nacional:
   certeza: indicio
   impacto: relevante
   categoria: simples_nacional
+  base_legal: LC 123/2006; Res. CGSN 140/2018
 - id: SN_012
   register: C170
-  fields: [ALIQ_ICMS]
+  fields:
+  - ALIQ_ICMS
   error_type: SN_CREDITO_INCONSISTENTE
   severity: info
-  description: >
-    Aliquotas de credito ICMS variam significativamente entre itens (delta > 1pp)
-    para CSOSN 101/201. Isso pode indicar: mistura de Anexos diferentes (correto mas
-    raro), mudanca de faixa de RBT12 durante o periodo (improvavel), ou parametrizacao
-    inconsistente no ERP (provavel erro).
-  condition: >
-    CSOSN in {101,201}
-    AND count(distinct ALIQ_ICMS) > 1
-    AND (max(ALIQ_ICMS) - min(ALIQ_ICMS)) > 1.0
+  description: 'Aliquotas de credito ICMS variam significativamente entre itens (delta > 1pp) para CSOSN 101/201. Isso pode
+    indicar: mistura de Anexos diferentes (correto mas raro), mudanca de faixa de RBT12 durante o periodo (improvavel), ou
+    parametrizacao inconsistente no ERP (provavel erro).
+
+    '
+  condition: 'CSOSN in {101,201} AND count(distinct ALIQ_ICMS) > 1 AND (max(ALIQ_ICMS) - min(ALIQ_ICMS)) > 1.0
+
+    '
   certeza: indicio
   impacto: relevante
   implemented: true
   module: simples_validator.py
-  legislation: 'LC 123/2006 art. 23'
-  mensagem_padrao: >
-    Aliquotas de credito ICMS variam entre itens (min={min}%, max={max}%).
-    Pode ser correto (multiplos Anexos) ou erro de parametrizacao do ERP.
-  acao_recomendada: >
-    Verificar se a empresa opera em mais de um Anexo da LC 123.
-    Se nao, corrigir a parametrizacao do ERP para aliquota unica.
+  legislation: LC 123/2006 art. 23
+  mensagem_padrao: 'Aliquotas de credito ICMS variam entre itens (min={min}%, max={max}%). Pode ser correto (multiplos Anexos)
+    ou erro de parametrizacao do ERP.
+
+    '
+  acao_recomendada: 'Verificar se a empresa opera em mais de um Anexo da LC 123. Se nao, corrigir a parametrizacao do ERP
+    para aliquota unica.
+
+    '
   corrigivel: investigar
   depende_externo: true
-  fontes_externas: [DAS, PGDAS-D]
+  fontes_externas:
+  - DAS
+  - PGDAS-D
   vigencia_de: '2018-01-01'
   vigencia_ate: null
   version: '3.0'
   last_updated: '2026-04-06'
   categoria: simples_nacional
-
+  base_legal: LC 123/2006; Res. CGSN 140/2018
 bloco_k:
 - id: K_001
   register: K001
-  fields: [IND_MOV]
+  fields:
+  - IND_MOV
   error_type: K_BLOCO_SEM_MOVIMENTO_COM_REGISTROS
   severity: error
   corrigivel: proposta
@@ -3752,10 +3881,11 @@ bloco_k:
   last_updated: '2026-04-07'
   certeza: objetivo
   impacto: relevante
-
+  base_legal: Guia Pratico EFD — Bloco K
 - id: K_002
   register: K200
-  fields: [COD_ITEM]
+  fields:
+  - COD_ITEM
   error_type: K_REF_ITEM_INEXISTENTE
   severity: warning
   corrigivel: proposta
@@ -3769,10 +3899,11 @@ bloco_k:
   last_updated: '2026-04-07'
   certeza: objetivo
   impacto: relevante
-
+  base_legal: Guia Pratico EFD — Bloco K
 - id: K_003
   register: K200
-  fields: [QTD]
+  fields:
+  - QTD
   error_type: K_QTD_NEGATIVA
   severity: error
   corrigivel: proposta
@@ -3786,10 +3917,11 @@ bloco_k:
   last_updated: '2026-04-07'
   certeza: objetivo
   impacto: relevante
-
+  base_legal: Guia Pratico EFD — Bloco K
 - id: K_004
   register: K230
-  fields: [COD_ITEM]
+  fields:
+  - COD_ITEM
   error_type: K_REF_ITEM_INEXISTENTE
   severity: warning
   corrigivel: proposta
@@ -3803,10 +3935,11 @@ bloco_k:
   last_updated: '2026-04-07'
   certeza: objetivo
   impacto: relevante
-
+  base_legal: Guia Pratico EFD — Bloco K
 - id: K_005
   register: K230
-  fields: [COD_DOC_OP]
+  fields:
+  - COD_DOC_OP
   error_type: K_ORDEM_SEM_COMPONENTES
   severity: info
   corrigivel: investigar
@@ -3820,3 +3953,4 @@ bloco_k:
   last_updated: '2026-04-07'
   certeza: provavel
   impacto: informativo
+  base_legal: Guia Pratico EFD — Bloco K

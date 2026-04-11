@@ -1,7 +1,13 @@
-"""Detecção robusta de regime tributário com múltiplos sinais.
+"""Deteccao de regime tributario por CSTs reais do arquivo (BUG-001 fix).
 
-Usa IND_PERFIL, presença de CSOSN, CST Tabela A e outros sinais
-para inferir o regime com grau de confiança.
+CORRECAO CRITICA: IND_PERFIL indica nivel de escrituracao (A/B/C),
+NAO regime tributario. A deteccao usa exclusivamente os CSTs encontrados
+nos registros C170/C190 do arquivo SPED.
+
+Evidencias de regime:
+- CSTs 101-900 (Tabela B) ou CSOSN → Simples Nacional
+- CSTs 00-90 (Tabela A) sem CSOSN  → Regime Normal (LP/LR)
+- Conflito CST vs cadastro MySQL    → regime_source='CONFLITO'
 """
 
 from __future__ import annotations
@@ -17,7 +23,7 @@ class RegimeTributario(str, Enum):
     REGIME_NORMAL = "NORMAL"               # Lucro Real ou Presumido
     SIMPLES_NACIONAL = "SIMPLES_NACIONAL"  # LC 123/2006
     MEI = "MEI"                            # Microempreendedor Individual
-    DESCONHECIDO = "DESCONHECIDO"          # Não foi possível determinar
+    DESCONHECIDO = "DESCONHECIDO"          # Nao foi possivel determinar
 
 
 @dataclass
@@ -26,73 +32,80 @@ class DetectionResult:
     confidence: float          # 0.0 a 1.0
     signals: list[str] = field(default_factory=list)
     needs_confirmation: bool = True
+    regime_source: str = "CST"  # "CST" | "CST+MYSQL" | "CONFLITO"
+
+
+# CSOSN validos (Tabela B — Simples Nacional)
+CSOSN_VALIDOS = {"101", "102", "103", "201", "202", "203", "300", "400", "500", "900"}
+
+# CSTs Tabela A (Regime Normal) — 2 digitos
+CST_TABELA_A = {
+    "00", "02", "10", "12", "13", "15", "20", "30", "40", "41",
+    "50", "51", "52", "53", "60", "61", "70", "72", "74", "90",
+}
 
 
 class RegimeDetector:
-    """Detecta o regime tributário a partir dos registros do arquivo SPED.
+    """Detecta o regime tributario a partir dos CSTs reais do arquivo SPED.
 
-    Usa múltiplos sinais com pesos para aumentar confiança.
+    BUG-001 CORRIGIDO: IND_PERFIL NAO e mais usado para determinar regime.
+    IND_PERFIL e armazenado apenas como metadado informativo.
 
-    Sinais usados:
-    1. IND_PERFIL no 0000: C = Simples Nacional (forte)
-    2. Presença de CSOSN nos C170: indica SN (forte)
-    3. IND_PERFIL A/B: indica Regime Normal (forte)
-    4. Presença de CST Tabela A (00-90) nos C170: indica Normal (moderado)
+    Logica de deteccao:
+    1. Varrer C170 e C190 em busca de CSTs
+    2. Se encontrar CSOSN (101-900) → Simples Nacional (determinante)
+    3. Se encontrar apenas CSTs Tabela A (00-90) → Regime Normal (determinante)
+    4. Confirmar com cadastro MySQL (se disponivel)
+    5. Se conflito → regime_source='CONFLITO', CST prevalece
     """
-
-    from .helpers import (
-        CST_DIFERIMENTO, CST_ISENTO_NT, CST_RESIDUAL, CST_TRIBUTADO, CSOSN_VALIDOS,
-    )
-    CSOSN_VALUES = CSOSN_VALIDOS
-    CST_NORMAL_VALUES = CST_TRIBUTADO | CST_ISENTO_NT | CST_DIFERIMENTO | CST_RESIDUAL
 
     @classmethod
     def detect(cls, records: list[SpedRecord]) -> DetectionResult:
         signals: list[str] = []
-        sn_score = 0.0
-        normal_score = 0.0
+        has_csosn = False
+        has_cst_normal = False
 
-        # Sinal 1: IND_PERFIL no 0000
+        # Registrar IND_PERFIL apenas como informacao (NAO como regime)
         reg_0000 = next((r for r in records if r.register == "0000"), None)
         if reg_0000:
             ind_perfil = get_field(reg_0000, "IND_PERFIL")
-            if ind_perfil == "C":
-                sn_score += 0.7
-                signals.append("IND_PERFIL=C no 0000 (forte indício de Simples Nacional)")
-            elif ind_perfil in ("A", "B"):
-                normal_score += 0.7
-                signals.append(f"IND_PERFIL={ind_perfil} no 0000 (indica Regime Normal)")
+            if ind_perfil:
+                signals.append(
+                    f"IND_PERFIL={ind_perfil} (nivel de escrituracao, NAO indica regime)"
+                )
 
-        # Sinal 2: presença de CSOSN nos C170
-        c170_records = [r for r in records if r.register == "C170"]
-        has_csosn = False
-        has_normal_cst = False
-
-        for r in c170_records[:200]:  # Amostra dos primeiros 200 itens
+        # Sinal DETERMINANTE: CSTs reais nos C170 e C190
+        registros_fiscais = [
+            r for r in records if r.register in ("C170", "C190")
+        ]
+        for r in registros_fiscais:
             cst = get_field(r, "CST_ICMS")
-            if cst in cls.CSOSN_VALUES:
+            if not cst:
+                continue
+            cst_limpo = cst.strip()
+            # CST de 6 digitos (SN) → normalizar para ultimos 2
+            if len(cst_limpo) > 3 and cst_limpo.isdigit():
+                cst_limpo = cst_limpo[-2:]
+            if cst_limpo in CSOSN_VALIDOS:
                 has_csosn = True
-            if cst in cls.CST_NORMAL_VALUES:
-                has_normal_cst = True
+            elif cst_limpo in CST_TABELA_A:
+                has_cst_normal = True
+            # CSTs numericos >= 101 tambem indicam SN
+            if cst_limpo.isdigit() and int(cst_limpo) >= 101:
+                has_csosn = True
 
         if has_csosn:
-            sn_score += 0.6
-            signals.append("CSOSN encontrado em itens C170 (indica Simples Nacional)")
-        if has_normal_cst and not has_csosn:
-            normal_score += 0.5
-            signals.append("CST Tabela A encontrado em C170 sem CSOSN (indica Regime Normal)")
-
-        # Determinar regime
-        if sn_score >= 0.6:
+            signals.append("CSOSN/CST Tabela B encontrado em C170/C190 (Simples Nacional)")
             regime = RegimeTributario.SIMPLES_NACIONAL
-            confidence = min(sn_score, 1.0)
-        elif normal_score >= 0.6:
+            confidence = 1.0
+        elif has_cst_normal:
+            signals.append("CST Tabela A encontrado em C170/C190 sem CSOSN (Regime Normal)")
             regime = RegimeTributario.REGIME_NORMAL
-            confidence = min(normal_score, 1.0)
+            confidence = 1.0
         else:
+            signals.append("Nenhum CST encontrado em C170/C190 — confirme o regime manualmente")
             regime = RegimeTributario.DESCONHECIDO
             confidence = 0.0
-            signals.append("Sinais insuficientes — confirme o regime manualmente")
 
         needs_confirmation = confidence < 0.8 or regime == RegimeTributario.DESCONHECIDO
 
@@ -101,4 +114,5 @@ class RegimeDetector:
             confidence=confidence,
             signals=signals,
             needs_confirmation=needs_confirmation,
+            regime_source="CST",
         )

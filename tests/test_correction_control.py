@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import warnings
 from pathlib import Path
@@ -69,7 +70,7 @@ def client(seeded_db: sqlite3.Connection) -> TestClient:
             pass
 
     app.dependency_overrides[get_db] = _override_db
-    c = TestClient(app)
+    c = TestClient(app, headers={"X-API-Key": os.environ.get("API_KEY", "test-api-key-for-pytest-minimum-32-chars!")})
     yield c
     app.dependency_overrides.clear()
 

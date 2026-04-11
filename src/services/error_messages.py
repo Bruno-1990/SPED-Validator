@@ -581,6 +581,103 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
         "guidance": f"Revise os registros E111 e o totalizador E110. {_DETALHE}",
         "icon": "sigma",
     },
+    # ── Novos error types Fases 1-6 ──
+
+    "NF_CANCELADA_ESCRITURADA": {
+        "friendly": "NF-e cancelada (cStat={value}) escriturada como ativa (COD_SIT=00) na linha {line}. Credito de ICMS indevido.",
+        "guidance": "Corrija COD_SIT para 02 (cancelada). Credito tomado sobre NF cancelada deve ser estornado.",
+        "icon": "alert-octagon",
+    },
+    "NF_DENEGADA_ESCRITURADA": {
+        "friendly": "NF-e denegada (cStat={value}) escriturada como ativa (COD_SIT=00) na linha {line}.",
+        "guidance": "Corrija COD_SIT para 05 (denegada). NF com autorizacao denegada nao deve gerar credito.",
+        "icon": "alert-octagon",
+    },
+    "COD_SIT_DIVERGENTE_XML": {
+        "friendly": "COD_SIT={value} incompativel com cStat do XML na linha {line}.",
+        "guidance": "Verifique a situacao da NF-e na SEFAZ e corrija o COD_SIT no SPED.",
+        "icon": "alert-triangle",
+    },
+    "ST_MVA_AUSENTE": {
+        "friendly": "Produto sujeito a ST (NCM com MVA) mas BC_ICMS_ST esta zerada na linha {line}.",
+        "guidance": "Calcule a BC_ST usando a formula: (valor operacao) x (1 + MVA/100). Consulte tabela MVA por NCM/UF.",
+        "icon": "calculator",
+    },
+    "ST_MVA_DIVERGENTE": {
+        "friendly": "BC_ICMS_ST={value} diverge do esperado R${expected} com MVA tabelado na linha {line}.",
+        "guidance": "Recalcule a BC_ST com MVA correto para o NCM/UF. Diferenca: R${difference}.",
+        "icon": "calculator",
+    },
+    "ST_MVA_NAO_MAPEADO": {
+        "friendly": "NCM sem MVA na tabela de referencia na linha {line}. Recalculo de ST nao executado.",
+        "guidance": "Atualize a tabela mva_por_ncm_uf.yaml com o MVA vigente para este NCM/UF.",
+        "icon": "database",
+    },
+    "ST_ALIQ_INCORRETA": {
+        "friendly": "Aliquota ST={value}% diverge da esperada {expected}% para NCM/UF na linha {line}.",
+        "guidance": "Verifique a aliquota de ST vigente para este NCM na UF de destino.",
+        "icon": "percent",
+    },
+    "SPED_CST_BENEFICIO": {
+        "friendly": "CST {value} incompativel com beneficio fiscal ativo para CFOP na linha {line}.",
+        "guidance": "CSTs validos para este beneficio: {expected}. Verifique a parametrizacao do beneficio.",
+        "icon": "shield-alert",
+    },
+    "SPED_ALIQ_BENEFICIO": {
+        "friendly": "Aliquota {value}% em saida com beneficio que exige debito integral na linha {line}.",
+        "guidance": "COMPETE exige aliquota cheia (17% ES). Credito presumido deve ser via E111, nao por reducao de aliquota.",
+        "icon": "shield-alert",
+    },
+    "BENEFICIO_SEM_AJUSTE_E111": {
+        "friendly": "Beneficio fiscal ativo no periodo sem ajuste E111 correspondente.",
+        "guidance": "Verifique se o credito presumido/diferimento esta sendo declarado via E111 com codigo de ajuste correto.",
+        "icon": "file-warning",
+    },
+    "C100_SEM_ITENS": {
+        "friendly": "C100 (VL_DOC=R${value}) sem nenhum C170 vinculado na linha {line}.",
+        "guidance": "Documento fiscal ativo deve ter itens detalhados (C170). Verifique se os itens foram escriturados.",
+        "icon": "file-x",
+    },
+    "C100_ICMS_INCONSISTENTE": {
+        "friendly": "VL_ICMS do C100 (R${value}) diverge da soma dos C170 (R${expected}) na linha {line}.",
+        "guidance": "Corrija VL_ICMS do C100 ou os valores de ICMS dos C170 vinculados.",
+        "icon": "calculator",
+    },
+    "C100_IPI_INCONSISTENTE": {
+        "friendly": "VL_IPI do C100 (R${value}) diverge da soma dos C170 (R${expected}) na linha {line}.",
+        "guidance": "Corrija VL_IPI do C100 ou os valores de IPI dos C170 vinculados.",
+        "icon": "calculator",
+    },
+    "C100_ICMS_ST_INCONSISTENTE": {
+        "friendly": "VL_ICMS_ST do C100 (R${value}) diverge da soma dos C170 (R${expected}) na linha {line}.",
+        "guidance": "Corrija VL_ICMS_ST do C100 ou os valores de ST dos C170 vinculados.",
+        "icon": "calculator",
+    },
+    "C170_ORFAO": {
+        "friendly": "Registro C170 na linha {line} sem C100 pai.",
+        "guidance": "Item fiscal deve estar vinculado a um documento (C100). Verifique a estrutura do arquivo.",
+        "icon": "unlink",
+    },
+    "ST_APURACAO_DIVERGENTE": {
+        "friendly": "E210.VL_ICMS_RECOL_ST (R${value}) diverge da soma de ST dos C170 saidas (R${expected}).",
+        "guidance": "Reconcilie os valores de ICMS-ST na apuracao (E210) com os itens escriturados.",
+        "icon": "sigma",
+    },
+    "IPI_REFLEXO_BC_AUSENTE": {
+        "friendly": "BC_ICMS (R${value}) nao inclui VL_IPI em operacao de entrada para empresa industrial na linha {line}.",
+        "guidance": "Para empresas industriais, o IPI integra a base de calculo do ICMS nas entradas (RIPI Art. 153).",
+        "icon": "calculator",
+    },
+    "IPI_CST_MONETARIO_ZERADO": {
+        "friendly": "CST IPI {value} indica tributacao mas VL_IPI esta zerado na linha {line}.",
+        "guidance": "Se o IPI e tributado, o valor deve ser > 0. Verifique CST IPI e base de calculo.",
+        "icon": "alert-triangle",
+    },
+    "CST_REGIME_INCOMPATIVEL": {
+        "friendly": "CST {value} incompativel com regime tributario detectado na linha {line}.",
+        "guidance": "Empresa SN deve usar CSOSN (101-900). Empresa Normal deve usar CST Tabela A (00-90).",
+        "icon": "alert-circle",
+    },
 }
 
 # Mensagem padrão para tipos não mapeados

@@ -9,7 +9,8 @@ from src.models import SpedRecord
 from src.services.context_builder import (
     TaxRegime,
     ValidationContext,
-    _determine_regime,
+    _determine_regime_by_cst,
+    _resolve_regime_with_mysql,
     build_context,
 )
 from src.services.database import init_audit_db
@@ -101,25 +102,59 @@ def c170_normal(cst: str, vl_bc: str = "1000,00", vl_icms: str = "180,00", line:
 
 
 # ──────────────────────────────────────────────
-# Testes de _determine_regime
+# Testes de deteccao de regime por CST (BUG-001 fix)
 # ──────────────────────────────────────────────
 
-class TestDetermineRegime:
-    def test_perfil_c_simples_nacional(self) -> None:
-        assert _determine_regime("C") == TaxRegime.SIMPLES_NACIONAL
+class TestDetermineRegimeByCst:
+    """BUG-001: Regime detectado pelos CSTs reais, NAO por IND_PERFIL."""
 
-    def test_perfil_a_normal(self) -> None:
-        assert _determine_regime("A") == TaxRegime.NORMAL
+    def test_csosn_detecta_simples(self) -> None:
+        """CSTs da Tabela B (CSOSN) → Simples Nacional."""
+        db = _in_memory_db()
+        fid = _insert_file(db)
+        # Inserir C170 com CST 101 (CSOSN)
+        db.execute(
+            "INSERT INTO sped_records (file_id, line_number, register, block, fields_json, raw_line) "
+            "VALUES (?, ?, 'C170', 'C', ?, '')",
+            (fid, 10, json.dumps({"REG": "C170", "CST_ICMS": "101", "CFOP": "5102"})),
+        )
+        db.commit()
+        regime, source = _determine_regime_by_cst(db, fid)
+        assert regime == TaxRegime.SIMPLES_NACIONAL
+        assert source == "CST"
 
-    def test_perfil_b_normal(self) -> None:
-        assert _determine_regime("B") == TaxRegime.NORMAL
+    def test_cst_normal_detecta_normal(self) -> None:
+        """CSTs Tabela A (00-90) sem CSOSN → Regime Normal."""
+        db = _in_memory_db()
+        fid = _insert_file(db)
+        db.execute(
+            "INSERT INTO sped_records (file_id, line_number, register, block, fields_json, raw_line) "
+            "VALUES (?, ?, 'C170', 'C', ?, '')",
+            (fid, 10, json.dumps({"REG": "C170", "CST_ICMS": "00", "CFOP": "5102"})),
+        )
+        db.commit()
+        regime, source = _determine_regime_by_cst(db, fid)
+        assert regime == TaxRegime.NORMAL
+        assert source == "CST"
 
-    def test_perfil_vazio_unknown(self) -> None:
-        assert _determine_regime("") == TaxRegime.UNKNOWN
+    def test_sem_cst_unknown(self) -> None:
+        """Sem registros C170/C190 → UNKNOWN."""
+        db = _in_memory_db()
+        fid = _insert_file(db)
+        regime, source = _determine_regime_by_cst(db, fid)
+        assert regime == TaxRegime.UNKNOWN
 
-    def test_perfil_lowercase_c(self) -> None:
-        """Deve funcionar mesmo com minúscula."""
-        assert _determine_regime("c") == TaxRegime.SIMPLES_NACIONAL
+    def test_conflito_cst_mysql(self) -> None:
+        """CST diz SN, MySQL diz Normal → CONFLITO (CST prevalece)."""
+        regime, source = _resolve_regime_with_mysql(TaxRegime.SIMPLES_NACIONAL, "normal")
+        assert regime == TaxRegime.SIMPLES_NACIONAL
+        assert source == "CONFLITO"
+
+    def test_concordancia_cst_mysql(self) -> None:
+        """CST e MySQL concordam → CST+MYSQL."""
+        regime, source = _resolve_regime_with_mysql(TaxRegime.NORMAL, "lucro real")
+        assert regime == TaxRegime.NORMAL
+        assert source == "CST+MYSQL"
 
 
 # ──────────────────────────────────────────────
@@ -127,27 +162,45 @@ class TestDetermineRegime:
 # ──────────────────────────────────────────────
 
 class TestBuildContext:
-    def test_perfil_c_regime_simples(self) -> None:
+    def test_csosn_em_c170_regime_simples(self) -> None:
+        """BUG-001: Regime vem dos CSTs, nao do IND_PERFIL."""
         db = _in_memory_db()
         fid = _insert_file(db)
         _insert_record(db, fid, "0000", _make_0000(ind_perfil="C"))
+        # Inserir C170 com CSOSN 101 para que regime seja detectado
+        import json
+        db.execute(
+            "INSERT INTO sped_records (file_id, line_number, register, block, fields_json, raw_line) "
+            "VALUES (?, ?, 'C170', 'C', ?, '')",
+            (fid, 50, json.dumps({"REG": "C170", "CST_ICMS": "101", "CFOP": "5102"})),
+        )
+        db.commit()
         ctx = build_context(fid, db)
         assert ctx.regime == TaxRegime.SIMPLES_NACIONAL
         assert ctx.ind_perfil == "C"
 
-    def test_perfil_a_regime_normal(self) -> None:
+    def test_cst_normal_em_c170_regime_normal(self) -> None:
+        """BUG-001: CST 00 em C170 → Normal, independente de IND_PERFIL."""
         db = _in_memory_db()
         fid = _insert_file(db)
         _insert_record(db, fid, "0000", _make_0000(ind_perfil="A"))
+        import json
+        db.execute(
+            "INSERT INTO sped_records (file_id, line_number, register, block, fields_json, raw_line) "
+            "VALUES (?, ?, 'C170', 'C', ?, '')",
+            (fid, 50, json.dumps({"REG": "C170", "CST_ICMS": "00", "CFOP": "5102"})),
+        )
+        db.commit()
         ctx = build_context(fid, db)
         assert ctx.regime == TaxRegime.NORMAL
 
-    def test_perfil_b_regime_normal(self) -> None:
+    def test_sem_c170_regime_unknown(self) -> None:
+        """Sem C170/C190 → UNKNOWN (nao depende de IND_PERFIL)."""
         db = _in_memory_db()
         fid = _insert_file(db)
         _insert_record(db, fid, "0000", _make_0000(ind_perfil="B"))
         ctx = build_context(fid, db)
-        assert ctx.regime == TaxRegime.NORMAL
+        assert ctx.regime == TaxRegime.UNKNOWN
 
     def test_metadata_populated(self) -> None:
         db = _in_memory_db()

@@ -29,12 +29,17 @@ def verify_api_key(
     key = x_api_key or api_key
     expected = os.getenv("API_KEY")
 
+    # BUG-004 fix: eliminar bypass de autenticacao
     if not expected:
-        global _dev_mode_logged  # noqa: PLW0603
-        if not _dev_mode_logged:
-            logger.warning("API_KEY nao configurada — modo desenvolvimento (qualquer key aceita)")
-            _dev_mode_logged = True
-        return key or "dev"
+        raise HTTPException(
+            status_code=500,
+            detail="API_KEY nao configurada no servidor. Configure a variavel API_KEY no .env.",
+        )
+    if len(expected) < 32:
+        raise HTTPException(
+            status_code=500,
+            detail="API_KEY deve ter no minimo 32 caracteres. Corrija no .env.",
+        )
 
     if not key or key != expected:
         raise HTTPException(status_code=401, detail="API Key invalida ou ausente")

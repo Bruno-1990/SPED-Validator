@@ -280,6 +280,135 @@ _MIGRATIONS: dict[int, list[str]] = {
         "DROP INDEX IF EXISTS idx_nfe_xmls_chave",
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_nfe_xmls_file_chave ON nfe_xmls(file_id, chave_nfe)",
     ],
+    14: [
+        # ── Migration 14: Context-First — Dados mestres e rastreabilidade (Fase 2) ──
+
+        # Cadastro mestre de contribuintes
+        """CREATE TABLE IF NOT EXISTS clientes (
+            id              INTEGER PRIMARY KEY,
+            cnpj            TEXT UNIQUE NOT NULL,
+            razao_social    TEXT NOT NULL,
+            regime          TEXT NOT NULL
+                            CHECK(regime IN ('LP','LR','SN','MEI','Imune','Isento')),
+            regime_override TEXT,
+            uf              TEXT DEFAULT 'ES',
+            cnae_principal  TEXT,
+            porte           TEXT CHECK(porte IN ('ME','EPP','Medio','Grande')),
+            ativo           INTEGER DEFAULT 1,
+            created_at      TEXT DEFAULT (datetime('now')),
+            updated_at      TEXT DEFAULT (datetime('now'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_clientes_cnpj ON clientes(cnpj)",
+
+        # Beneficios fiscais ativos por cliente e periodo
+        """CREATE TABLE IF NOT EXISTS beneficios_ativos (
+            id                  INTEGER PRIMARY KEY,
+            cliente_id          INTEGER NOT NULL REFERENCES clientes(id),
+            codigo_beneficio    TEXT NOT NULL,
+            tipo                TEXT NOT NULL,
+            competencia_inicio  TEXT NOT NULL,
+            competencia_fim     TEXT,
+            ato_concessorio     TEXT,
+            aliq_icms_efetiva   REAL,
+            reducao_base_pct    REAL,
+            debito_integral     INTEGER DEFAULT 0,
+            observacoes         TEXT,
+            ativo               INTEGER DEFAULT 1
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_beneficios_cliente_periodo ON beneficios_ativos(cliente_id, competencia_inicio, competencia_fim)",
+
+        # CRT dos emitentes (populado durante parsing de XMLs)
+        """CREATE TABLE IF NOT EXISTS emitentes_crt (
+            cnpj_emitente  TEXT PRIMARY KEY,
+            crt            INTEGER NOT NULL CHECK(crt IN (1, 2, 3)),
+            razao_social   TEXT,
+            uf_emitente    TEXT,
+            last_seen      TEXT DEFAULT (datetime('now')),
+            fonte          TEXT DEFAULT 'xml' CHECK(fonte IN ('xml', 'manual'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_emitentes_crt ON emitentes_crt(cnpj_emitente)",
+
+        # Snapshot de cada execucao de auditoria
+        """CREATE TABLE IF NOT EXISTS validation_runs (
+            id                 INTEGER PRIMARY KEY,
+            file_id            INTEGER NOT NULL REFERENCES sped_files(id),
+            mode               TEXT NOT NULL CHECK(mode IN ('sped_only','sped_xml')),
+            cliente_id         INTEGER REFERENCES clientes(id),
+            regime_usado       TEXT,
+            regime_source      TEXT,
+            beneficios_json    TEXT,
+            context_hash       TEXT,
+            rules_version      TEXT,
+            xml_cobertura_pct  REAL,
+            executed_rules     INTEGER DEFAULT 0,
+            skipped_rules      INTEGER DEFAULT 0,
+            total_findings     INTEGER DEFAULT 0,
+            coverage_score     REAL,
+            risk_score         REAL,
+            started_at         TEXT DEFAULT (datetime('now')),
+            finished_at        TEXT,
+            status             TEXT DEFAULT 'running'
+                               CHECK(status IN ('running','done','error','blocked'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_validation_runs_file ON validation_runs(file_id, mode)",
+
+        # Indice de pareamento XML <-> C100 (Trilha B)
+        """CREATE TABLE IF NOT EXISTS xml_match_index (
+            id            INTEGER PRIMARY KEY,
+            run_id        INTEGER NOT NULL REFERENCES validation_runs(id),
+            xml_id        INTEGER REFERENCES nfe_xmls(id),
+            sped_c100_id  INTEGER,
+            match_status  TEXT CHECK(match_status IN
+                          ('matched','sem_xml','sem_c100','fora_periodo','cancelada')),
+            chave_nfe     TEXT,
+            confidence    REAL DEFAULT 1.0,
+            reason        TEXT
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_xml_match_run ON xml_match_index(run_id, match_status)",
+
+        # Lacunas de cobertura registradas por execucao
+        """CREATE TABLE IF NOT EXISTS coverage_gaps (
+            id            INTEGER PRIMARY KEY,
+            run_id        INTEGER NOT NULL REFERENCES validation_runs(id),
+            gap_type      TEXT NOT NULL,
+            description   TEXT,
+            affected_rule TEXT,
+            severity      TEXT CHECK(severity IN ('critical','high','medium','low'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_coverage_gaps_run ON coverage_gaps(run_id, gap_type)",
+
+        # Snapshot de contexto fiscal para audit trail
+        """CREATE TABLE IF NOT EXISTS fiscal_context_snapshots (
+            id                      INTEGER PRIMARY KEY,
+            run_id                  INTEGER NOT NULL REFERENCES validation_runs(id),
+            cnpj                    TEXT,
+            uf                      TEXT,
+            periodo                 TEXT,
+            regime                  TEXT,
+            ind_perfil              TEXT,
+            beneficios_json         TEXT,
+            tables_available_json   TEXT,
+            context_hash            TEXT
+        )""",
+
+        # Campos adicionais em nfe_xmls (correcao P2: CRT do emitente)
+        "ALTER TABLE nfe_xmls ADD COLUMN crt_emitente INTEGER",
+        "ALTER TABLE nfe_xmls ADD COLUMN uf_emitente TEXT",
+        "ALTER TABLE nfe_xmls ADD COLUMN uf_dest TEXT",
+        "ALTER TABLE nfe_xmls ADD COLUMN mod_nfe INTEGER DEFAULT 55",
+        "ALTER TABLE nfe_xmls ADD COLUMN dentro_periodo INTEGER DEFAULT 1",
+        "ALTER TABLE nfe_xmls ADD COLUMN c_sit TEXT",
+        "ALTER TABLE nfe_xmls ADD COLUMN content_hash TEXT",
+
+        # Rastreabilidade de divergencias por item no cruzamento
+        "ALTER TABLE nfe_cruzamento ADD COLUMN nfe_item_id INTEGER",
+        "ALTER TABLE nfe_cruzamento ADD COLUMN xml_xpath TEXT",
+        "ALTER TABLE nfe_cruzamento ADD COLUMN tipo_comp TEXT",
+
+        # Indices adicionais
+        "CREATE INDEX IF NOT EXISTS idx_nfe_xmls_crt ON nfe_xmls(crt_emitente)",
+        "CREATE INDEX IF NOT EXISTS idx_nfe_xmls_periodo ON nfe_xmls(file_id, dentro_periodo)",
+    ],
 }
 
 

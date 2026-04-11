@@ -123,6 +123,21 @@ def _to_float(val) -> float:
         return 0.0
 
 
+def _extract_uf_emitente(emit) -> str:
+    """Extrai UF do emitente do elemento emit do XML NF-e."""
+    if emit is None:
+        return ""
+    ender = emit.find(f"{{{_NS.get('nfe', '')}}}enderEmit") if _NS else None
+    if ender is None:
+        ender = emit.find("enderEmit")
+    if ender is None:
+        return ""
+    uf = ender.find(f"{{{_NS.get('nfe', '')}}}UF") if _NS else None
+    if uf is None:
+        uf = ender.find("UF")
+    return uf.text.strip() if uf is not None and uf.text else ""
+
+
 def _find(el, path_ns: str, path_plain: str):
     """Busca elemento com namespace, fallback sem namespace. Evita DeprecationWarning."""
     result = el.find(path_ns, _NS)
@@ -201,6 +216,8 @@ def parse_nfe_xml(xml_bytes: bytes) -> dict | None:
             _text(dest, "nfe:CNPJ", _NS) or _text(dest, "CNPJ") if dest else ""
         ),
         "crt_emitente": _text(emit, "nfe:CRT", _NS) or _text(emit, "CRT") if emit else "",
+        "uf_emitente": _extract_uf_emitente(emit),
+        "nome_emitente": (_text(emit, "nfe:xNome", _NS) or _text(emit, "xNome")) if emit is not None else "",
         "totais": {},
         "itens": [],
         "prot_cstat": "",
@@ -387,12 +404,20 @@ def upload_nfe_xmls(
     for filename, parsed in to_insert:
         chave = parsed["chave_nfe"]
 
+        # Extrair CRT e cStat para novos campos (Migration 14)
+        crt_raw = parsed.get("crt_emitente", "")
+        crt_int = int(crt_raw) if crt_raw and crt_raw.isdigit() else None
+        c_sit = parsed.get("prot_cstat", "")
+        uf_emitente = parsed.get("uf_emitente", "")
+
         db.execute(
             """INSERT INTO nfe_xmls
                (file_id, chave_nfe, numero_nfe, serie, cnpj_emitente,
                 cnpj_destinatario, dh_emissao, vl_doc, vl_icms, vl_icms_st,
-                vl_ipi, vl_pis, vl_cofins, qtd_itens, prot_cstat, status, parsed_json)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)""",
+                vl_ipi, vl_pis, vl_cofins, qtd_itens, prot_cstat, status, parsed_json,
+                crt_emitente, uf_emitente, c_sit)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?,
+                       ?, ?, ?)""",
             (
                 file_id, chave, parsed["numero_nfe"], parsed["serie"],
                 parsed["cnpj_emitente"], parsed["cnpj_destinatario"],
@@ -401,9 +426,23 @@ def upload_nfe_xmls(
                 parsed["vl_ipi"], parsed["vl_pis"], parsed["vl_cofins"],
                 parsed["qtd_itens"], parsed["prot_cstat"],
                 json.dumps(parsed, ensure_ascii=False),
+                crt_int, uf_emitente, c_sit,
             ),
         )
         nfe_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+        # Persistir CRT na tabela incremental emitentes_crt (Fase 5)
+        if crt_int and parsed.get("cnpj_emitente"):
+            try:
+                db.execute(
+                    """INSERT OR REPLACE INTO emitentes_crt
+                       (cnpj_emitente, crt, razao_social, uf_emitente, last_seen, fonte)
+                       VALUES (?, ?, ?, ?, datetime('now'), 'xml')""",
+                    (parsed["cnpj_emitente"], crt_int,
+                     parsed.get("nome_emitente", ""), uf_emitente),
+                )
+            except Exception:
+                pass  # Tabela pode nao existir pre-Migration 14
 
         # Inserir itens
         for item in parsed["itens"]:
@@ -464,14 +503,18 @@ def cruzar_xml_vs_sped(
 
     _emit(5, "Carregando XMLs do banco...")
 
-    # Carregar XMLs
+    # Carregar XMLs (inclui numero_nfe para mensagens)
     xmls = db.execute(
         "SELECT id, chave_nfe, vl_doc, vl_icms, vl_icms_st, vl_ipi, qtd_itens, "
-        "prot_cstat, cnpj_emitente, cnpj_destinatario, dh_emissao "
+        "prot_cstat, cnpj_emitente, cnpj_destinatario, dh_emissao, numero_nfe "
         "FROM nfe_xmls WHERE file_id = ? AND status = 'active'",
         (file_id,),
     ).fetchall()
     xml_by_chave = {r[1]: r for r in xmls}
+    # Mapa chave → numero_nfe para enriquecer mensagens
+    _nfe_num: dict[str, str] = {}
+    for r in xmls:
+        _nfe_num[r[1]] = str(r[11] or "") if isinstance(r, tuple) else str(r["numero_nfe"] or "")
 
     _emit(10, f"{len(xmls)} XMLs carregados. Carregando registros C100...")
 
@@ -509,9 +552,11 @@ def cruzar_xml_vs_sped(
 
         # XML001: NF-e no XML mas ausente no SPED
         if xml and not sped:
+            num = _nfe_num.get(chave, "")
+            nf_label = f"NF {num}" if num else f"Chave {chave[:20]}..."
             findings.append(_finding(file_id, xml[0], chave, "XML001", "critical",
                                      "chave_nfe", chave, "C100.CHV_NFE", "(ausente)",
-                                     None, f"NF-e {chave[:20]}... presente no XML mas ausente na escrituracao SPED."))
+                                     None, f"{nf_label}: NF-e presente no XML mas ausente na escrituracao SPED."))
             continue
 
         # XML002: NF-e no SPED mas ausente nos XMLs
@@ -525,12 +570,40 @@ def cruzar_xml_vs_sped(
         assert xml is not None and sped is not None
         nfe_id = xml[0]
         sf = sped["fields"]
+        num_nfe = _nfe_num.get(chave, "")
+        _nf = f"NF {num_nfe}" if num_nfe else f"Chave {chave[:15]}..."
 
-        # XML011: NF-e cancelada escriturada
-        if xml[7] and xml[7] != "100":
-            findings.append(_finding(file_id, nfe_id, chave, "XML011", "critical",
-                                     "prot_cstat", xml[7], "C100", "presente",
-                                     None, f"NF-e cancelada (cStat={xml[7]}) mas escriturada no SPED."))
+        # BUG-003 fix: Cruzamento COD_SIT (C100) x cStat (XML) com mapeamento completo
+        cstat = str(xml[7] or "").strip()
+        cod_sit = str(sf.get("COD_SIT", "")).strip()
+        _CSTAT_TO_COD_SIT = {
+            "100": "00",  # Autorizada → Normal
+            "101": "02",  # Cancelada → Cancelada
+            "135": "02",  # Cancelada fora prazo → Cancelada
+            "110": "05",  # Denegada → Denegada
+            "301": "05",  # Uso indevido → Denegada
+        }
+        if cstat:
+            cod_sit_esperado = _CSTAT_TO_COD_SIT.get(cstat)
+            if cod_sit_esperado and cod_sit != cod_sit_esperado:
+                if cstat in ("101", "135") and cod_sit == "00":
+                    findings.append(_finding(
+                        file_id, nfe_id, chave, "NF_CANCELADA_ESCRITURADA", "critical",
+                        "prot_cstat", cstat, "C100.COD_SIT", cod_sit, None,
+                        f"{_nf}: NF-e cancelada (cStat={cstat}) escriturada como ativa (COD_SIT=00). "
+                        f"Credito de ICMS indevido. Esperado COD_SIT=02."))
+                elif cstat in ("110", "301") and cod_sit == "00":
+                    findings.append(_finding(
+                        file_id, nfe_id, chave, "NF_DENEGADA_ESCRITURADA", "critical",
+                        "prot_cstat", cstat, "C100.COD_SIT", cod_sit, None,
+                        f"{_nf}: NF-e denegada (cStat={cstat}) escriturada como ativa (COD_SIT=00). "
+                        f"Esperado COD_SIT=05."))
+                elif cod_sit_esperado:
+                    findings.append(_finding(
+                        file_id, nfe_id, chave, "COD_SIT_DIVERGENTE_XML", "error",
+                        "prot_cstat", cstat, "C100.COD_SIT", cod_sit, None,
+                        f"{_nf}: COD_SIT={cod_sit} incompativel com cStat={cstat}. "
+                        f"Esperado COD_SIT={cod_sit_esperado}."))
 
         # XML003: VL_DOC
         _compare_value(findings, file_id, nfe_id, chave, "XML003", "critical",
@@ -648,15 +721,31 @@ def _gerar_erros_com_sugestao_xml(
     findings: list[dict],
     sped_by_chave: dict[str, dict],
 ) -> None:
-    """Gera validation_errors para divergências XML vs SPED.
+    """Gera validation_errors para divergencias XML vs SPED.
 
-    Para campos corrigíveis, o expected_value vem do XML (fonte da verdade)
-    e auto_correctable=1.
+    Para campos corrigiveis, o expected_value vem do XML e auto_correctable=1.
+    NOTA: O XML tambem pode conter erros. A divergencia e apontada para
+    conferencia do analista, nao como correcao automatica definitiva.
     """
+    # Buscar numero_nfe para cada chave (para exibir na mensagem)
+    nfe_numeros: dict[str, str] = {}
+    try:
+        rows_nfe = db.execute(
+            "SELECT chave_nfe, numero_nfe FROM nfe_xmls WHERE file_id = ?",
+            (file_id,),
+        ).fetchall()
+        for r in rows_nfe:
+            ch = r[0] if isinstance(r, tuple) else r["chave_nfe"]
+            num = r[1] if isinstance(r, tuple) else r["numero_nfe"]
+            nfe_numeros[ch] = str(num or "")
+    except Exception:
+        pass
+
     for f in findings:
         rule_id = f["rule_id"]
         chave = f["chave_nfe"]
         sped = sped_by_chave.get(chave)
+        numero_nfe = nfe_numeros.get(chave, "")
 
         corr_info = _CORRIGIVEL_POR_XML.get(rule_id, (None, None, False))
         campo_sped, register, corrigivel = corr_info
@@ -669,19 +758,22 @@ def _gerar_erros_com_sugestao_xml(
         sev_map = {"critical": "critical", "error": "error", "warning": "warning"}
         severity = sev_map.get(f["severity"], "error")
 
-        # Expected value = valor do XML (fonte da verdade)
+        # Expected value = valor do XML (sugestao, nao definitivo)
         expected = f["valor_xml"] if corrigivel and f["valor_xml"] else None
         auto_corr = 1 if corrigivel and expected else 0
 
-        # Mensagem enriquecida
-        msg = f"[XML] {f['message']}"
+        # Prefixo com numero da NF para identificacao
+        nf_label = f"NF {numero_nfe}" if numero_nfe else f"Chave {chave[:15]}..."
+
+        # Mensagem enriquecida (sem afirmar que XML e fonte da verdade)
+        msg = f"[XML] {nf_label}: {f['message']}"
         if corrigivel:
-            msg += f" Sugestao: corrigir {campo_sped} para {expected} (conforme XML da NF-e)."
+            msg += f" Sugestao: verificar {campo_sped} — XML indica {expected}."
 
         friendly = (
-            f"O valor no SPED ({f['valor_sped']}) diverge do XML da NF-e ({f['valor_xml']}). "
-            f"O XML e a fonte da verdade — o valor correto e {f['valor_xml']}."
-        ) if corrigivel else f"Divergencia entre XML e SPED: {f['message']}"
+            f"NF-e {numero_nfe}: valor no SPED ({f['valor_sped']}) diverge do "
+            f"XML ({f['valor_xml']}). Confira ambos os valores e corrija o que estiver incorreto."
+        ) if corrigivel else f"NF-e {numero_nfe}: divergencia XML x SPED — {f['message']}"
 
         try:
             db.execute(

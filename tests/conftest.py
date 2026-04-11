@@ -23,10 +23,11 @@ from src.models import RegisterField, SpedRecord  # noqa: E402
 from src.parser import parse_sped_file  # noqa: E402
 from src.services.context_builder import TaxRegime, ValidationContext  # noqa: E402
 
-# Desabilitar autenticação nos testes (API_KEY pode estar no .env via load_dotenv)
-# Importar auth primeiro para trigger load_dotenv, depois limpar
+# BUG-004: API_KEY agora e obrigatoria. Configurar key de teste para todos os testes.
+os.environ["API_KEY"] = "test-api-key-for-pytest-minimum-32-chars!"
 import api.auth  # noqa: E402, F401
-os.environ.pop("API_KEY", None)
+
+TEST_API_KEY = "test-api-key-for-pytest-minimum-32-chars!"
 
 # Diretório das fixtures
 FIXTURES_DIR = Path(__file__).parent / "fixtures"

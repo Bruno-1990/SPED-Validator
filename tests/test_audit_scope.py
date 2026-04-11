@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import warnings
 from pathlib import Path
@@ -104,7 +105,7 @@ def client(seeded_db: sqlite3.Connection) -> TestClient:
             pass
 
     app.dependency_overrides[get_db] = _override_db
-    c = TestClient(app)
+    c = TestClient(app, headers={"X-API-Key": os.environ.get("API_KEY", "test-api-key-for-pytest-minimum-32-chars!")})
     yield c
     app.dependency_overrides.clear()
 
@@ -225,12 +226,12 @@ class TestGlobalAuditScope:
     """Testes do endpoint GET /api/audit-scope (escopo geral do sistema)."""
 
     def test_audit_scope_returns_200(self) -> None:
-        c = TestClient(app)
+        c = TestClient(app, headers={"X-API-Key": os.environ.get("API_KEY", "test-api-key-for-pytest-minimum-32-chars!")})
         resp = c.get("/api/audit-scope")
         assert resp.status_code == 200
 
     def test_audit_scope_has_required_fields(self) -> None:
-        c = TestClient(app)
+        c = TestClient(app, headers={"X-API-Key": os.environ.get("API_KEY", "test-api-key-for-pytest-minimum-32-chars!")})
         resp = c.get("/api/audit-scope").json()
         assert "validacao_cobre" in resp
         assert "validacao_nao_cobre" in resp
@@ -238,13 +239,13 @@ class TestGlobalAuditScope:
         assert len(resp["validacao_nao_cobre"]) >= 4
 
     def test_aviso_legal_is_string(self) -> None:
-        c = TestClient(app)
+        c = TestClient(app, headers={"X-API-Key": os.environ.get("API_KEY", "test-api-key-for-pytest-minimum-32-chars!")})
         resp = c.get("/api/audit-scope").json()
         assert isinstance(resp["aviso_legal"], str)
         assert len(resp["aviso_legal"]) > 50
 
     def test_apontamentos_por_certeza(self) -> None:
-        c = TestClient(app)
+        c = TestClient(app, headers={"X-API-Key": os.environ.get("API_KEY", "test-api-key-for-pytest-minimum-32-chars!")})
         resp = c.get("/api/audit-scope").json()
         assert "apontamentos_por_certeza" in resp
         assert "objetivo" in resp["apontamentos_por_certeza"]

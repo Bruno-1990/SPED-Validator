@@ -1,7 +1,7 @@
 import type { AuditScope, AuditScopeRaw, CorrectionSuggestion, CrossValidationItem, ErrorSummary, FileInfo, GeneratedRule, PipelineEvent, RecordInfo, RuleSummary, SearchResult, StructuredReport, ValidationError, ValidationResponse } from '../types/sped'
 
 const BASE = '/api'
-const API_KEY = 'sped-audit-dev-key-2026'
+const API_KEY = 'sped-audit-dev-key-2026-central-contabil'
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers)
