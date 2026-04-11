@@ -118,9 +118,25 @@ def _to_float(val) -> float:
     if val is None:
         return 0.0
     try:
-        return round(float(val), 2)
+        return round(float(str(val).replace(",", ".")), 2)
     except (ValueError, TypeError):
         return 0.0
+
+
+def _track_status(raw_val) -> str:
+    """Determina status de rastreamento de um valor bruto do XML."""
+    if raw_val is None:
+        return "missing"
+    s = str(raw_val).strip()
+    if s == "":
+        return "missing"
+    if s == "0" or s == "0.00" or s == "0.0":
+        return "explicit_zero"
+    try:
+        float(s)
+        return "ok"
+    except (ValueError, TypeError):
+        return "parse_error"
 
 
 def _extract_uf_emitente(emit) -> str:
@@ -221,6 +237,7 @@ def parse_nfe_xml(xml_bytes: bytes) -> dict | None:
         "totais": {},
         "itens": [],
         "prot_cstat": "",
+        "_tracked": {},
     }
 
     # Totais
@@ -231,6 +248,11 @@ def parse_nfe_xml(xml_bytes: bytes) -> dict | None:
                        "vIPIDevol", "vPIS", "vCOFINS", "vOutro", "vNF"]:
             val = _text(icms_tot, f"nfe:{campo}", _NS) or _text(icms_tot, campo)
             result["totais"][campo] = _to_float(val)
+            result["_tracked"][f"totais.{campo}"] = {
+                "raw_value": val if val else None,
+                "source_xpath": f".//infNFe/total/ICMSTot/{campo}",
+                "status": _track_status(val if val else None),
+            }
 
     result["vl_doc"] = result["totais"].get("vNF", 0.0)
     result["vl_icms"] = result["totais"].get("vICMS", 0.0)
@@ -245,13 +267,28 @@ def parse_nfe_xml(xml_bytes: bytes) -> dict | None:
         prod = _find(det, "nfe:prod", "prod")
         imp = _find(det, "nfe:imposto", "imposto")
 
+        _raw_vl_prod = (_text(prod, "nfe:vProd", _NS) or _text(prod, "vProd")) if prod else None
+        _raw_vl_desc = (_text(prod, "nfe:vDesc", _NS) or _text(prod, "vDesc")) if prod else None
+
         item = {
             "num_item": int(det.attrib.get("nItem", 0)),
             "cod_produto": _text(prod, "nfe:cProd", _NS) or _text(prod, "cProd") if prod else "",
             "ncm": _norm_ncm(_text(prod, "nfe:NCM", _NS) or _text(prod, "NCM") if prod else ""),
             "cfop": _norm_cfop(_text(prod, "nfe:CFOP", _NS) or _text(prod, "CFOP") if prod else ""),
-            "vl_prod": _to_float(_text(prod, "nfe:vProd", _NS) or _text(prod, "vProd") if prod else "0"),
-            "vl_desc": _to_float(_text(prod, "nfe:vDesc", _NS) or _text(prod, "vDesc") if prod else "0"),
+            "vl_prod": _to_float(_raw_vl_prod or "0"),
+            "vl_desc": _to_float(_raw_vl_desc or "0"),
+            "_tracked": {
+                "vl_prod": {
+                    "raw_value": _raw_vl_prod if _raw_vl_prod else None,
+                    "source_xpath": ".//infNFe/det/prod/vProd",
+                    "status": _track_status(_raw_vl_prod if _raw_vl_prod else None),
+                },
+                "vl_desc": {
+                    "raw_value": _raw_vl_desc if _raw_vl_desc else None,
+                    "source_xpath": ".//infNFe/det/prod/vDesc",
+                    "status": _track_status(_raw_vl_desc if _raw_vl_desc else None),
+                },
+            },
         }
 
         # Tributos ICMS
@@ -269,28 +306,46 @@ def parse_nfe_xml(xml_bytes: bytes) -> dict | None:
             cst = _text(icms_group, "nfe:CST", _NS) or _text(icms_group, "CST")
             csosn = _text(icms_group, "nfe:CSOSN", _NS) or _text(icms_group, "CSOSN")
             item["cst_icms"] = _norm_cst(f"{orig}{csosn}" if csosn else f"{orig}{cst}")
-            item["vbc_icms"] = _to_float(
-                _text(icms_group, "nfe:vBC", _NS) or _text(icms_group, "vBC")
-            )
-            item["aliq_icms"] = _to_float(
-                _text(icms_group, "nfe:pICMS", _NS) or _text(icms_group, "pICMS")
-            )
-            item["vl_icms"] = _to_float(
-                _text(icms_group, "nfe:vICMS", _NS) or _text(icms_group, "vICMS")
-            )
+
+            _raw_vbc_icms = _text(icms_group, "nfe:vBC", _NS) or _text(icms_group, "vBC")
+            _raw_aliq_icms = _text(icms_group, "nfe:pICMS", _NS) or _text(icms_group, "pICMS")
+            _raw_vl_icms = _text(icms_group, "nfe:vICMS", _NS) or _text(icms_group, "vICMS")
+
+            item["vbc_icms"] = _to_float(_raw_vbc_icms)
+            item["aliq_icms"] = _to_float(_raw_aliq_icms)
+            item["vl_icms"] = _to_float(_raw_vl_icms)
+
+            item["_tracked"]["vbc_icms"] = {
+                "raw_value": _raw_vbc_icms if _raw_vbc_icms else None,
+                "source_xpath": ".//infNFe/det/imposto/ICMS/*/vBC",
+                "status": _track_status(_raw_vbc_icms if _raw_vbc_icms else None),
+            }
+            item["_tracked"]["aliq_icms"] = {
+                "raw_value": _raw_aliq_icms if _raw_aliq_icms else None,
+                "source_xpath": ".//infNFe/det/imposto/ICMS/*/pICMS",
+                "status": _track_status(_raw_aliq_icms if _raw_aliq_icms else None),
+            }
+            item["_tracked"]["vl_icms"] = {
+                "raw_value": _raw_vl_icms if _raw_vl_icms else None,
+                "source_xpath": ".//infNFe/det/imposto/ICMS/*/vICMS",
+                "status": _track_status(_raw_vl_icms if _raw_vl_icms else None),
+            }
         else:
             item.update({"cst_icms": "", "vbc_icms": 0.0, "aliq_icms": 0.0, "vl_icms": 0.0})
+            item["_tracked"]["vbc_icms"] = {"raw_value": None, "source_xpath": ".//infNFe/det/imposto/ICMS/*/vBC", "status": "missing"}
+            item["_tracked"]["aliq_icms"] = {"raw_value": None, "source_xpath": ".//infNFe/det/imposto/ICMS/*/pICMS", "status": "missing"}
+            item["_tracked"]["vl_icms"] = {"raw_value": None, "source_xpath": ".//infNFe/det/imposto/ICMS/*/vICMS", "status": "missing"}
 
         # IPI
+        _raw_vl_ipi = None
         if imp is not None:
             ipi_el = _find(imp, "nfe:IPI", "IPI")
             if ipi_el is not None:
                 ipi_trib = _find(ipi_el, "nfe:IPITrib", "IPITrib")
                 if ipi_trib is not None:
                     item["cst_ipi"] = _text(ipi_trib, "nfe:CST", _NS) or _text(ipi_trib, "CST")
-                    item["vl_ipi"] = _to_float(
-                        _text(ipi_trib, "nfe:vIPI", _NS) or _text(ipi_trib, "vIPI")
-                    )
+                    _raw_vl_ipi = _text(ipi_trib, "nfe:vIPI", _NS) or _text(ipi_trib, "vIPI")
+                    item["vl_ipi"] = _to_float(_raw_vl_ipi)
                 else:
                     ipi_nt = _find(ipi_el, "nfe:IPINT", "IPINT")
                     item["cst_ipi"] = _text(ipi_nt, "nfe:CST", _NS) or _text(ipi_nt, "CST") if ipi_nt else ""
@@ -299,6 +354,12 @@ def parse_nfe_xml(xml_bytes: bytes) -> dict | None:
                 item.update({"cst_ipi": "", "vl_ipi": 0.0})
         else:
             item.update({"cst_ipi": "", "vl_ipi": 0.0})
+
+        item["_tracked"]["vl_ipi"] = {
+            "raw_value": _raw_vl_ipi if _raw_vl_ipi else None,
+            "source_xpath": ".//infNFe/det/imposto/IPI/IPITrib/vIPI",
+            "status": _track_status(_raw_vl_ipi if _raw_vl_ipi else None),
+        }
 
         # PIS/COFINS simplificado
         item.update({"cst_pis": "", "vl_pis": 0.0, "cst_cofins": "", "vl_cofins": 0.0})
@@ -607,19 +668,27 @@ def cruzar_xml_vs_sped(
 
         # XML003: VL_DOC
         _compare_value(findings, file_id, nfe_id, chave, "XML003", "critical",
-                       "totais.vNF", xml[2], "C100.VL_DOC", _to_float(sf.get("VL_DOC", "0")), 0.02)
+                       "totais.vNF", xml[2], "C100.VL_DOC", _to_float(sf.get("VL_DOC")), 0.02,
+                       tracked={"source_xpath_xml": ".//infNFe/total/ICMSTot/vNF",
+                                "campo_sped": "C100.VL_DOC"})
 
         # XML004: VL_ICMS
         _compare_value(findings, file_id, nfe_id, chave, "XML004", "critical",
-                       "totais.vICMS", xml[3], "C100.VL_ICMS", _to_float(sf.get("VL_ICMS", "0")), 0.02)
+                       "totais.vICMS", xml[3], "C100.VL_ICMS", _to_float(sf.get("VL_ICMS")), 0.02,
+                       tracked={"source_xpath_xml": ".//infNFe/total/ICMSTot/vICMS",
+                                "campo_sped": "C100.VL_ICMS"})
 
         # XML005: VL_ICMS_ST
         _compare_value(findings, file_id, nfe_id, chave, "XML005", "error",
-                       "totais.vST", xml[4], "C100.VL_ICMS_ST", _to_float(sf.get("VL_ICMS_ST", "0")), 0.02)
+                       "totais.vST", xml[4], "C100.VL_ICMS_ST", _to_float(sf.get("VL_ICMS_ST")), 0.02,
+                       tracked={"source_xpath_xml": ".//infNFe/total/ICMSTot/vST",
+                                "campo_sped": "C100.VL_ICMS_ST"})
 
         # XML006: VL_IPI
         _compare_value(findings, file_id, nfe_id, chave, "XML006", "error",
-                       "totais.vIPI", xml[5], "C100.VL_IPI", _to_float(sf.get("VL_IPI", "0")), 0.02)
+                       "totais.vIPI", xml[5], "C100.VL_IPI", _to_float(sf.get("VL_IPI")), 0.02,
+                       tracked={"source_xpath_xml": ".//infNFe/total/ICMSTot/vIPI",
+                                "campo_sped": "C100.VL_IPI"})
 
         # XML012: Quantidade de itens
         qtd_xml = xml[6] or 0
@@ -715,6 +784,306 @@ _CORRIGIVEL_POR_XML: dict[str, tuple[str, str, bool]] = {
 }
 
 
+# ──────────────────────────────────────────────
+# Mensagens ricas para o usuario (XML cruzamento)
+# ──────────────────────────────────────────────
+
+# Base legal por regra de cruzamento XML
+_LEGAL_BASIS_XML: dict[str, dict] = {
+    "XML001": {
+        "fonte": "Guia Pratico EFD ICMS/IPI",
+        "artigo": "Registro C100 — Obrigatoriedade",
+        "trecho": (
+            "Devem ser informadas todas as NF-e (mod. 55) emitidas e recebidas, "
+            "conforme operacoes do periodo de apuracao. A omissao de documentos "
+            "fiscais pode configurar infração a legislacao tributaria estadual."
+        ),
+    },
+    "XML002": {
+        "fonte": "Guia Pratico EFD ICMS/IPI",
+        "artigo": "Registro C100 — Integridade documental",
+        "trecho": (
+            "Todo registro C100 deve corresponder a um documento fiscal valido. "
+            "A escrituracao de NF-e sem XML correspondente impede a verificacao "
+            "da autenticidade do documento pela administracao tributaria."
+        ),
+    },
+    "XML003": {
+        "fonte": "Guia Pratico EFD ICMS/IPI",
+        "artigo": "Registro C100, campo 12 — VL_DOC",
+        "trecho": (
+            "VL_DOC deve corresponder ao valor total da NF-e (tag vNF do XML). "
+            "Divergencias entre o valor escriturado e o documento fiscal original "
+            "podem gerar glosa de creditos ou autuacao por subfaturamento."
+        ),
+    },
+    "XML004": {
+        "fonte": "Guia Pratico EFD ICMS/IPI",
+        "artigo": "Registro C100, campo 22 — VL_ICMS",
+        "trecho": (
+            "VL_ICMS deve refletir o valor do ICMS destacado na NF-e (tag vICMS). "
+            "Art. 23 da LC 87/96: o direito ao credito esta condicionado a "
+            "escrituracao correta do imposto destacado no documento fiscal."
+        ),
+    },
+    "XML005": {
+        "fonte": "Guia Pratico EFD ICMS/IPI",
+        "artigo": "Registro C100, campo 24 — VL_ICMS_ST",
+        "trecho": (
+            "VL_ICMS_ST deve corresponder ao valor do ICMS-ST da NF-e (tag vST). "
+            "Divergencia pode indicar apropriacao indevida de credito de ST ou "
+            "erro na parametrizacao do ERP."
+        ),
+    },
+    "XML006": {
+        "fonte": "Guia Pratico EFD ICMS/IPI",
+        "artigo": "Registro C100, campo 25 — VL_IPI",
+        "trecho": (
+            "VL_IPI deve corresponder ao valor do IPI da NF-e (tag vIPI). "
+            "Art. 190 do RIPI (Dec. 7.212/2010): o credito de IPI e vinculado "
+            "ao valor efetivamente destacado no documento fiscal."
+        ),
+    },
+    "XML011": {
+        "fonte": "Ajuste SINIEF 07/2005, Art. 19",
+        "artigo": "Cancelamento de NF-e",
+        "trecho": (
+            "NF-e cancelada nao produz efeitos fiscais. A escrituracao de "
+            "documento cancelado como ativo configura credito indevido de ICMS, "
+            "sujeito a multa e juros conforme legislacao estadual."
+        ),
+    },
+    "XML012": {
+        "fonte": "Guia Pratico EFD ICMS/IPI",
+        "artigo": "Registro C170 — Itens do documento",
+        "trecho": (
+            "O numero de registros C170 deve corresponder a quantidade de itens "
+            "do documento fiscal. Itens faltantes comprometem a apuracao por item "
+            "e a verificacao de NCM, CST e CFOP individuais."
+        ),
+    },
+    "XML013": {
+        "fonte": "Guia Pratico EFD ICMS/IPI",
+        "artigo": "Registro 0150 — Cadastro de participantes",
+        "trecho": (
+            "O CNPJ/CPF do participante deve ser consistente entre o registro "
+            "0150, o C100 (COD_PART) e o documento fiscal original. "
+            "Inconsistencia pode indicar escrituracao em nome de terceiros."
+        ),
+    },
+    "XML014": {
+        "fonte": "Guia Pratico EFD ICMS/IPI",
+        "artigo": "Registro C100, campo 10 — DT_DOC",
+        "trecho": (
+            "DT_DOC deve corresponder a data de emissao da NF-e (tag dhEmi). "
+            "Data incorreta pode levar a escrituracao em periodo de apuracao errado."
+        ),
+    },
+    "XML015": {
+        "fonte": "Guia Pratico EFD ICMS/IPI",
+        "artigo": "Registro C100, campo 11 — DT_E_S",
+        "trecho": (
+            "DT_E_S deve corresponder a data de entrada/saida da mercadoria "
+            "(tag dhSaiEnt). Impacta o periodo de aproveitamento do credito."
+        ),
+    },
+    "NF_CANCELADA_ESCRITURADA": {
+        "fonte": "Ajuste SINIEF 07/2005, Art. 19 + LC 87/96, Art. 23",
+        "artigo": "Cancelamento — Vedacao de credito",
+        "trecho": (
+            "NF-e cancelada nao produz efeitos tributarios. O aproveitamento "
+            "de credito de ICMS sobre documento cancelado e vedado, podendo "
+            "configurar infraçao qualificada (dolo ou fraude)."
+        ),
+    },
+    "NF_DENEGADA_ESCRITURADA": {
+        "fonte": "Ajuste SINIEF 07/2005, Art. 20",
+        "artigo": "Denegacao — Impedimento de uso",
+        "trecho": (
+            "NF-e com uso denegado nao autoriza circulacao de mercadorias "
+            "nem gera direito a credito fiscal. Deve ser escriturada com COD_SIT=05."
+        ),
+    },
+    "COD_SIT_DIVERGENTE_XML": {
+        "fonte": "Guia Pratico EFD ICMS/IPI",
+        "artigo": "Registro C100, campo 06 — COD_SIT",
+        "trecho": (
+            "COD_SIT deve refletir a situacao real do documento: "
+            "00=Regular, 02=Cancelado, 05=Denegado. "
+            "Mapeamento obrigatorio conforme cStat da SEFAZ."
+        ),
+    },
+}
+
+_CAMPO_LABEL: dict[str, str] = {
+    "VL_DOC": "Valor do Documento (VL_DOC)",
+    "VL_ICMS": "Valor do ICMS (VL_ICMS)",
+    "VL_ICMS_ST": "Valor do ICMS-ST (VL_ICMS_ST)",
+    "VL_IPI": "Valor do IPI (VL_IPI)",
+    "DT_DOC": "Data de Emissao (DT_DOC)",
+    "DT_E_S": "Data de Entrada/Saida (DT_E_S)",
+}
+
+
+def _build_friendly_xml(
+    rule_id: str, numero_nfe: str, f: dict,
+    campo_sped: str | None, corrigivel: bool,
+) -> str:
+    """Monta friendly_message formatada para exibicao no card de erro."""
+    nf = numero_nfe or "?"
+    label = _CAMPO_LABEL.get(campo_sped or "", campo_sped or f["campo_sped"])
+
+    if rule_id == "XML001":
+        return (
+            f"NF-e {nf} presente no XML mas **ausente na escrituracao SPED**. "
+            f"A nota fiscal foi emitida/recebida mas nao consta no arquivo."
+        )
+    if rule_id == "XML002":
+        return (
+            f"NF-e {nf} escriturada no SPED mas **sem XML correspondente**. "
+            f"O documento fiscal de origem nao foi localizado."
+        )
+    if rule_id in ("XML003", "XML004", "XML005", "XML006") and corrigivel:
+        return (
+            f"**{label}** da NF-e {nf}: "
+            f"SPED informa **R$ {f['valor_sped']}**, "
+            f"XML informa **R$ {f['valor_xml']}**. "
+            f"Diferenca de R$ {f.get('diferenca', '?')}."
+        )
+    if rule_id == "XML011":
+        return (
+            f"NF-e {nf} esta **cancelada na SEFAZ** mas foi escriturada "
+            f"como ativa no SPED (COD_SIT=00)."
+        )
+    if rule_id == "XML012":
+        return (
+            f"NF-e {nf}: **quantidade de itens diverge** entre XML e SPED. "
+            f"XML tem {f['valor_xml']} itens, SPED tem {f['valor_sped']}."
+        )
+    if rule_id == "XML013":
+        return (
+            f"NF-e {nf}: **CNPJ do participante diverge** entre XML e cadastro 0150."
+        )
+    if rule_id in ("XML014", "XML015"):
+        return (
+            f"NF-e {nf}: **data diverge** entre XML ({f['valor_xml']}) "
+            f"e SPED ({f['valor_sped']})."
+        )
+    if rule_id == "NF_CANCELADA_ESCRITURADA":
+        return (
+            f"NF-e {nf} **cancelada** (cStat={f['valor_xml']}) escriturada como "
+            f"ativa no SPED. **Credito de ICMS possivelmente indevido.**"
+        )
+    if rule_id == "NF_DENEGADA_ESCRITURADA":
+        return (
+            f"NF-e {nf} **denegada** (cStat={f['valor_xml']}) escriturada como "
+            f"ativa no SPED."
+        )
+    # Fallback generico
+    return f"NF-e {nf}: divergencia detectada — {f['message']}"
+
+
+def _build_doc_suggestion_xml(
+    rule_id: str, numero_nfe: str, f: dict,
+    campo_sped: str | None, corrigivel: bool,
+) -> str | None:
+    """Monta doc_suggestion com secao **Como corrigir:** para o painel expandido."""
+    nf = numero_nfe or "?"
+    label = _CAMPO_LABEL.get(campo_sped or "", campo_sped or f["campo_sped"])
+
+    if rule_id == "XML001":
+        return (
+            f"A NF-e {nf} consta nos XMLs enviados a SEFAZ, porem nao foi escriturada no SPED EFD.\n\n"
+            f"Isso pode indicar nota fiscal nao contabilizada, gerando risco de omissao de receita "
+            f"ou falta de aproveitamento de credito.\n\n"
+            f"**Como corrigir:**\n"
+            f"Inclua o registro C100 (e respectivos C170/C190) referente a esta NF-e no arquivo SPED. "
+            f"Verifique no ERP se a nota foi escriturada em periodo diferente."
+        )
+    if rule_id == "XML002":
+        return (
+            f"A NF-e {nf} esta escriturada no SPED mas o XML correspondente nao foi localizado.\n\n"
+            f"Pode ser nota de periodo anterior, XML extraviado ou escrituracao indevida.\n\n"
+            f"**Como corrigir:**\n"
+            f"Consulte a SEFAZ para verificar a situacao da nota. "
+            f"Obtenha o XML pelo portal da NF-e ou solicite ao emitente."
+        )
+    if rule_id in ("XML003", "XML004", "XML005", "XML006") and corrigivel:
+        return (
+            f"O campo **{label}** no registro C100 da NF-e {nf} esta com valor "
+            f"**R$ {f['valor_sped']}**, porem o XML autorizado pela SEFAZ registra "
+            f"**R$ {f['valor_xml']}**.\n\n"
+            f"Diferenca: R$ {f.get('diferenca', '?')}.\n\n"
+            f"**Como corrigir:**\n"
+            f"Compare o valor no SPED com o DANFE/XML original. "
+            f"Se o XML estiver correto, clique em **Corrigir** para atualizar o campo {campo_sped} "
+            f"no registro C100. Caso o XML esteja incorreto, emita carta de correcao ou "
+            f"solicite cancelamento junto ao emitente."
+        )
+    if rule_id == "XML011":
+        return (
+            f"A NF-e {nf} foi cancelada junto a SEFAZ mas permanece escriturada como "
+            f"documento ativo (COD_SIT=00) no SPED.\n\n"
+            f"Documentos cancelados **nao devem gerar credito** de ICMS.\n\n"
+            f"**Como corrigir:**\n"
+            f"Altere o COD_SIT do registro C100 para 02 (cancelada). "
+            f"Se creditos ja foram aproveitados, efetue o estorno na apuracao (E111)."
+        )
+    if rule_id == "XML012":
+        return (
+            f"O XML da NF-e {nf} possui {f['valor_xml']} itens, mas o SPED registra "
+            f"{f['valor_sped']} itens (C170).\n\n"
+            f"Itens faltantes podem resultar em creditos nao aproveitados ou divergencia "
+            f"na apuracao.\n\n"
+            f"**Como corrigir:**\n"
+            f"Verifique os registros C170 vinculados a este C100 e compare item a item "
+            f"com o XML. Inclua os itens faltantes ou remova os excedentes."
+        )
+    if rule_id == "XML013":
+        return (
+            f"O CNPJ do participante na NF-e {nf} nao corresponde ao cadastrado "
+            f"no registro 0150 do SPED.\n\n"
+            f"**Como corrigir:**\n"
+            f"Verifique o cadastro 0150 e o COD_PART no C100. Corrija o CNPJ no "
+            f"registro 0150 ou atualize o COD_PART no C100."
+        )
+    if rule_id in ("XML014", "XML015"):
+        campo_dt = "DT_DOC" if rule_id == "XML014" else "DT_E_S"
+        return (
+            f"A data {campo_dt} no SPED ({f['valor_sped']}) difere da data no XML "
+            f"({f['valor_xml']}) para a NF-e {nf}.\n\n"
+            f"**Como corrigir:**\n"
+            f"Confira a data no DANFE/XML original e corrija o campo {campo_dt} "
+            f"no registro C100."
+        )
+    if rule_id == "NF_CANCELADA_ESCRITURADA":
+        return (
+            f"A NF-e {nf} foi cancelada na SEFAZ (cStat={f['valor_xml']}), "
+            f"mas esta escriturada como ativa no SPED (COD_SIT=00).\n\n"
+            f"Isso configura **credito indevido de ICMS**, passivel de autuacao.\n\n"
+            f"**Como corrigir:**\n"
+            f"Altere COD_SIT para 02 (cancelada). Estorne creditos ja aproveitados "
+            f"via ajuste E111. Verifique se ha outras notas do mesmo emitente na mesma situacao."
+        )
+    if rule_id == "NF_DENEGADA_ESCRITURADA":
+        return (
+            f"A NF-e {nf} teve autorizacao denegada (cStat={f['valor_xml']}), "
+            f"mas foi escriturada como ativa no SPED.\n\n"
+            f"NF-e denegada **nao gera efeitos fiscais**.\n\n"
+            f"**Como corrigir:**\n"
+            f"Altere COD_SIT para 05 (denegada). Remova creditos eventualmente tomados."
+        )
+    if rule_id == "COD_SIT_DIVERGENTE_XML":
+        return (
+            f"O COD_SIT informado no C100 da NF-e {nf} nao corresponde ao status "
+            f"registrado na SEFAZ.\n\n"
+            f"**Como corrigir:**\n"
+            f"Consulte a situacao da NF-e no portal da SEFAZ e ajuste o COD_SIT "
+            f"conforme o mapeamento: Autorizada=00, Cancelada=02, Denegada=05."
+        )
+    return None
+
+
 def _gerar_erros_com_sugestao_xml(
     db: sqlite3.Connection,
     file_id: int,
@@ -770,23 +1139,32 @@ def _gerar_erros_com_sugestao_xml(
         if corrigivel:
             msg += f" Sugestao: verificar {campo_sped} — XML indica {expected}."
 
-        friendly = (
-            f"NF-e {numero_nfe}: valor no SPED ({f['valor_sped']}) diverge do "
-            f"XML ({f['valor_xml']}). Confira ambos os valores e corrija o que estiver incorreto."
-        ) if corrigivel else f"NF-e {numero_nfe}: divergencia XML x SPED — {f['message']}"
+        friendly = _build_friendly_xml(
+            rule_id, numero_nfe, f, campo_sped, corrigivel,
+        )
+
+        doc_sug = _build_doc_suggestion_xml(
+            rule_id, numero_nfe, f, campo_sped, corrigivel,
+        )
+
+        # Base legal fixa por regra de cruzamento
+        legal_data = _LEGAL_BASIS_XML.get(rule_id)
+        legal_json = json.dumps(legal_data, ensure_ascii=False) if legal_data else None
 
         try:
             db.execute(
                 """INSERT INTO validation_errors
                    (file_id, record_id, line_number, register, field_no, field_name,
                     value, expected_value, error_type, severity, message,
-                    friendly_message, auto_correctable, categoria, certeza, impacto)
-                   VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, 'cruzamento_xml', 'objetivo', 'critico')""",
+                    friendly_message, auto_correctable, categoria, certeza, impacto,
+                    doc_suggestion, legal_basis)
+                   VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, 'cruzamento_xml', 'objetivo', 'critico', ?, ?)""",
                 (
                     file_id, record_id, line_no, register or "C100",
                     campo_sped or f["campo_sped"],
                     f["valor_sped"], expected,
                     rule_id, severity, msg, friendly, auto_corr,
+                    doc_sug, legal_json,
                 ),
             )
         except Exception as exc:
@@ -796,18 +1174,26 @@ def _gerar_erros_com_sugestao_xml(
 
 
 def _finding(file_id, nfe_id, chave, rule_id, severity,
-             campo_xml, valor_xml, campo_sped, valor_sped, diferenca, message):
-    return {
+             campo_xml, valor_xml, campo_sped, valor_sped, diferenca, message,
+             tracked=None):
+    result = {
         "file_id": file_id, "nfe_id": nfe_id, "chave_nfe": chave,
         "rule_id": rule_id, "severity": severity,
         "campo_xml": campo_xml, "valor_xml": str(valor_xml) if valor_xml is not None else "",
         "campo_sped": campo_sped, "valor_sped": str(valor_sped) if valor_sped is not None else "",
         "diferenca": diferenca, "message": message,
     }
+    if tracked:
+        result["tracked"] = tracked
+    return result
 
 
 def _compare_value(findings, file_id, nfe_id, chave, rule_id, severity,
-                   campo_xml, val_xml, campo_sped, val_sped, tolerance):
+                   campo_xml, val_xml, campo_sped, val_sped, tolerance,
+                   tracked=None):
+    # Ausente != zero: se qualquer lado for None/vazio, skip (sem falso positivo)
+    if val_xml is None or val_sped is None:
+        return
     val_x = _to_float(val_xml)
     val_s = _to_float(val_sped)
     diff = abs(val_x - val_s)
@@ -816,4 +1202,5 @@ def _compare_value(findings, file_id, nfe_id, chave, rule_id, severity,
             file_id, nfe_id, chave, rule_id, severity,
             campo_xml, f"{val_x:.2f}", campo_sped, f"{val_s:.2f}", diff,
             f"{campo_xml}={val_x:.2f} vs {campo_sped}={val_s:.2f} (dif={diff:.2f}).",
+            tracked=tracked,
         ))

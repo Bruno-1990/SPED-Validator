@@ -9,6 +9,14 @@ import ErrorChart from '../components/Dashboard/ErrorChart'
 import AuditScopePanel from '../components/Dashboard/AuditScopePanel'
 import CorrectionApprovalPanel from '../components/Corrections/CorrectionApprovalPanel'
 
+/** Converte **texto** em <strong>texto</strong> para exibicao formatada. */
+function renderBold(text: string) {
+  const parts = text.split(/\*\*(.*?)\*\*/g)
+  return parts.map((part, i) =>
+    i % 2 === 1 ? <strong key={i} className="font-semibold">{part}</strong> : part
+  )
+}
+
 const STAGE_LABELS: Record<string, string> = {
   estrutural: 'Analise Estrutural',
   cruzamento: 'Cruzamento de Dados',
@@ -777,7 +785,7 @@ function ErrorCard({
             {error.certeza === 'indicio' && <span className="px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700">Indicio</span>}
             {isCorrected && <span className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">Corrigido</span>}
           </div>
-          <p className="text-sm text-gray-800">{displayMessage}</p>
+          <p className="text-sm text-gray-800">{renderBold(displayMessage)}</p>
           {/* Inline correction preview + confidence */}
           {!isCorrected && error.expected_value && error.value && (
             <div className="mt-1.5 flex items-center gap-3 flex-wrap">
@@ -846,17 +854,17 @@ function ErrorCard({
               <div className="text-sm text-gray-800 whitespace-pre-line leading-relaxed">
                 {error.doc_suggestion.split('**Como corrigir:**').map((part, i) =>
                   i === 0 ? (
-                    <p key={i}>{part.trim()}</p>
+                    <p key={i}>{renderBold(part.trim())}</p>
                   ) : (
                     <div key={i} className="mt-3 pt-3 border-t border-blue-200">
                       <span className="font-semibold text-blue-800">Como corrigir: </span>
-                      <span className="text-gray-700">{part.trim()}</span>
+                      <span className="text-gray-700">{renderBold(part.trim())}</span>
                     </div>
                   )
                 )}
               </div>
             ) : error.friendly_message ? (
-              <p className="text-sm text-gray-800">{error.friendly_message}</p>
+              <p className="text-sm text-gray-800">{renderBold(error.friendly_message)}</p>
             ) : null}
 
             {/* Dados do erro */}

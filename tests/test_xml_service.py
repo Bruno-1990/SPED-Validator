@@ -9,7 +9,7 @@ import pytest
 
 from src.services.xml_service import (
     _norm_chave, _norm_cnpj, _norm_cfop, _norm_cst, _norm_ncm,
-    _norm_date_iso, _to_float, parse_nfe_xml,
+    _norm_date_iso, _to_float, _compare_value, parse_nfe_xml,
 )
 
 
@@ -57,6 +57,45 @@ class TestNormalizacao:
         assert _to_float("1000.50") == 1000.50
         assert _to_float(None) == 0.0
         assert _to_float("abc") == 0.0
+
+    def test_to_float_virgula_decimal(self):
+        """SPED usa virgula como separador decimal (formato BR)."""
+        assert _to_float("1931,49") == 1931.49
+        assert _to_float("0,00") == 0.0
+        assert _to_float("1000,50") == 1000.50
+
+
+# ── _compare_value: ausente != zero (BUG falso positivo VL_DOC) ──
+
+class TestCompareValueAusente:
+    def test_skip_quando_sped_ausente(self):
+        """VL_DOC ausente no SPED (None) nao deve gerar divergencia."""
+        findings = []
+        _compare_value(findings, 1, 1, "chave", "XML003", "critical",
+                       "totais.vNF", 1000.0, "C100.VL_DOC", None, 0.02)
+        assert findings == []
+
+    def test_skip_quando_xml_ausente(self):
+        """Campo ausente no XML (None) nao deve gerar divergencia."""
+        findings = []
+        _compare_value(findings, 1, 1, "chave", "XML003", "critical",
+                       "totais.vNF", None, "C100.VL_DOC", 1000.0, 0.02)
+        assert findings == []
+
+    def test_diverge_quando_ambos_presentes(self):
+        """Valores presentes e diferentes devem divergir normalmente."""
+        findings = []
+        _compare_value(findings, 1, 1, "chave", "XML003", "critical",
+                       "totais.vNF", 1000.0, "C100.VL_DOC", 500.0, 0.02)
+        assert len(findings) == 1
+        assert findings[0]["rule_id"] == "XML003"
+
+    def test_ok_quando_ambos_iguais(self):
+        """Valores presentes e iguais nao devem gerar divergencia."""
+        findings = []
+        _compare_value(findings, 1, 1, "chave", "XML003", "critical",
+                       "totais.vNF", 1000.0, "C100.VL_DOC", 1000.0, 0.02)
+        assert findings == []
 
 
 # ── Parser XML ──

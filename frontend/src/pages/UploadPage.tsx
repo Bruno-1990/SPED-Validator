@@ -539,9 +539,9 @@ export default function UploadPage() {
                     />
                   </div>
                   {cruzLog.length > 0 && (
-                    <div className="bg-slate-900 rounded-md p-3 max-h-32 overflow-y-auto">
-                      {cruzLog.map((msg, i) => (
-                        <p key={i} className={`font-mono text-xs leading-5 ${i === cruzLog.length - 1 ? 'text-green-400' : 'text-slate-500'}`}>
+                    <div className="bg-slate-900 rounded-md p-3 max-h-32 overflow-y-auto flex flex-col-reverse">
+                      {[...cruzLog].reverse().map((msg, i) => (
+                        <p key={i} className={`font-mono text-xs leading-5 ${i === 0 ? 'text-green-400' : 'text-slate-500'}`}>
                           <span className="text-slate-600 mr-1.5">{'>'}</span>{msg}
                         </p>
                       ))}

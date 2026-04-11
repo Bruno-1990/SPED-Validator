@@ -89,9 +89,37 @@ class FieldComparator:
         return CompareResult.diverge(sped_val=str(sped or ""), xml_val=str(xml or ""))
 
     def _monetary(self, sped, xml) -> CompareResult:
-        """Comparacao decimal com tolerancia proporcional (BUG-005)."""
+        """Comparacao decimal com tolerancia proporcional (BUG-005).
+
+        Politica de ausencia (mapeamento robusto):
+        - Ambos ausentes/None → OK (sem divergencia)
+        - Ambos zero → OK
+        - Um ausente e outro tem valor → diverge (ausente != zero)
+        """
+        sped_is_none = sped is None or str(sped).strip() == ""
+        xml_is_none = xml is None or str(xml).strip() == ""
+
+        # Ambos ausentes → OK
+        if sped_is_none and xml_is_none:
+            return CompareResult.ok()
+
         sped_d = self._to_decimal(sped)
         xml_d = self._to_decimal(xml)
+
+        # Um ausente e outro com valor significativo → diverge
+        if sped_is_none and xml_d != Decimal("0"):
+            return CompareResult.diverge(
+                sped_val="(ausente)", xml_val=f"{float(xml_d):.2f}",
+                diferenca=float(xml_d),
+                nota="Campo ausente no SPED mas presente no XML",
+            )
+        if xml_is_none and sped_d != Decimal("0"):
+            return CompareResult.diverge(
+                sped_val=f"{float(sped_d):.2f}", xml_val="(ausente)",
+                diferenca=float(sped_d),
+                nota="Campo ausente no XML mas presente no SPED",
+            )
+
         diff = abs(sped_d - xml_d)
         tol = Decimal(str(tolerancia_proporcional(float(max(sped_d, xml_d)))))
 

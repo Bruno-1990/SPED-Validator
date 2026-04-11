@@ -1,159 +1,446 @@
-# Mapeamento SPED <-> XML NF-e (ICMS/IPI)
-# Fase 5: Configuracao externalizada para FieldComparator
-# Foco: ICMS e IPI exclusivamente. PIS/COFINS apenas como reflexo.
-version: "2.0"
+# MAPEAMENTO ROBUSTO — XML NF-e (mod 55) x SPED EFD ICMS/IPI
+# Baseado em: data/reference/MAPEAMENTO_ROBUSTO_XML_SPED_ICMS_IPI.md v1.0
+# XPaths completos com prefixo .//infNFe/ conforme schema NF-e
+#
+# Principios:
+#   - Ausente != zero (default_policy: missing retorna null, nao 0)
+#   - Cada campo com xpath, tipo, normalizacao, compare_to, default_policy
+#   - Rastreabilidade: source_xpath preservado no payload
+#
+version: "3.0"
 namespace_nfe: "http://www.portalfiscal.inf.br/nfe"
 
-# Tipos de comparacao:
-#   EXACT: string apos normalizacao
-#   MONETARY: decimal com tolerancia proporcional
-#   PERCENTAGE: decimal com tolerancia 0.001%
-#   DATE: normaliza para AAAA-MM-DD
-#   CST_AWARE: CST ou CSOSN conforme CRT emitente
-#   DERIVED: campo calculado (regra especifica)
+# ── Tipos de comparacao ──
+# EXACT: igualdade de string apos normalizacao (trim, upper, digits_only)
+# MONETARY: decimal com tolerancia proporcional (BUG-005)
+# PERCENTAGE: decimal com tolerancia 0.001%
+# DATE: normaliza para AAAA-MM-DD (trunca horario do XML)
+# CST_AWARE: CST ou CSOSN conforme CRT do emitente (CRT=1/2 → CSOSN)
+# DERIVED: campo calculado com mapeamento especifico
+# AGGREGATED: comparacao por agrupamento (C190)
+
+# ── Politicas de ausencia ──
+# missing: campo obrigatorio ausente → null (NUNCA zero automatico)
+# optional: campo opcional, sem erro estrutural se ausente
+# zero_allowed: zero e valor valido (ex: VL_IPI pode ser 0.00 legitimamente)
+
+# ══════════════════════════════════════════════
+# CABECALHO NF-e ↔ C100
+# ══════════════════════════════════════════════
 
 c100_header:
+
+  # ── Identificacao do documento ──
+
   - sped_campo: CHV_NFE
     xml_xpath: ".//protNFe/infProt/chNFe"
+    xml_xpath_fallback: ".//infNFe/@Id"
     tipo: EXACT
+    required: true
     join_key: true
+    normalization: [trim, digits_only]
+    default_policy: missing
+    notes: "Se ausente em protNFe, fallback em infNFe/@Id removendo prefixo NFe"
 
   - sped_campo: NUM_DOC
-    xml_xpath: ".//ide/nNF"
+    xml_xpath: ".//infNFe/ide/nNF"
     tipo: EXACT
-
-  - sped_campo: SER
-    xml_xpath: ".//ide/serie"
-    tipo: EXACT
-
-  - sped_campo: DT_DOC
-    xml_xpath: ".//ide/dhEmi"
-    tipo: DATE
-    regra_id: XML015
+    required: true
+    normalization: [trim]
+    default_policy: missing
+    regra_id: XML_NUM_DIVERGENTE
     severidade: medium
 
+  - sped_campo: SER
+    xml_xpath: ".//infNFe/ide/serie"
+    tipo: EXACT
+    required: true
+    normalization: [trim]
+    default_policy: missing
+    regra_id: XML017
+    severidade: medium
+
+  - sped_campo: COD_MOD
+    xml_xpath: ".//infNFe/ide/mod"
+    tipo: EXACT
+    required: true
+    normalization: [trim]
+    default_policy: missing
+    notes: "55=NF-e, 65=NFC-e"
+
+  # ── Datas ──
+
+  - sped_campo: DT_DOC
+    xml_xpath: ".//infNFe/ide/dhEmi"
+    tipo: DATE
+    required: true
+    normalization: [date_from_iso]
+    default_policy: missing
+    regra_id: XML015
+    severidade: medium
+    notes: "XML tem datetime ISO, truncar para data ao comparar com DDMMAAAA"
+
+  - sped_campo: DT_E_S
+    xml_xpath: ".//infNFe/ide/dhSaiEnt"
+    tipo: DATE
+    required: false
+    normalization: [date_from_iso]
+    default_policy: optional
+    regra_id: XML_DT_ES_DIV
+    severidade: low
+    notes: "Pode ser ausente em NF-e de entrada"
+
+  # ── Emitente e destinatario ──
+
+  - sped_campo: CNPJ_EMIT
+    xml_xpath: ".//infNFe/emit/CNPJ"
+    tipo: EXACT
+    required: true
+    normalization: [digits_only]
+    default_policy: missing
+    compare_to: "emitente logico / 0000.CNPJ"
+    regra_id: XML012
+    severidade: critical
+
+  - sped_campo: CRT_EMIT
+    xml_xpath: ".//infNFe/emit/CRT"
+    tipo: DERIVED
+    required: true
+    normalization: [trim]
+    default_policy: missing
+    compare_to: "context.emitente_crt"
+    notes: "Fundamental para CST_AWARE. 1=SN, 2=SN excesso, 3=Normal"
+
+  - sped_campo: CNPJ_DEST
+    xml_xpath: ".//infNFe/dest/CNPJ"
+    xml_xpath_alt: ".//infNFe/dest/CPF"
+    tipo: EXACT
+    required: false
+    normalization: [digits_only]
+    default_policy: optional
+    compare_to: "0150.CNPJ via C100.COD_PART"
+    regra_id: XML012
+    severidade: critical
+
+  - sped_campo: IE_DEST
+    xml_xpath: ".//infNFe/dest/IE"
+    tipo: EXACT
+    required: false
+    normalization: [trim, digits_only]
+    default_policy: optional
+    compare_to: "0150.IE"
+    regra_id: XML013
+    severidade: medium
+
+  - sped_campo: UF_DEST
+    xml_xpath: ".//infNFe/dest/enderDest/UF"
+    tipo: EXACT
+    required: false
+    normalization: [trim, upper]
+    default_policy: optional
+    compare_to: "0150.UF"
+    regra_id: XML014
+    severidade: medium
+
+  # ── Totais da NF-e ↔ C100 ──
+
   - sped_campo: VL_DOC
-    xml_xpath: ".//total/ICMSTot/vNF"
+    xml_xpath: ".//infNFe/total/ICMSTot/vNF"
     tipo: MONETARY
+    required: true
+    normalization: [decimal_2]
+    default_policy: missing
     regra_id: XML004
     severidade: high
-
-  - sped_campo: VL_ICMS
-    xml_xpath: ".//total/ICMSTot/vICMS"
-    tipo: MONETARY
-    regra_id: XML_C100_VL_ICMS
-    severidade: high
+    notes: "Se ausente ou invalido, NUNCA converter para 0.00"
 
   - sped_campo: VL_BC_ICMS
-    xml_xpath: ".//total/ICMSTot/vBC"
+    xml_xpath: ".//infNFe/total/ICMSTot/vBC"
     tipo: MONETARY
+    required: true
+    normalization: [decimal_2]
+    default_policy: missing
     regra_id: XML_C100_VL_BC
     severidade: high
 
-  - sped_campo: VL_ICMS_ST
-    xml_xpath: ".//total/ICMSTot/vST"
+  - sped_campo: VL_ICMS
+    xml_xpath: ".//infNFe/total/ICMSTot/vICMS"
     tipo: MONETARY
+    required: true
+    normalization: [decimal_2]
+    default_policy: missing
+    regra_id: XML_C100_VL_ICMS
+    severidade: high
+
+  - sped_campo: VL_ICMS_ST
+    xml_xpath: ".//infNFe/total/ICMSTot/vST"
+    tipo: MONETARY
+    required: false
+    normalization: [decimal_2]
+    default_policy: zero_allowed
     regra_id: XML_C100_VL_ST
     severidade: high
 
   - sped_campo: VL_IPI
-    xml_xpath: ".//total/ICMSTot/vIPI"
+    xml_xpath: ".//infNFe/total/ICMSTot/vIPI"
     tipo: MONETARY
+    required: false
+    normalization: [decimal_2]
+    default_policy: zero_allowed
     regra_id: XML_C100_VL_IPI
     severidade: high
-    opcional: true
-
-  - sped_campo: VL_DESC
-    xml_xpath: ".//total/ICMSTot/vDesc"
-    tipo: MONETARY
-    severidade: medium
+    notes: "Apenas NF-e industriais — zero e valido"
 
   - sped_campo: VL_FRT
-    xml_xpath: ".//total/ICMSTot/vFrete"
+    xml_xpath: ".//infNFe/total/ICMSTot/vFrete"
     tipo: MONETARY
+    required: false
+    normalization: [decimal_2]
+    default_policy: zero_allowed
+    regra_id: XML_FRETE_DIVERGENTE
     severidade: medium
+    notes: "Relevante para calculo de MVA na ST"
+
+  - sped_campo: VL_DESC
+    xml_xpath: ".//infNFe/total/ICMSTot/vDesc"
+    tipo: MONETARY
+    required: false
+    normalization: [decimal_2]
+    default_policy: zero_allowed
+    regra_id: XML_DESC_DIVERGENTE
+    severidade: medium
+
+  # ── Situacao documental ──
 
   - sped_campo: COD_SIT
     xml_xpath: ".//protNFe/infProt/cStat"
     tipo: DERIVED
+    required: true
+    normalization: [trim]
+    default_policy: missing
     mapeamento:
-      "100": "00"
-      "101": "02"
-      "135": "02"
-      "110": "05"
-      "301": "05"
+      "100": "00"   # Autorizada → Normal
+      "101": "02"   # Cancelada → Cancelada
+      "135": "02"   # Cancelada fora prazo → Cancelada
+      "110": "05"   # Denegada → Denegada
+      "301": "05"   # Uso indevido → Denegada
     regra_id: XML003_B
     severidade: critical
 
+
+# ══════════════════════════════════════════════
+# ITENS NF-e ↔ C170
+# ══════════════════════════════════════════════
+
 c170_items:
+
+  # ── Chave do item ──
+
   - sped_campo: NUM_ITEM
-    xml_xpath: "./@nItem"
+    xml_xpath: ".//infNFe/det/@nItem"
     tipo: EXACT
+    required: true
     join_key: true
+    normalization: [trim]
+    default_policy: missing
+    notes: "1-based — ancora de vinculacao item XML ↔ C170"
+
+  # ── Produto ──
+
+  - sped_campo: COD_ITEM
+    xml_xpath: ".//infNFe/det/prod/cProd"
+    tipo: EXACT
+    required: true
+    normalization: [trim]
+    default_policy: missing
+    compare_to: "C170.COD_ITEM / 0200.COD_ITEM"
+    regra_id: XML_COD_ITEM_DIV
+    severidade: medium
 
   - sped_campo: NCM
-    xml_xpath: "./prod/NCM"
+    xml_xpath: ".//infNFe/det/prod/NCM"
     tipo: EXACT
+    required: true
+    normalization: [digits_only]
+    default_policy: missing
+    compare_to: "0200.COD_NCM / C170.NCM logico"
     regra_id: XML009
     severidade: medium
 
   - sped_campo: CFOP
-    xml_xpath: "./prod/CFOP"
+    xml_xpath: ".//infNFe/det/prod/CFOP"
     tipo: EXACT
+    required: true
+    normalization: [digits_only]
+    default_policy: missing
     regra_id: XML007
     severidade: high
 
-  - sped_campo: VL_ITEM
-    xml_xpath: "./prod/vProd"
+  - sped_campo: QTD
+    xml_xpath: ".//infNFe/det/prod/qCom"
     tipo: MONETARY
+    required: true
+    normalization: [decimal_4]
+    default_policy: missing
+    regra_id: XML_QTD_DIVERGENTE
+    severidade: medium
+    notes: "Ate 4 casas decimais"
+
+  - sped_campo: VL_ITEM
+    xml_xpath: ".//infNFe/det/prod/vProd"
+    tipo: MONETARY
+    required: true
+    normalization: [decimal_2]
+    default_policy: missing
     regra_id: XML011_A
     severidade: high
 
+  # ── ICMS ──
+
   - sped_campo: CST_ICMS
-    xml_xpath: "./imposto/ICMS/*/CST"
-    xml_xpath_alt: "./imposto/ICMS/*/CSOSN"
+    xml_xpath: ".//infNFe/det/imposto/ICMS/*/CST"
+    xml_xpath_alt: ".//infNFe/det/imposto/ICMS/*/CSOSN"
     tipo: CST_AWARE
+    required: true
+    normalization: [trim]
+    default_policy: missing
     regra_id: XML008
     severidade: high
+    notes: "Se CRT=1/2, usar CSOSN. Mapeamento via CSOSN_TO_CST"
 
   - sped_campo: VL_BC_ICMS
-    xml_xpath: "./imposto/ICMS/*/vBC"
+    xml_xpath: ".//infNFe/det/imposto/ICMS/*/vBC"
     tipo: MONETARY
+    required: false
+    normalization: [decimal_2]
+    default_policy: optional
     regra_id: XML_C170_VL_BC
     severidade: high
 
   - sped_campo: ALIQ_ICMS
-    xml_xpath: "./imposto/ICMS/*/pICMS"
+    xml_xpath: ".//infNFe/det/imposto/ICMS/*/pICMS"
     tipo: PERCENTAGE
+    required: false
+    normalization: [decimal_4]
+    default_policy: optional
     regra_id: XML010
     severidade: high
 
   - sped_campo: VL_ICMS
-    xml_xpath: "./imposto/ICMS/*/vICMS"
+    xml_xpath: ".//infNFe/det/imposto/ICMS/*/vICMS"
     tipo: MONETARY
+    required: false
+    normalization: [decimal_2]
+    default_policy: optional
     regra_id: XML011
     severidade: high
 
+  # ── ICMS-ST ──
+
   - sped_campo: VL_BC_ICMS_ST
-    xml_xpath: "./imposto/ICMS/*/vBCST"
+    xml_xpath: ".//infNFe/det/imposto/ICMS/*/vBCST"
     tipo: MONETARY
+    required: false
+    normalization: [decimal_2]
+    default_policy: optional
+    regra_id: XML_BC_ST_DIVERGENTE
     severidade: high
-    opcional: true
+
+  - sped_campo: ALIQ_ST
+    xml_xpath: ".//infNFe/det/imposto/ICMS/*/pICMSST"
+    xml_xpath_alt: ".//infNFe/det/imposto/ICMS/*/pST"
+    tipo: PERCENTAGE
+    required: false
+    normalization: [decimal_4]
+    default_policy: optional
+    regra_id: XML_ALIQ_ST_DIVERGENTE
+    severidade: high
 
   - sped_campo: VL_ICMS_ST
-    xml_xpath: "./imposto/ICMS/*/vICMSST"
+    xml_xpath: ".//infNFe/det/imposto/ICMS/*/vICMSST"
+    xml_xpath_alt: ".//infNFe/det/imposto/ICMS/*/vICMSSTRet"
     tipo: MONETARY
+    required: false
+    normalization: [decimal_2]
+    default_policy: optional
+    regra_id: XML_ICMS_ST_DIVERGENTE
     severidade: high
-    opcional: true
+
+  # ── IPI ──
 
   - sped_campo: CST_IPI
-    xml_xpath: "./imposto/IPI/*/CST"
+    xml_xpath: ".//infNFe/det/imposto/IPI/*/CST"
     tipo: EXACT
+    required: false
+    normalization: [trim]
+    default_policy: optional
+    regra_id: XML_CST_IPI_DIVERGENTE
     severidade: medium
-    opcional: true
+
+  - sped_campo: VL_BC_IPI
+    xml_xpath: ".//infNFe/det/imposto/IPI/*/vBC"
+    tipo: MONETARY
+    required: false
+    normalization: [decimal_2]
+    default_policy: optional
+    regra_id: XML_BC_IPI_DIVERGENTE
+    severidade: medium
+
+  - sped_campo: ALIQ_IPI
+    xml_xpath: ".//infNFe/det/imposto/IPI/*/pIPI"
+    tipo: PERCENTAGE
+    required: false
+    normalization: [decimal_4]
+    default_policy: optional
+    regra_id: XML_ALIQ_IPI_DIVERGENTE
+    severidade: medium
 
   - sped_campo: VL_IPI
-    xml_xpath: "./imposto/IPI/*/vIPI"
+    xml_xpath: ".//infNFe/det/imposto/IPI/*/vIPI"
     tipo: MONETARY
+    required: false
+    normalization: [decimal_2]
+    default_policy: zero_allowed
+    regra_id: XML_IPI_DIVERGENTE
     severidade: high
-    opcional: true
+
+
+# ══════════════════════════════════════════════
+# C190 — Comparacao por agregacao (nao 1:1)
+# ══════════════════════════════════════════════
+
+c190_aggregation:
+  description: |
+    C190 nao tem equivalente direto no XML.
+    Agrupar det[] do XML por (CST_ICMS normalizado, CFOP, pICMS).
+    Somar: vBC, vICMS, vBCST, vICMSST.
+    Comparar com C190 do SPED pelo mesmo grupo.
+  campos:
+    - grupo: [CST_ICMS, CFOP, ALIQ_ICMS]
+      xml_soma: [vBC, vICMS, vBCST, vICMSST]
+      sped_campos: [VL_BC_ICMS, VL_ICMS, VL_BC_ICMS_ST, VL_ICMS_ST]
+      compare_type: MONETARY
+      regra_id: XML_C190_DIVERGE
+      severidade: high
+
+
+# ══════════════════════════════════════════════
+# Regras anti-falso-positivo
+# ══════════════════════════════════════════════
+
+anti_falso_positivo:
+  campo_monetario_ausente:
+    acao: "retornar null, registrar status=missing"
+    proibido: "NUNCA retornar 0.00 automaticamente"
+
+  campo_monetario_zero_explicito:
+    acao: "retornar 0.00, registrar status=explicit_zero"
+
+  campo_monetario_invalido:
+    acao: "retornar null, registrar status=parse_error"
+    proibido: "NUNCA substituir por zero silenciosamente"
+
+  fallback_chave:
+    primario: ".//protNFe/infProt/chNFe"
+    secundario: ".//infNFe/@Id"
+    normalizacao: "remover prefixo NFe, manter 44 digitos"

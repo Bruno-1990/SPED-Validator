@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react'
 import type { SearchResult, ValidationError, LegalBasis } from '../../types/sped'
 
+/** Converte **texto** em <strong>texto</strong>. */
+function renderBold(text: string) {
+  const parts = text.split(/\*\*(.*?)\*\*/g)
+  return parts.map((part, i) =>
+    i % 2 === 1 ? <strong key={i} className="font-semibold">{part}</strong> : part
+  )
+}
+
 interface Props {
   error: ValidationError
   onSearch: (query: string) => Promise<SearchResult[]>
@@ -72,7 +80,7 @@ export default function SuggestionPanel({ error, onSearch }: Props) {
       <section>
         <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">O que o sistema encontrou</h5>
         <p className="text-sm text-gray-700">
-          {error.friendly_message || error.message}
+          {renderBold(error.friendly_message || error.message)}
         </p>
       </section>
 
