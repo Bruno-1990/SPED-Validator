@@ -1,427 +1,401 @@
-================================================================================
-MAPA DE MELHORIAS — MOTOR DE VALIDAÇÃO SPED EFD
-Gerado em: 2026-04-10 | Atualizado: 2026-04-10 (auditoria fiscal federal)
-Base: Auditoria de 30 validators, pipeline, validation_service, helpers
-PRD referência: upgrade/PRD_SPED_v2_Completo.docx
-Ref. TypeScript: data/reference/typescript-spec/ (apuration.reconciler, c100.validator)
-================================================================================
-
-AUDITORIA FISCAL FEDERAL — RESULTADO (2026-04-10)
-  Score geral: 84/100 (production-ready)
-  Regras implementadas: 195 (100% do rules.yaml)
-  Registros SPED cobertos: 42/53 (83%, 100% dos high-materiality)
-  Dados de referência: 12/12 arquivos presentes e atualizados
-  Pipeline→Validators: 30 validators, TODOS recebem context ✓
-  Benefícios fiscais: fluxo MySQL→JSON→Validators completo e funcional ✓
-  rules.yaml: conectado ao motor (severidade, certeza, impacto, corrigível, vigência) ✓
-
-FLUXO END-TO-END VERIFICADO:
-  ✅ Upload → file_service.upload_file() → build_context() → todos os campos populados
-  ✅ buscar_cliente(cnpj) → ClienteInfo.beneficios_fiscais → loader.get_beneficios_do_cliente()
-  ✅ context.beneficios_ativos → validate_beneficio_cross() → CROSS_004-010
-  ✅ RuleIndex criado no pipeline → passado para _persist_stage_errors e _enrich_errors
-  ✅ _severity_for() consulta YAML primeiro, fallback hardcoded
-  ✅ _enrich_errors() usa corrigivel do YAML para auto_correctable
-  ✅ Pipeline e validation_service sincronizados (30 validators em ambos)
-
-================================================================================
-
-NOVOS ARQUIVOS INTEGRADOS (2026-04-10):
-  ✅ data/JSON/Tabela_Fiscal_Complementar_v6.json — 125 CFOPs com efeitos, MOD_BC, aliq UF, UF IBGE, NF-e campos
-  ✅ data/tabelas/aliquotas_internas_uf.yaml → atualizado data/reference/aliquotas_internas_uf.yaml (2026, 18 UFs mudaram)
-  ✅ data/tabelas/fcp_por_uf.yaml → atualizado data/reference/fcp_por_uf.yaml (2026)
-  ✅ data/reference/vigencias/*/2026-01-01.yaml criados
-  ✅ data/reference/typescript-spec/*.ts — referência de implementação TS (RF001, RF002, C100 validator)
-  ✅ apuracao_validator.py atualizado: RF001/RF002 agora incluem D190 (CT-e) e D590 (comunicação)
-  ✅ CSTs de débito/crédito separados por registro (C190, D190, D590) — do TS de referência
-  ✅ Exceções EX-D-002 (subcontratação 5932/6932) e EX-D-004 (CT-e cancelado) implementadas
-
-NOVOS DADOS DISPONÍVEIS MAS NÃO INTEGRADOS AINDA:
-  ⬜ Tabela_Fiscal_Complementar_v6.json → blocos.CFOP (125 CFOPs com efeitos condicionais)
-     AÇÃO: Carregar no ReferenceLoader; substituir CFOP_VENDA/CFOP_DEVOLUCAO hardcoded do helpers.py
-  ⬜ Tabela_Fiscal_Complementar_v6.json → blocos.MOD_BC_ICMS (4 modalidades)
-     AÇÃO: Usar na validação de VL_BC_ICMS em C170
-  ⬜ Tabela_Fiscal_Complementar_v6.json → blocos.MOD_BC_ICMS_ST (5 modalidades)
-     AÇÃO: Usar na validação de VL_BC_ICMS_ST
-  ⬜ Tabela_Fiscal_Complementar_v6.json → blocos.ICMS_ALIQUOTAS_INTERNAS_UF (27 UFs com detalhes)
-     AÇÃO: Pode substituir aliquotas_internas_uf.yaml como fonte mais rica
-  ⬜ Tabela_Fiscal_Complementar_v6.json → blocos.CODIGO_UF_IBGE (28 códigos)
-     AÇÃO: Usar no destinatario_validator em vez de CEP→UF hardcoded
-  ⬜ Tabela_Fiscal_Complementar_v6.json → blocos.NFE_CAMPOS_DOMINIO (29 domínios)
-     AÇÃO: Validar campos como finNFe, indFinal, idDest contra tabela oficial
-  ⬜ c100.validator.ts → lógica de VL_DOC vs Σ C170 com breakdown detalhado
-     AÇÃO: Portar para Python; substituir/complementar c190_validator._check_c190_001
 
 
-================================================================================
-1. ✅ RESOLVIDO — Pipeline vs validation_service sincronizados
-================================================================================
+NOVAS TABELAS (migration 12)
+─────────────────────────────
 
-Ambos os caminhos agora chamam TODOS os 29 validators.
-  - validation_service.py: +13 validators adicionados (apuracao, beneficio_cross,
-    base_calculo, beneficio, bloco_d, cfop, devolucao, ipi, ncm, parametrizacao,
-    pis_cofins, st_mva, simples)
-  - pipeline.py: +3 validators adicionados (bloco_c_servicos, bloco_k, retificador)
-RESOLVIDO EM: 2026-04-10
+  nfe_xmls — cabeçalho da NF-e parseada
+    id, file_id(FK), chave_nfe(UNIQUE), numero_nfe, serie,
+    cnpj_emitente, cnpj_destinatario, dh_emissao,
+    vl_doc, vl_icms, vl_icms_st, vl_ipi, vl_pis, vl_cofins,
+    qtd_itens, prot_cstat,
+    status TEXT DEFAULT 'active',    -- active|duplicate|superseded|invalid_xml
+    parsed_json TEXT,
+    upload_date TEXT DEFAULT (datetime('now'))
 
+  nfe_itens — itens da NF-e (cruzamento item-a-item)
+    id, nfe_id(FK), num_item, cod_produto, ncm, cfop,
+    vl_prod, vl_desc, cst_icms, vbc_icms, aliq_icms, vl_icms,
+    cst_ipi, vl_ipi, cst_pis, vl_pis, cst_cofins, vl_cofins
 
-================================================================================
-2. CRÍTICO — D190 não soma na reconciliação RF001/RF002
-================================================================================
+  nfe_cruzamento — resultado do cruzamento XML vs SPED
+    id, file_id(FK), nfe_id(FK), chave_nfe, rule_id,
+    severity, campo_xml, valor_xml, campo_sped, valor_sped,
+    diferenca, message, status DEFAULT 'open', created_at
 
-O apuracao_validator (RF001-DEB, RF002-CRE) soma apenas C190 para
-débitos/créditos, mas o E110 inclui também:
-  - D190 (CT-e — serviços de transporte)
-  - C490 (ECF — cupom fiscal)
-  - C590 (C500 — energia/gás/água)
+  ÍNDICES:
+    nfe_xmls(chave_nfe)
+    nfe_xmls(file_id, chave_nfe)
+    nfe_xmls(prot_cstat)
+    nfe_itens(nfe_id, num_item)
+    nfe_cruzamento(file_id, rule_id, severity)
+    nfe_cruzamento(chave_nfe)
 
-Contribuintes com frete próprio ou CT-e terão DIVERGÊNCIA FALSA.
-
-AÇÃO: Incluir D190, C490, C590 na soma de débitos/créditos do RF001/RF002.
-ARQUIVO: src/validators/apuracao_validator.py (funções _rf001_debitos, _rf002_creditos)
-PRD: RF001-DEB pseudocódigo menciona "sped.blocoC.C190" mas E110 agrega TODOS os blocos.
-
-
-================================================================================
-3. CRÍTICO — 10 validators recebem context mas NÃO usam
-================================================================================
-
-Estes validators aceitam ValidationContext mas ignoram campos críticos
-como regime, UF e benefícios:
-
-  VALIDATOR                        CAMPO QUE DEVERIA USAR
-  ─────────────────────────────    ─────────────────────────
-  base_calculo_validator.py        regime (Simples tem regras diferentes)
-  beneficio_audit_validator.py     regime, UF, beneficios_ativos
-  bloco_c_servicos_validator.py    regime, periodo_ini/fim
-  devolucao_validator.py           regime, periodo_ini
-  fiscal_semantics.py              regime (monofásico varia por regime)
-  pendentes_validator.py           regime (desoneracao é regime-dependent)
-  st_validator.py                  regime (ST não se aplica a todo Simples)
-  tax_recalc.py                    regime (tolerância poderia variar)
-  beneficio_validator.py           beneficios_ativos (BENE_001 usa 17% fixo)
-  c190_validator.py                parcialmente corrigido (usa loader)
-
-AÇÃO: Adicionar checagem de regime em cada validator. Mínimo: `if context.regime == SIMPLES_NACIONAL: return []` onde aplicável.
-ARQUIVO: cada um dos 10 listados acima
+  POLÍTICA DE DUPLICATAS:
+    - Mesmo XML enviado 2x → status='duplicate', manter apenas o primeiro
+    - Mesma chave com conteúdo diferente → status='superseded' no antigo, novo fica 'active'
+    - XML malformado → status='invalid_xml', parsed_json=NULL
+    - Lote com documento repetido → aceitar apenas primeiro, logar warning
 
 
-================================================================================
-4. ALTO — Regime não checado em 5 validators
-================================================================================
+API ENDPOINTS
+─────────────
 
-Estes validators DEVERIAM variar comportamento por regime mas não fazem:
+  POST /api/files/{id}/xml/upload    — upload batch de XMLs (multipart)
+  GET  /api/files/{id}/xml           — lista XMLs vinculados + resumo
+  GET  /api/files/{id}/xml/cruzamento — resultado do cruzamento
+  DELETE /api/files/{id}/xml/{xml_id} — remove um XML
+  POST /api/files/{id}/xml/cruzar    — (re)executa o cruzamento
 
-  aliquota_validator.py
-    - ALIQ_003 (interestadual em interna) não se aplica a Simples
-    - Threshold 17% fixo — deveria usar aliquota da UF
-    ARQUIVO: src/validators/aliquota_validator.py (~linha 147, 183, 263)
 
-  audit_rules.py
-    - Registros essenciais (_REGISTROS_ESSENCIAIS) variam por regime
-    - Simples não tem E111 obrigatório
-    ARQUIVO: src/validators/audit_rules.py
+FRONTEND (nova página XMLCrossPage.tsx)
+───────────────────────────────────────
 
-  beneficio_validator.py
-    - BENE_001 usa 17% hardcoded — deveria ser aliquota interna da UF
-    - Não consulta beneficios_ativos do contexto
-    ARQUIVO: src/validators/beneficio_validator.py (~linha 130)
+  1. Dropzone de XMLs (múltiplos .xml)
+  2. Parsing em tempo real com progresso (X de Y processados)
+  3. Resumo pré-cruzamento:
+     - Total XMLs: 150 | Autorizadas: 148 | Canceladas: 2
+     - Duplicatas ignoradas: 0 | Malformados: 0
+  4. Botão "Cruzar com SPED"
+  5. Resultado em 3 abas:
+     - Divergências (XML vs SPED): tabela com chave, campo, XML, SPED, diff
+     - Ausentes no SPED: NF-e que existem no XML mas não no C100
+     - Ausentes nos XMLs: C100 que existem no SPED mas não foram enviados
+  6. Filtros por severidade, regra (XML001-XML017), CNPJ
+  7. Export CSV/JSON
+  Rota: /files/:fileId/xml
 
-  fiscal_semantics.py
-    - Monofásico tem tratamento diferente para Simples
-    - NCM monofásico hardcoded em vez de referência
-    ARQUIVO: src/validators/fiscal_semantics.py
 
-  pendentes_validator.py
-    - Desoneracao e anomalia histórica são regime-dependent
-    ARQUIVO: src/validators/pendentes_validator.py
+PARSING DO XML
+──────────────
+
+  Lib: xml.etree.ElementTree (stdlib)
+
+  Cuidados obrigatórios:
+    - Tratar namespace XML da NF-e (xmlns="http://www.portalfiscal.inf.br/nfe")
+    - Aceitar <nfeProc> (com protocolo) e <NFe> (sem protocolo)
+    - Campos ausentes → None/0.0 (não crashear)
+    - XML malformado → status='invalid_xml', logar, continuar batch
+    - CST do item: se CRT emitente = 1 (SN) → usar CSOSN; se CRT = 3 → usar CST
+
+  Fluxo:
+    1. Detectar envelope (<nfeProc> ou <NFe>)
+    2. Ler <infNFe> → identificação, emitente, destinatário
+    3. Ler <det> → itens com produto + tributos
+    4. Ler <total><ICMSTot> → totalizadores
+    5. Ler <protNFe> → protocolo (cStat, chave)
+    6. Normalizar todos os campos (Etapa 0)
+    7. Salvar em nfe_xmls (cabeçalho) + nfe_itens (detalhe)
+
+
+ARQUIVOS A CRIAR
+────────────────
+
+  src/services/xml_service.py         — parser XML + normalização + cruzamento (17 regras)
+  api/routers/xml.py                  — 5 endpoints REST
+  frontend/src/pages/XMLCrossPage.tsx  — página de upload + resultado
+  tests/test_xml_service.py           — testes do parser e cruzamento
+
+ARQUIVOS A MODIFICAR
+────────────────────
+
+  src/services/database.py            — migration 12 (3 tabelas + 6 índices)
+  api/main.py                         — registrar xml router
+  frontend/src/api/client.ts          — funções XML
+  frontend/src/App.tsx                — rota /files/:fileId/xml
+  frontend/src/types/sped.ts          — tipos NfeXml, NfeCruzamento
 
 
 ================================================================================
-5. ALTO — context.beneficios_ativos não usado pelos validators antigos
+18. PLANO — IA para Tratamento de Erros (cache incremental)
 ================================================================================
 
-Implementamos beneficios_ativos no context_builder e no beneficio_cross_validator,
-mas os validators existentes não consultam:
+STATUS: PLANEJADO (não implementado)
+PRINCÍPIO: IA nunca cria regras fiscais. Apenas trata a apresentação dos erros.
 
-  beneficio_validator.py (BENE_001-003)
-    - BENE_001 usa threshold fixo 17% — deveria usar aliquotas_referencia do JSON
-    - BENE_002 poderia pular para benefícios com interestadual permitido
-    AÇÃO: Fase 6 do plano original de benefícios
-    ARQUIVO: src/validators/beneficio_validator.py
+ARQUITETURA DE CACHE
+────────────────────
 
-  beneficio_audit_validator.py
-    - Não cruza códigos de ajuste E111 com benefícios declarados do cliente
-    - Poderia usar perfil.registros_afetados para focar verificação
-    ARQUIVO: src/validators/beneficio_audit_validator.py
+  Chave ampliada (evita colisão de contexto):
+    (rule_id, regime, uf, beneficio_codigo, ind_oper, campo_principal)
 
+  Motivo: dois erros do mesmo error_type podem exigir explicações diferentes
+  conforme bloco/registro, severidade, entrada vs saída, campo envolvido.
 
-================================================================================
-6. ALTO — Hardcoded que deveria usar referência (ReferenceLoader)
-================================================================================
+  Valor: texto gerado pela IA
 
-  aliquota_validator.py
-    - _NCM_IMPORTACAO_TIPICA: prefixos NCM hardcoded
-    - Threshold 17% fixo em vez de aliquotas_internas_uf.yaml
-    AÇÃO: usar context.reference_loader.get_aliquota_interna(uf)
-    ARQUIVO: src/validators/aliquota_validator.py
-
-  destinatario_validator.py
-    - CEP→UF mapping: dicionário hardcoded
-    - Formato IE por UF: dicionário hardcoded
-    AÇÃO: migrar para YAML ou JSON de referência
-    ARQUIVO: src/validators/destinatario_validator.py
-
-  fiscal_semantics.py
-    - NCM monofásico: prefixos hardcoded (_NCM_MONOFASICO)
-    AÇÃO: usar reference_loader.get_ncm_tributacao()
-    ARQUIVO: src/validators/fiscal_semantics.py
-
-  difal_validator.py
-    - Carrega YAML diretamente em variáveis globais
-    AÇÃO: usar context.reference_loader em vez de cache global
-    ARQUIVO: src/validators/difal_validator.py (~linha 37-55)
-
-  tolerance.py
-    - Tolerâncias hardcoded (0.02, 0.01, etc.)
-    AÇÃO: considerar parametrização via rules.yaml
-    ARQUIVO: src/validators/tolerance.py
+  Fluxo:
+    1. Erro gerado pelo validator → montar chave do cache
+    2. Buscar no banco (ai_error_cache) por chave_hash
+    3. Se encontrar → usar texto cacheado (zero IA, incrementar hits)
+    4. Se não encontrar → chamar IA → salvar no cache → usar
+  Após 2-3 meses: 99% dos erros já cacheados, IA quase nunca chamada
 
 
-================================================================================
-7. ALTO — Cadeia ST não reconciliada (PRD ST001-ST007)
-================================================================================
+FRENTES
+───────
 
-A cadeia de apuração ICMS-ST não é validada:
-  C190 (VL_ICMS_ST) → E210 → E220 → E250
+  Frente 1 — Explicação Inteligente (maior impacto)
+    Input: erro bruto + contexto (regime, UF, benefícios, CNAE)
+    Output: explicação personalizada em português para contador
+    Onde: complementar _enrich_errors() no pipeline
+    Modelo: Claude Haiku (rápido, barato) via batch
 
-PRD define 7 regras:
-  ST001-DEB:   Σ C190.VL_ICMS_ST (CST 10/30/70, saída) = E210.VL_TOT_DEB_ST
-  ST002-CRE:   Σ C190.VL_ICMS_ST (CST 60, entrada) = E210.VL_TOT_CRED_ST
-  ST003-SALDO: E210 consistência interna
-  ST004-AJ-COD: Código ajuste E220 válido para UF
-  ST005-E250:  E250 presente quando há saldo ST
-  ST006-RESSARC: E113 presente no ressarcimento
-  ST007-PROT:  Protocolo ST referenciado
+  Frente 2 — Agrupamento e Priorização
+    Input: lista de 2000+ erros de um SPED
+    Output: 3-5 problemas principais com ordem de resolução
+    Onde: novo endpoint POST /api/files/{id}/ai-summary
+    Modelo: Claude Haiku
 
-O st_validator.py existente valida apenas MVA e CST 60 débito indevido.
+  Frente 3 — Sugestão de Correção Contextual
+    Input: erro sem expected_value + contexto
+    Output: sugestão textual de como corrigir
+    Onde: campo ai_suggestion na tabela validation_errors
+    Modelo: Claude Haiku
 
-AÇÃO: Criar src/validators/apuracao_st_validator.py análogo ao apuracao_validator.py
-ARQUIVO: src/validators/st_validator.py (existente — MVA/CST)
-ARQUIVO: novo src/validators/apuracao_st_validator.py (reconciliação E210)
-
-
-================================================================================
-8. ALTO — Cadeia IPI não reconciliada (PRD IPI001-IPI008)
-================================================================================
-
-A cadeia de apuração IPI não é validada:
-  C190 (VL_IPI) → E510 → E520 → E530
-
-PRD define 8 regras:
-  IPI001-DEB:   Σ C190.VL_IPI (CST-IPI saída) = E510.VL_TOT_DEB
-  IPI002-CRE:   Σ C190.VL_IPI (CST-IPI entrada) = E510.VL_TOT_CRED
-  IPI003-SALDO: E510 consistência interna
-  IPI004-AJ-COD: Código ajuste E520 válido
-  IPI005-E530:  E530 presente quando há saldo IPI
-  IPI006-TIPI:  Alíquota IPI conforme TIPI (precisa tabela TIPI no SQLite)
-  IPI007-CST-IPI: CST-IPI compatível com operação
-  IPI008-NT:    IPI não tributado verificado contra TIPI
-
-O ipi_validator.py existente valida apenas reflexo na BC ICMS e CST monetário.
-
-AÇÃO: Criar src/validators/apuracao_ipi_validator.py
-DEPENDÊNCIA: Tabela TIPI no SQLite (não temos ainda)
-ARQUIVO: src/validators/ipi_validator.py (existente — reflexo BC)
-ARQUIVO: novo src/validators/apuracao_ipi_validator.py (reconciliação E510)
+  Frente 4 — Relatório Narrativo
+    Input: todos os erros + contexto do contribuinte
+    Output: parecer de fechamento em linguagem contábil/fiscal
+    Onde: novo endpoint GET /api/files/{id}/report/narrative
+    Modelo: Claude Sonnet (texto longo, qualidade)
 
 
-================================================================================
-9. MÉDIO — DIFAL agregado não reconciliado (PRD DF001-DF005)
-================================================================================
+NOVA TABELA: ai_error_cache
+────────────────────────────
 
-O difal_validator.py valida por item (C170) mas não reconcilia com E110:
-  DF001-AGR: Σ C170.VL_ICMS_UF_DEST por UF = E110.DEB_ESP
-  DF002-E116: DEB_ESP > 0 → E116 com COD_OR de DIFAL
-  DF003-FCP: Σ C170.VL_FCP > 0 → E116 separado para FCP
+  id INTEGER PRIMARY KEY,
+  chave_hash TEXT UNIQUE,              -- SHA256 da chave ampliada
+  rule_id TEXT,
+  error_type TEXT,
+  regime TEXT,
+  uf TEXT,
+  beneficio_codigo TEXT,
+  ind_oper TEXT,                        -- '0'=saída, '1'=entrada
+  campo_principal TEXT,
+  explicacao_texto TEXT,
+  sugestao_texto TEXT,
+  modelo_usado TEXT,                   -- 'haiku-4.5', 'sonnet-4.6'
+  prompt_version INTEGER DEFAULT 1,    -- versionamento do prompt
+  rule_version INTEGER DEFAULT 1,      -- versão da regra no rules.yaml
+  gerado_em TEXT,
+  hits INTEGER DEFAULT 0               -- contador de reutilizações
 
-AÇÃO: Adicionar reconciliação agregada no difal_validator ou apuracao_validator.
-ARQUIVO: src/validators/difal_validator.py ou src/validators/apuracao_validator.py
+  ÍNDICES:
+    ai_error_cache(chave_hash)
+    ai_error_cache(error_type, regime, uf)
+
+  INVALIDAÇÃO:
+    - Se prompt_version mudar → cache antigo ignorado, IA regenera
+    - Se rule_version mudar → cache antigo ignorado, IA regenera
+    - Ambas as versões comparadas no momento da busca
+
+
+FRONTEND — APRESENTAÇÃO DA IA
+──────────────────────────────
+
+  Toda saída da IA deve ser marcada visualmente como:
+    🤖 "Explicação automática — sugestão não vinculante"
+    "Esta análise foi gerada por IA e depende de conferência técnica."
+
+  Elementos visuais:
+    - Badge "IA" ao lado do texto gerado
+    - Cor diferente do texto determinístico (ex: fundo azul claro)
+    - Disclaimer fixo no rodapé do card de sugestão
+    - Botão "Reportar erro na sugestão" para feedback
+
+  Motivo: ambiente fiscal — sugestão errada pode causar prejuízo real.
+
+
+DEPENDÊNCIA: API key Anthropic configurada no .env (ANTHROPIC_API_KEY)
 
 
 ================================================================================
-10. MÉDIO — Campos do E110 não validados
+19. PLANO — Auditoria Unificada (Pipeline Unico SPED + XML + Regime + Beneficio)
 ================================================================================
 
-  DEB_ESP (débito especial / DIFAL)
-    - Mencionado no código mas sem validação dedicada
-    - Deveria ser reconciliado com DIFAL do C170
-    ARQUIVO: src/validators/apuracao_validator.py
+STATUS: PLANEJADO (não implementado)
+IMPACTO: Arquitetural — elimina revalidação, unifica fluxo, replica lógica da RFB
+REFERÊNCIA: Procedimentos de auditoria fiscal da Receita Federal (malha ICMS)
 
-  VL_TOT_AJ_DEBITOS / VL_TOT_AJ_CREDITOS
-    - Campos totalizadores que incluem ajustes + estornos
-    - Não cruzados formalmente com E111
-    ARQUIVO: src/validators/apuracao_validator.py (_rf004_ajustes)
+PROBLEMA ATUAL
+──────────────
 
+  Hoje existem 2 processos independentes que competem entre si:
 
-================================================================================
-11. MÉDIO — Registros SPED sem validação
-================================================================================
+  1. Pipeline SPED (26 validadores)
+     - Roda estrutural → cruzamento blocos → enriquecimento
+     - DELETE todos os validation_errors ao iniciar
+     - Não sabe que existem XMLs
 
-Registros que têm mapeamento em REGISTER_FIELDS mas nenhum validator os checa:
+  2. Cruzamento XML (17 regras XML001-XML017)
+     - Roda separadamente, em momento diferente
+     - Gera erros com categoria='cruzamento_xml'
+     - O pipeline SPED apaga esses erros ao revalidar
 
-  Bloco E (apuração):
-    E100 — abertura período apuração (sem validação de período vs 0000)
-    E200 — apuração ST por UF (sem reconciliação)
-    E300 — DIFAL período (sem reconciliação com C170)
-    E500 — apuração IPI (sem reconciliação)
-    E520 — ajustes IPI (sem validação)
-    E530 — recolhimento IPI (sem validação)
+  Consequências:
+    - O usuário precisa executar 2 processos manualmente
+    - Se revalida o SPED, perde os erros do XML
+    - Os validadores de recálculo não usam dados do XML como referência
+    - A Receita Federal não faz assim
 
-  Bloco C (documentos):
-    C400/C405/C490 — ECF (validação básica em bloco_c_servicos)
-    C500/C510/C590 — energia/gás (validação básica em bloco_c_servicos)
+COMO A RECEITA FEDERAL FAZ
+──────────────────────────
 
-  Bloco K (produção):
-    K210/K235 — ordem produção/insumo (validação básica em bloco_k)
+  A RFB tem 4 fontes de dados e cruza TUDO JUNTO em uma passada:
 
+  ┌─────────────────┐    ┌─────────────────┐
+  │  XML NF-e       │    │  SPED EFD       │
+  │  (SEFAZ)        │    │  (Contribuinte) │
+  │  FONTE VERDADE  │    │  DECLARAÇÃO     │
+  └────────┬────────┘    └────────┬────────┘
+           │                      │
+           ▼                      ▼
+  ┌────────────────────────────────────────┐
+  │       AUDITORIA UNIFICADA             │
+  │                                        │
+  │  1. Validação estrutural do SPED       │
+  │  2. Cruzamento entre blocos SPED       │
+  │  3. Cruzamento XML x SPED             │◄── NOVO ESTÁGIO
+  │  4. Recálculo com dados XML+regime     │
+  │  5. Enriquecimento e base legal        │
+  │                                        │
+  └────────────────────────────────────────┘
+           │                      │
+           ▼                      ▼
+  ┌─────────────────┐    ┌─────────────────┐
+  │  Regime Tribut. │    │  Benefícios     │
+  │  (Cadastro)     │    │  (Concessões)   │
+  └─────────────────┘    └─────────────────┘
 
-================================================================================
-12. MÉDIO — Fases 4-5 do plano de benefícios pendentes
-================================================================================
+  Hierarquia de confiança:
+    XML NF-e > Cadastro RFB > SPED EFD > Declarações acessórias
 
-Do plano original de cruzamento de benefícios:
+  Quando há divergência entre XML e SPED:
+    - O XML é a fonte da verdade (veio da SEFAZ, tem protocolo)
+    - O SPED é a declaração do contribuinte (pode ter erro)
+    - O regime determina quais regras se aplicam
+    - O benefício determina se isenção/redução é legítima
 
-  Fase 4 — Regras condicionadas ao contexto da operação:
-    CROSS_001: CFOP incompatível (condicionada a sinal de fruição)
-    CROSS_002: CST incompatível (condicionada)
-    CROSS_003: cBenef ausente (inativa até apto_producao_cbenef=True)
+SOLUÇÃO: PIPELINE ÚNICO COM ESTÁGIO XML INTEGRADO
+──────────────────────────────────────────────────
 
-  Fase 5 — Alertas do motor (passthrough):
-    CROSS_011: alertas_motor[] dos JSONs de benefício convertidos em validações
+  O cruzamento XML vira o estágio 2.5 do pipeline existente.
+  Os 26 validadores continuam intactos.
+  Se não tem XMLs, o estágio é pulado.
 
-AÇÃO: Implementar após apuração estar fechada (dependência: RF001-RF009 OK ✓)
-ARQUIVO: src/validators/beneficio_cross_validator.py
+  Novo fluxo de estágios:
 
+  ┌──────────────┐
+  │ ESTRUTURAL   │ Formatos, campos obrigatórios, tipos
+  │ (9+4+10=23)  │
+  └──────┬───────┘
+         ▼
+  ┌──────────────┐
+  │ CRUZAMENTO   │ C100 x C170 x C190, refs 0150/0200,
+  │ SPED (100+)  │ recálculo, CST, semântica, alíquotas
+  └──────┬───────┘
+         ▼
+  ┌──────────────┐
+  │ CRUZAMENTO   │ XML001-XML017: presença, valores,    ◄── NOVO
+  │ XML (17)     │ itens, CNPJ, datas, canceladas
+  └──────┬───────┘
+         ▼
+  ┌──────────────┐
+  │ ENRIQUECIM.  │ Mensagens amigáveis, base legal,
+  │              │ auto-corrigibilidade
+  └──────────────┘
 
-================================================================================
-13. BAIXO — rules.yaml incompleto
-================================================================================
+IMPLEMENTAÇÃO — 5 ARQUIVOS
+──────────────────────────
 
-  - 193 regras no YAML, mas nenhuma regra RF001-RF014 (apuração nova)
-  - Nenhuma regra BENE_CROSS_* no YAML
-  - Nenhuma regra DIFAL_010 no YAML
-  - Campo 'explanation_template' do PRD v2 não implementado
-  - Campo 'correction_hint' do PRD v2 não implementado
+  1. src/services/context_builder.py
+     ──────────────────────────────
+     Adicionar ao ValidationContext:
+       xml_by_chave: dict[str, dict] = {}  # chave_nfe → dados do XML
+       has_xmls: bool = False
 
-AÇÃO: Adicionar regras novas ao rules.yaml com todos os campos do PRD v2
-ARQUIVO: rules.yaml
+     Nova função enrich_context_with_xmls(ctx, db):
+       - Consulta nfe_xmls WHERE file_id = ctx.file_id
+       - Popula ctx.xml_by_chave
+       - Seta ctx.has_xmls = True
 
+     IMPACTO NOS 26 VALIDADORES: ZERO
+       Eles simplesmente ignoram xml_by_chave (não usam).
+       Futuramente podem consultar para recálculos mais precisos.
 
-================================================================================
-14. BAIXO — Testes flaky (16 testes falham em batch)
-================================================================================
+  2. src/services/pipeline.py
+     ────────────────────────
+     a) DELETE inicial limpa TUDO (sem exceção):
+        DELETE FROM validation_errors WHERE file_id = ?
 
-  tests/test_api.py — 9 testes (KeyError: file_id por contaminação DB)
-  tests/test_api_validation.py — 6 testes (mesma causa)
-  tests/test_infrastructure.py — 1 teste (timeout em arquivo grande)
+     b) Após construir contexto:
+        enrich_context_with_xmls(context, db)
 
-CAUSA: app.dependency_overrides compartilhado entre módulos de teste.
-AÇÃO: Refatorar fixtures para isolamento de DB por teste (subprocess ou scope).
-ARQUIVO: tests/test_api.py, tests/test_api_validation.py, tests/test_infrastructure.py
+     c) Inserir estágio 2.5 entre cruzamento SPED e enriquecimento:
+        if context.has_xmls:
+            stage = "cruzamento_xml"
+            cruzar_xml_vs_sped(db, file_id, on_progress=callback)
 
+     d) Progresso SSE emite stage: "cruzamento_xml"
 
-================================================================================
-15. BAIXO — Bloco H (inventário) vs 0200
-================================================================================
+  3. frontend/src/pages/UploadPage.tsx
+     ────────────────────────────────
+     REMOVER: cruzamento automático após upload XMLs
+     REMOVER: estados cruzandoXml, cruzPct, cruzLog, cruzResult
+     REMOVER: toda UI de progresso do cruzamento
 
-  H010 (inventário) vs 0200 (cadastro de produtos):
-    - Apenas checagem básica de formato em cst_validator
-    - Não valida se todos os itens do H010 existem no 0200
-    - Não valida coerência de valores com movimentação C170
+     irParaValidacao SEMPRE navega com ?validate=1
+     Após upload XMLs: resumo + botão "Validar" (pipeline faz tudo)
 
-AÇÃO: Estender cross_block_validator ou audit_rules
-ARQUIVO: src/validators/cross_block_validator.py
+  4. frontend/src/pages/FileDetailPage.tsx
+     ─────────────────────────────────────
+     Adicionar label do novo estágio:
+       cruzamento_xml: 'Cruzamento XML NF-e'
 
+     REMOVER: banner "validação SPED não executada"
+     REMOVER: busca separada de erros cruzamento_xml no loadData
+     loadData busca TODOS os erros sem filtro de categoria
 
-================================================================================
-RESUMO POR PRIORIDADE
-================================================================================
+  5. src/services/xml_service.py
+     ──────────────────────────
+     SEM mudança estrutural.
+     cruzar_xml_vs_sped já funciona standalone.
+     O pipeline chama ela diretamente.
 
-  CRÍTICO (3):
-    1. Sincronizar pipeline.py vs validation_service.py
-    2. D190/C490/C590 na reconciliação RF001/RF002
-    3. 10 validators ignoram context (regime/UF/benefícios)
+     Nota: o DELETE interno de nfe_cruzamento e validation_errors
+     com categoria='cruzamento_xml' pode ser mantido (redundante mas seguro)
+     ou removido (o pipeline já limpou tudo).
 
-  ALTO (5):
-    4. Regime não checado em 5 validators
-    5. beneficios_ativos não usado por validators antigos
-    6. Hardcoded → ReferenceLoader (5 validators)
-    7. Cadeia ST não reconciliada (ST001-ST007)
-    8. Cadeia IPI não reconciliada (IPI001-IPI008)
+FLUXO FINAL DO USUÁRIO
+──────────────────────
 
-  MÉDIO (4):
-    9.  DIFAL agregado não reconciliado (DF001-DF005)
-    10. Campos E110 não validados (DEB_ESP, TOT_AJ)
-    11. Registros SPED sem validação (E200, E300, E500)
-    12. Fases 4-5 benefícios pendentes
+  SEM XMLs:
+    Upload SPED → "Validar" → Pipeline (3 estágios) → Resultado
+    xml_crossref = não_executado no audit-scope
 
-  BAIXO (3):
-    13. rules.yaml incompleto
-    14. Testes flaky
-    15. Bloco H vs 0200
+  COM XMLs:
+    Upload SPED → Upload XMLs → "Validar" → Pipeline (4 estágios) → Resultado
+    xml_crossref = ok no audit-scope
 
+  Em ambos os casos: UM botão, UM processo, UM resultado.
 
-================================================================================
-16. GAPS FORA DO SPED (requer integração externa)
-================================================================================
+EVOLUÇÃO FUTURA (Fase 2)
+────────────────────────
 
-Verificações que um auditor SEFAZ/RFB faz mas que dependem de sistemas externos:
+  Com ctx.xml_by_chave disponível para TODOS os validadores:
 
-  ALTO IMPACTO:
-    ⬜ NF-e XML Cross-Reference — validar XML assinado vs escrituração EFD
-       REQUER: parser XML + verificação ICP-Brasil
-    ⬜ GIA Reconciliação — cruzar GIA mensal vs E110
-       REQUER: upload GIA separado (formulário externo)
-    ⬜ ECD vs EFD — contabilidade vs escrituração fiscal
-       REQUER: integração com sistema contábil
+  - tax_recalc: compara imposto recalculado com XML
+    "SPED diz R$100, recálculo diz R$95, XML diz R$95 → corrigir para R$95"
 
-  MÉDIO IMPACTO:
-    ⬜ DCTF Cross-Check — PIS/COFINS declarado vs apurado
-       REQUER: arquivo DCTF ou API RFB
-    ⬜ Análise multi-período (24 meses) — tendências históricas
-       REQUER: banco com múltiplos arquivos do mesmo contribuinte
-    ⬜ CNAE vs operações — compatibilidade atividade econômica vs CFOPs
-       REQUER: tabela CNAE no SQLite + cruzamento com 0150/0200
+  - cross_block_validator: verifica se C190 bate com totais do XML
 
-  BAIXO IMPACTO:
-    ⬜ SISCOMEX — registro aduaneiro vs importações no SPED
-    ⬜ Multi-marketplace e-commerce — cenários complexos de DIFAL
-    ⬜ MVA dinâmico por decreto estadual — atualização mensal
+  - cst_validator: compara CST do SPED com CST do XML
 
+  - beneficio_audit: verifica se o benefício aplicado condiz com o XML
 
-================================================================================
-SCORECARD POR DIMENSÃO DE VALIDAÇÃO
-================================================================================
-
-  Formato & Estrutura:           99/100 ✓
-  Aritmética & Cálculo:          98/100 ✓
-  ICMS Próprio:                  96/100 ✓
-  ICMS-ST:                       94/100 ✓
-  IPI:                           93/100 ✓
-  DIFAL/FCP:                     91/100 ✓
-  Benefícios Fiscais:            90/100 ✓
-  CST/Regime:                    89/100 ✓
-  Parametrização:                88/100 ✓
-  PIS/COFINS:                    85/100 ✓
-  Inventário/Produção:           82/100 ✓
-  Simples Nacional:              80/100 ✓
-  ─────────────────────────────────────
-  Média Lógica de Negócio:       90/100 ✓ PRODUCTION-READY
-  Análise Histórica:             25/100 ⚠ (single-period)
-  Cruzamento Externo:            15/100 ⚠ (file-only)
-  ─────────────────────────────────────
-  SCORE GERAL:                   84/100 ✓
+  Transformar validadores em "XML-aware" sem reescrevê-los:
+    if context.has_xmls:
+        xml = context.xml_by_chave.get(chave)
+        if xml: usar valores do XML como referência
 
 
 ================================================================================
@@ -434,5 +408,6 @@ Tabela CST: data/JSON/Tabela_CST_Vigente.json
 Tabela DIFAL: data/JSON/Tabela_DIFAL_Vigente.json
 Tabela NCM: data/JSON/Tabela_NCM_Vigente_20260407.json
 Tabela Fiscal Complementar: data/JSON/Tabela_Fiscal_Complementar_v6.json
+XML NF-e ref: data/JSON/XML_PAYLOAD.json, data/JSON/XML_SCHEMA.json
 Benefícios: data/JSON/COMPETE_*.json, FUNDAP.json, INVEST_ES_*.json, SUBSTITUICAO_TRIBUTARIA_ES.json
 TypeScript ref: data/reference/typescript-spec/*.ts

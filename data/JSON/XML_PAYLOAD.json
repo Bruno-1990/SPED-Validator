@@ -1,0 +1,183 @@
+{
+  "nfe": {
+    "identificacao": {
+      "chave_nfe": "32260112345678000199550010000012341000012345",
+      "versao_nfe": "4.00",
+      "cod_uf_emitente": 32,
+      "cod_nf": "12345678",
+      "nat_operacao": "Venda de mercadoria",
+      "modelo_doc": 55,
+      "serie": 1,
+      "numero_nfe": 1234,
+      "dh_emissao": "2026-04-10T10:30:00-03:00",
+      "dh_saida_entrada": "2026-04-10T10:45:00-03:00",
+      "tipo_nfe": 1,
+      "ind_destino": 2,
+      "cod_mun_fg": 3205309,
+      "tipo_emissao": 1,
+      "tipo_ambiente": 1,
+      "finalidade_nfe": 1,
+      "ind_consumidor_final": 0,
+      "ind_presenca": 1,
+      "proc_emissao": 0,
+      "versao_proc": "1.0.0"
+    },
+
+    "emitente": {
+      "cnpj_emitente": "12345678000199",
+      "razao_emitente": "Empresa Exemplo LTDA",
+      "fantasia_emitente": "Empresa Exemplo",
+      "ie_emitente": "123456789",
+      "ie_st_emitente": "",
+      "crt_emitente": 3,
+      "uf_emitente": "ES",
+      "cod_mun_emitente": 3205309,
+      "cep_emitente": "29000000",
+      "fone_emitente": "2733334444"
+    },
+
+    "destinatario": {
+      "cnpj_destinatario": "98765432000188",
+      "razao_destinatario": "Cliente Exemplo SA",
+      "ie_destinatario": "987654321",
+      "ind_ie_dest": 1,
+      "email_destinatario": "fiscal@cliente.com.br",
+      "uf_destinatario": "RJ",
+      "cod_mun_destinatario": 3304557,
+      "cep_destinatario": "20000000"
+    },
+
+    "itens": [
+      {
+        "num_item": 1,
+        "produto": {
+          "cod_produto": "ABC123",
+          "ean": "7891234567890",
+          "desc_produto": "Produto exemplo",
+          "ncm": "22030000",
+          "cest": "",
+          "cod_beneficio": "",
+          "cfop": "6102",
+          "unidade_com": "UN",
+          "qtd_com": 10,
+          "vl_unit_com": 100.00,
+          "vl_prod": 1000.00,
+          "unidade_trib": "UN",
+          "qtd_trib": 10,
+          "vl_unit_trib": 100.00,
+          "ind_compoe_total": 1,
+          "num_pedido": "PED123",
+          "num_item_pedido": "1",
+          "num_fci": "",
+          "inf_ad_prod": ""
+        },
+        "tributos": {
+          "icms": {
+            "origem_merc": 0,
+            "cst_icms": "00",
+            "mod_bc_icms": 3,
+            "vbc_icms": 1000.00,
+            "paliq_icms": 12.00,
+            "vl_icms": 120.00,
+            "mod_bc_st": null,
+            "pmva_st": null,
+            "vbc_st": null,
+            "paliq_st": null,
+            "vl_icms_st": null
+          },
+          "ipi": {
+            "cod_enq_ipi": "999",
+            "cst_ipi": "53",
+            "vbc_ipi": null,
+            "paliq_ipi": null,
+            "vl_ipi": null
+          },
+          "pis": {
+            "cst_pis": "01",
+            "vbc_pis": 1000.00,
+            "paliq_pis": 1.65,
+            "vl_pis": 16.50
+          },
+          "cofins": {
+            "cst_cofins": "01",
+            "vbc_cofins": 1000.00,
+            "paliq_cofins": 7.60,
+            "vl_cofins": 76.00
+          }
+        }
+      }
+    ],
+
+    "totais": {
+      "total_vbc": 1000.00,
+      "total_vicms": 120.00,
+      "total_vicms_deson": 0.00,
+      "total_vbcst": 0.00,
+      "total_vst": 0.00,
+      "total_vfcp": 0.00,
+      "total_vfcpst": 0.00,
+      "total_vfcp_uf_dest": 0.00,
+      "total_vicms_uf_dest": 0.00,
+      "total_vicms_uf_remet": 0.00,
+      "total_vprod": 1000.00,
+      "total_vfrete": 0.00,
+      "total_vdesc": 0.00,
+      "total_vii": 0.00,
+      "total_vipi": 0.00,
+      "total_vpis": 16.50,
+      "total_vcofins": 76.00,
+      "total_voutro": 0.00,
+      "total_vnf": 1000.00
+    },
+
+    "transporte": {
+      "mod_frete": 0,
+      "cnpj_transportadora": "11111111000111",
+      "nome_transportadora": "Transportadora Exemplo",
+      "qtd_volumes": 1,
+      "peso_liquido": 100.000,
+      "peso_bruto": 110.000
+    },
+
+    "cobranca": {
+      "fatura": {
+        "num_fatura": "FAT1234",
+        "vl_fatura_orig": 1000.00,
+        "vl_fatura_desc": 0.00,
+        "vl_fatura_liq": 1000.00
+      },
+      "duplicatas": [
+        {
+          "num_duplicata": "001",
+          "dt_vencimento_dup": "2026-05-10",
+          "vl_duplicata": 1000.00
+        }
+      ]
+    },
+
+    "pagamento": {
+      "ind_pagamento": 1,
+      "tipo_pagamento": "15",
+      "vl_pagamento": 1000.00
+    },
+
+    "informacoes_adicionais": {
+      "inf_fisco": "",
+      "inf_complementar": "Pedido PED123",
+      "obs_campo": "",
+      "obs_texto": "",
+      "num_pedido_compra": "PED123"
+    },
+
+    "protocolo_sefaz": {
+      "prot_tipo_amb": 1,
+      "prot_chave": "32260112345678000199550010000012341000012345",
+      "prot_dh_recbto": "2026-04-10T10:31:05-03:00",
+      "prot_numero": "132260000123456",
+      "prot_digest": "ABCDEF1234567890",
+      "prot_cstat": 100,
+      "prot_motivo": "Autorizado o uso da NF-e",
+      "prot_ver_aplic": "SVRS202604"
+    }
+  }
+}
