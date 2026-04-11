@@ -227,95 +227,177 @@ def audit_scope(
     # Verificar benefícios fiscais ativos
     has_beneficios = bool(context.beneficios_ativos)
 
-    # Verificar se há XMLs vinculados
+    # ── Detectar conteudo real do arquivo ──
+    def _count_reg(register: str) -> int:
+        return db.execute(
+            "SELECT COUNT(*) FROM sped_records WHERE file_id = ? AND register = ?",
+            (file_id, register),
+        ).fetchone()[0]
+
+    def _count_block(block: str) -> int:
+        return db.execute(
+            "SELECT COUNT(*) FROM sped_records WHERE file_id = ? AND block = ?",
+            (file_id, block),
+        ).fetchone()[0]
+
+    has_c100 = _count_reg("C100") > 0
+    has_c170 = _count_reg("C170") > 0
+    has_c190 = _count_reg("C190") > 0
+    has_bloco_d = _count_block("D") > 5  # D001+D990 sempre existem
+    has_bloco_k = _count_block("K") > 5  # K001+K990 sempre existem
+    has_bloco_h = _count_reg("H010") > 0
+    has_e110 = _count_reg("E110") > 0
+    has_e111 = _count_reg("E111") > 0
+    is_validated = db.execute(
+        "SELECT status FROM sped_files WHERE id = ?", (file_id,)
+    ).fetchone()[0] == "validated"
+
+    # XMLs vinculados e cruzamento executado
     has_xmls = False
+    has_xml_cruzamento = False
     try:
         xml_count = db.execute(
             "SELECT COUNT(*) FROM nfe_xmls WHERE file_id = ?", (file_id,)
         ).fetchone()[0]
         has_xmls = xml_count > 0
+        if has_xmls:
+            has_xml_cruzamento = _has_xml_cruzamento(db, file_id)
     except Exception:
-        pass  # tabela pode não existir ainda
+        pass
 
-    # Definir checks executados (30 validators)
+    # Verificar benefícios fiscais ativos
+    has_beneficios = bool(context.beneficios_ativos)
+
+    # ── Helper: status baseado em se validacao rodou e se tem dados ──
+    def _check(has_data: bool, needs_table: bool = True, table_ok: bool = True) -> str:
+        if not is_validated:
+            return "nao_executado"
+        if not has_data:
+            return "nao_aplicavel"
+        if needs_table and not table_ok:
+            return "parcial"
+        return "ok"
+
+    def _motivo(status: str, sem_dados: str = "", sem_tabela: str = "", nao_validado: str = "") -> str | None:
+        if status == "nao_executado":
+            return nao_validado or "Validacao SPED nao executada"
+        if status == "nao_aplicavel":
+            return sem_dados
+        if status == "parcial":
+            return sem_tabela
+        return None
+
+    # ── Checks dinamicos (30 validators) ──
+
+    # Estrutural: sempre roda se validado
+    s_fmt = _check(True)
+    s_fld = _check(True)
+    s_intra = _check(True)
+
+    # Cruzamento entre blocos: depende de ter C100+C170+C190
+    s_cross = _check(has_c100 and has_c170)
+    s_recalc = _check(has_c100 and has_c170)
+    s_cst = _check(has_c100)
+    s_semantics = _check(has_c100)
+    s_pis = _check(has_c170)
+    s_param = _check(has_c170)
+    s_ncm = _check(has_c170)
+    s_aliq = _check(has_c170, needs_table=True, table_ok=has_aliq_tables)
+    s_c190 = _check(has_c190)
+    s_bloco_d = _check(has_bloco_d)
+    s_audit_ben = _check(has_e111, needs_table=True, table_ok=tabelas_externas["codigos_ajuste_uf"] == "disponivel")
+    s_pend = _check(has_c100)
+    s_bc = _check(has_c170)
+    s_difal = _check(has_c170, needs_table=True, table_ok=has_aliq_tables)
+    s_ben_fiscal = _check(has_c100)
+    s_ben_cross = _check(has_beneficios)
+    s_dev = _check(has_c100)
+    s_ipi = _check(has_c170)
+    s_dest = _check(has_c100)
+    s_cfop = _check(has_c170)
+    s_st = _check(has_c170, needs_table=True, table_ok=has_mva_tables)
+    s_simples = "nao_aplicavel" if not is_simples else _check(True)
+    s_apur = _check(has_e110)
+    s_c_serv = _check(has_c100)
+    s_bloco_k = _check(has_bloco_k)
+    s_retif = _check(True)
+
+    # XML crossref
+    if has_xml_cruzamento:
+        s_xml = "ok"
+    elif has_xmls:
+        s_xml = "parcial"
+    else:
+        s_xml = "nao_executado"
+
     checks: list[AuditCheckInfo] = [
         # Estágio 1: Estrutural
-        AuditCheckInfo(id="format_validation", status="ok", regras=9),
-        AuditCheckInfo(id="field_validation", status="ok", regras=4),
-        AuditCheckInfo(id="intra_register", status="ok", regras=10),
+        AuditCheckInfo(id="format_validation", status=s_fmt, regras=9,
+                       motivo_parcial=_motivo(s_fmt)),
+        AuditCheckInfo(id="field_validation", status=s_fld, regras=4,
+                       motivo_parcial=_motivo(s_fld)),
+        AuditCheckInfo(id="intra_register", status=s_intra, regras=10,
+                       motivo_parcial=_motivo(s_intra)),
         # Estágio 2: Cruzamento
-        AuditCheckInfo(id="cross_block", status="ok", regras=7),
-        AuditCheckInfo(id="tax_recalculation", status="ok", regras=8),
-        AuditCheckInfo(id="cst_validation", status="ok", regras=6),
-        AuditCheckInfo(id="fiscal_semantics", status="ok", regras=13),
-        AuditCheckInfo(id="pis_cofins", status="ok", regras=6),
-        AuditCheckInfo(id="parametrizacao", status="ok", regras=3),
-        AuditCheckInfo(id="ncm_validation", status="ok", regras=6),
+        AuditCheckInfo(id="cross_block", status=s_cross, regras=7,
+                       motivo_parcial=_motivo(s_cross, sem_dados="Sem registros C100/C170 para cruzar")),
+        AuditCheckInfo(id="tax_recalculation", status=s_recalc, regras=8,
+                       motivo_parcial=_motivo(s_recalc, sem_dados="Sem registros C100/C170 para recalcular")),
+        AuditCheckInfo(id="cst_validation", status=s_cst, regras=6,
+                       motivo_parcial=_motivo(s_cst, sem_dados="Sem registros C100")),
+        AuditCheckInfo(id="fiscal_semantics", status=s_semantics, regras=13,
+                       motivo_parcial=_motivo(s_semantics, sem_dados="Sem registros C100")),
+        AuditCheckInfo(id="pis_cofins", status=s_pis, regras=6,
+                       motivo_parcial=_motivo(s_pis, sem_dados="Sem itens C170")),
+        AuditCheckInfo(id="parametrizacao", status=s_param, regras=3,
+                       motivo_parcial=_motivo(s_param, sem_dados="Sem itens C170")),
+        AuditCheckInfo(id="ncm_validation", status=s_ncm, regras=6,
+                       motivo_parcial=_motivo(s_ncm, sem_dados="Sem itens C170")),
+        AuditCheckInfo(id="aliquota_validation", status=s_aliq, regras=7,
+                       motivo_parcial=_motivo(s_aliq, sem_tabela="Aliquotas por UF nao disponiveis")),
+        AuditCheckInfo(id="c190_consolidation", status=s_c190, regras=2,
+                       motivo_parcial=_motivo(s_c190, sem_dados="Sem registros C190")),
+        AuditCheckInfo(id="bloco_d", status=s_bloco_d, regras=6,
+                       motivo_parcial=_motivo(s_bloco_d, sem_dados="Arquivo nao possui Bloco D (CT-e)")),
+        AuditCheckInfo(id="audit_beneficios", status=s_audit_ben, regras=50,
+                       motivo_parcial=_motivo(s_audit_ben, sem_dados="Sem registros E111 (ajustes)", sem_tabela="Tabela 5.1.1 de codigos de ajuste nao disponivel")),
+        AuditCheckInfo(id="pendentes", status=s_pend, regras=5,
+                       motivo_parcial=_motivo(s_pend, sem_dados="Sem registros C100")),
+        AuditCheckInfo(id="base_calculo", status=s_bc, regras=5,
+                       motivo_parcial=_motivo(s_bc, sem_dados="Sem itens C170")),
+        AuditCheckInfo(id="difal_validation", status=s_difal, regras=12,
+                       motivo_parcial=_motivo(s_difal, sem_tabela="Tabelas de aliquotas por UF nao disponiveis")),
+        AuditCheckInfo(id="beneficio_fiscal", status=s_ben_fiscal, regras=3,
+                       motivo_parcial=_motivo(s_ben_fiscal, sem_dados="Sem registros C100")),
+        AuditCheckInfo(id="beneficio_cross", status=s_ben_cross, regras=9,
+                       motivo_parcial=_motivo(s_ben_cross, sem_dados="Nenhum beneficio fiscal cadastrado para este contribuinte")),
+        AuditCheckInfo(id="devolucao", status=s_dev, regras=3,
+                       motivo_parcial=_motivo(s_dev, sem_dados="Sem registros C100")),
+        AuditCheckInfo(id="ipi_validation", status=s_ipi, regras=3,
+                       motivo_parcial=_motivo(s_ipi, sem_dados="Sem itens C170")),
+        AuditCheckInfo(id="destinatario", status=s_dest, regras=3,
+                       motivo_parcial=_motivo(s_dest, sem_dados="Sem registros C100")),
+        AuditCheckInfo(id="cfop_validation", status=s_cfop, regras=3,
+                       motivo_parcial=_motivo(s_cfop, sem_dados="Sem itens C170")),
+        AuditCheckInfo(id="st_validation", status=s_st, regras=8,
+                       motivo_parcial=_motivo(s_st, sem_tabela="Tabelas MVA/pauta fiscal nao disponiveis")),
+        AuditCheckInfo(id="simples_nacional", status=s_simples, regras=12,
+                       motivo_parcial="Contribuinte em Regime Normal" if not is_simples else _motivo(s_simples)),
+        AuditCheckInfo(id="apuracao_icms", status=s_apur, regras=11,
+                       motivo_parcial=_motivo(s_apur, sem_dados="Sem registro E110 (apuracao)")),
+        AuditCheckInfo(id="bloco_c_servicos", status=s_c_serv, regras=4,
+                       motivo_parcial=_motivo(s_c_serv, sem_dados="Sem registros C100")),
+        AuditCheckInfo(id="bloco_k", status=s_bloco_k, regras=4,
+                       motivo_parcial=_motivo(s_bloco_k, sem_dados="Arquivo nao possui Bloco K (producao/estoque)")),
+        AuditCheckInfo(id="retificador", status=s_retif, regras=2,
+                       motivo_parcial=_motivo(s_retif)),
+        # Cruzamento NF-e XML
         AuditCheckInfo(
-            id="aliquota_validation",
-            status="ok" if has_aliq_tables else "parcial",
-            regras=7,
-            motivo_parcial="Aliquotas por UF nao disponiveis" if not has_aliq_tables else None,
-        ),
-        AuditCheckInfo(id="c190_consolidation", status="ok", regras=2),
-        AuditCheckInfo(id="bloco_d", status="ok", regras=6),
-        AuditCheckInfo(
-            id="audit_beneficios",
-            status="parcial" if tabelas_externas["codigos_ajuste_uf"] == "indisponivel" else "ok",
-            regras=50,
+            id="xml_crossref", status=s_xml, regras=17,
             motivo_parcial=(
-                "Tabela 5.1.1 de codigos de ajuste por UF nao disponivel"
-                if tabelas_externas["codigos_ajuste_uf"] == "indisponivel" else None
-            ),
-        ),
-        AuditCheckInfo(id="pendentes", status="ok", regras=5),
-        AuditCheckInfo(id="base_calculo", status="ok", regras=5),
-        AuditCheckInfo(
-            id="difal_validation",
-            status="ok" if has_aliq_tables else "nao_executado",
-            regras=12,
-            motivo_parcial="Tabelas de aliquotas por UF nao disponiveis" if not has_aliq_tables else None,
-        ),
-        AuditCheckInfo(id="beneficio_fiscal", status="ok", regras=3),
-        AuditCheckInfo(
-            id="beneficio_cross",
-            status="ok" if has_beneficios else "nao_aplicavel",
-            regras=9,
-            motivo_parcial="Nenhum beneficio fiscal cadastrado para este contribuinte" if not has_beneficios else None,
-        ),
-        AuditCheckInfo(id="devolucao", status="ok", regras=3),
-        AuditCheckInfo(id="ipi_validation", status="ok", regras=3),
-        AuditCheckInfo(id="destinatario", status="ok", regras=3),
-        AuditCheckInfo(id="cfop_validation", status="ok", regras=3),
-        AuditCheckInfo(
-            id="st_validation",
-            status="ok" if has_mva_tables else "parcial",
-            regras=8,
-            motivo_parcial="Tabelas MVA/pauta fiscal nao disponiveis" if not has_mva_tables else None,
-        ),
-        AuditCheckInfo(
-            id="simples_nacional",
-            status="nao_aplicavel" if not is_simples else "ok",
-            regras=12,
-            motivo_parcial="Contribuinte em Regime Normal" if not is_simples else None,
-        ),
-        # Apuração ICMS (RF001-RF009)
-        AuditCheckInfo(id="apuracao_icms", status="ok", regras=11),
-        # Blocos auxiliares
-        AuditCheckInfo(id="bloco_c_servicos", status="ok", regras=4),
-        AuditCheckInfo(id="bloco_k", status="ok", regras=4),
-        AuditCheckInfo(id="retificador", status="ok", regras=2),
-        # Cruzamento NF-e XML — verifica se cruzamento foi executado de fato
-        AuditCheckInfo(
-            id="xml_crossref",
-            status="ok" if _has_xml_cruzamento(db, file_id) else (
-                "parcial" if has_xmls else "nao_executado"
-            ),
-            regras=17,
-            motivo_parcial=(
-                None if _has_xml_cruzamento(db, file_id)
+                None if s_xml == "ok"
                 else "XMLs vinculados mas cruzamento nao executado" if has_xmls
-                else "Nenhum XML de NF-e vinculado — envie XMLs na aba de cruzamento"
+                else "Nenhum XML de NF-e vinculado"
             ),
         ),
     ]
