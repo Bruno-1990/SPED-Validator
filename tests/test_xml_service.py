@@ -121,6 +121,7 @@ _SAMPLE_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
           <cProd>ABC123</cProd>
           <NCM>22030000</NCM>
           <CFOP>6102</CFOP>
+          <qCom>2.0000</qCom>
           <vProd>1000.00</vProd>
         </prod>
         <imposto>
@@ -183,6 +184,7 @@ class TestParseNfeXml:
         assert item["cod_produto"] == "ABC123"
         assert item["ncm"] == "22030000"
         assert item["cfop"] == "6102"
+        assert item["qtd"] == 2.0
         assert item["vl_prod"] == 1000.0
         assert item["cst_icms"] == "000"
         assert item["aliq_icms"] == 12.0
@@ -213,4 +215,10 @@ class TestAiCache:
         from src.services.ai_service import _build_cache_key
         k1 = _build_cache_key("RF001", "RF001_DEB", "normal", "ES")
         k2 = _build_cache_key("RF001", "RF001_DEB", "normal", "SP")
+        assert k1 != k2
+
+    def test_cache_key_varies_by_expected_value(self):
+        from src.services.ai_service import _build_cache_key
+        k1 = _build_cache_key("RF001", "FM_X", "normal", "ES", "", "", "VL_DOC", "10", "11")
+        k2 = _build_cache_key("RF001", "FM_X", "normal", "ES", "", "", "VL_DOC", "10", "99")
         assert k1 != k2

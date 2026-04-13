@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import json
 import logging
-import sqlite3
 from dataclasses import dataclass, field
+
+from .db_types import AuditConnection
 from datetime import date
 from enum import Enum
 
@@ -95,6 +96,8 @@ class ValidationContext:
     has_xmls: bool = False
     xml_by_chave: dict = field(default_factory=dict)
     xml_cobertura_pct: float = 0.0
+    # True se cruzar_xml_vs_sped ja persistiu em nfe_cruzamento (evita duplicar C190 fiscal vs XML_C190)
+    xml_cruzamento_executado: bool = False
 
     # Controle de qualidade do contexto
     context_hash: str = ""
@@ -114,7 +117,13 @@ def _parse_date(dt_str: str) -> date | None:
         return None
 
 
-def _determine_regime_by_cst(db: sqlite3.Connection, file_id: int) -> tuple[TaxRegime, str]:
+def _is_pg(db) -> bool:
+    """Detecta se a conexao e PostgreSQL (PgConnection)."""
+    from .db_types import is_pg
+    return is_pg(db)
+
+
+def _determine_regime_by_cst(db: AuditConnection, file_id: int) -> tuple[TaxRegime, str]:
     """Detecta regime tributario pelos CSTs reais do arquivo (BUG-001 fix).
 
     CORRECAO CRITICA: IND_PERFIL indica nivel de escrituracao, NAO regime.
@@ -123,23 +132,24 @@ def _determine_regime_by_cst(db: sqlite3.Connection, file_id: int) -> tuple[TaxR
     Returns:
         (regime, source): regime detectado e fonte da deteccao ("CST")
     """
-    row = db.execute(
-        """SELECT DISTINCT
-            CASE
-                WHEN CAST(json_extract(fields_json, '$.CST_ICMS') AS TEXT)
-                    IN ('101','102','103','201','202','203','300','400','500','900')
-                THEN 'SN'
-                WHEN CAST(json_extract(fields_json, '$.CST_ICMS') AS INTEGER) BETWEEN 101 AND 900
-                THEN 'SN'
-                ELSE 'NORMAL'
-            END as regime_type
-        FROM sped_records
-        WHERE file_id = ? AND register IN ('C170', 'C190')
-              AND json_extract(fields_json, '$.CST_ICMS') IS NOT NULL
-              AND json_extract(fields_json, '$.CST_ICMS') != ''
-        LIMIT 500""",
-        (file_id,),
-    ).fetchall()
+    from .db_types import json_field
+    jf = json_field(db, "fields_json", "CST_ICMS")
+    sql = f"""SELECT DISTINCT
+        CASE
+            WHEN {jf}
+                IN ('101','102','103','201','202','203','300','400','500','900')
+            THEN 'SN'
+            WHEN CAST({jf} AS INTEGER) BETWEEN 101 AND 900
+            THEN 'SN'
+            ELSE 'NORMAL'
+        END as regime_type
+    FROM sped_records
+    WHERE file_id = ? AND register IN ('C170', 'C190')
+          AND {jf} IS NOT NULL
+          AND {jf} != ''
+    LIMIT 500"""
+
+    row = db.execute(sql, (file_id,)).fetchall()
 
     regimes_found = {r[0] if isinstance(r, tuple) else r["regime_type"] for r in row}
 
@@ -186,7 +196,7 @@ def _resolve_regime_with_mysql(
     return regime_cst, "CONFLITO"
 
 
-def _load_fields(row: tuple | sqlite3.Row, register: str) -> dict[str, str]:
+def _load_fields(row, register: str) -> dict[str, str]:
     """Carrega fields_json suportando formato dict (novo) e list (legado)."""
     raw = row[0]
     parsed = json.loads(raw)
@@ -195,13 +205,18 @@ def _load_fields(row: tuple | sqlite3.Row, register: str) -> dict[str, str]:
     return dict(parsed)
 
 
-def build_context(file_id: int, db: sqlite3.Connection) -> ValidationContext:
+def build_context(
+    file_id: int,
+    db: AuditConnection,
+    validation_mode: str = "sped_only",
+) -> ValidationContext:
     """Constroi ValidationContext a partir dos registros ja persistidos no banco.
 
     Le o registro 0000 para determinar regime, UF, periodo e CNPJ.
     Popula caches de participantes (0150), produtos (0200) e naturezas (0400).
     """
     ctx = ValidationContext(file_id=file_id)
+    ctx.mode = validation_mode if validation_mode in ("sped_only", "sped_xml") else "sped_only"
 
     # -- Reference loader --
     loader = ReferenceLoader()
@@ -333,6 +348,55 @@ def build_context(file_id: int, db: sqlite3.Connection) -> ValidationContext:
     if ctx.cnpj:
         ctx.cliente_id = _get_cliente_local_id(db, ctx.cnpj)
 
+    # -- XML itens por chave (para enriquecer validacao C190) --
+    if ctx.mode == "sped_only":
+        ctx.xml_by_chave = {}
+        ctx.has_xmls = False
+        ctx.xml_cobertura_pct = 0.0
+    else:
+        ctx.xml_by_chave = _load_xml_items_by_chave(db, file_id)
+        n_xml_header = 0
+        try:
+            row_n = db.execute(
+                "SELECT COUNT(*) FROM nfe_xmls WHERE file_id = ? AND status = 'active'",
+                (file_id,),
+            ).fetchone()
+            n_xml_header = int(row_n[0] if row_n and row_n[0] is not None else 0)
+        except Exception:
+            n_xml_header = 0
+        ctx.has_xmls = len(ctx.xml_by_chave) > 0 or n_xml_header > 0
+        total_c100_com_chave = db.execute(
+            "SELECT COUNT(*) FROM sped_records WHERE file_id = ? AND register = 'C100' "
+            "AND CAST(fields_json AS TEXT) LIKE '%CHV_NFE%'",
+            (file_id,),
+        ).fetchone()[0]
+        if total_c100_com_chave > 0 and (len(ctx.xml_by_chave) > 0 or n_xml_header > 0):
+            denom = max(int(total_c100_com_chave or 0), 1)
+            ctx.xml_cobertura_pct = round(
+                max(len(ctx.xml_by_chave), n_xml_header) / denom * 100, 1
+            )
+
+    try:
+        row_cruz = db.execute(
+            "SELECT COUNT(*) FROM nfe_cruzamento WHERE file_id = ?",
+            (file_id,),
+        ).fetchone()
+        n_cruz = int(row_cruz[0]) if row_cruz and row_cruz[0] is not None else 0
+    except Exception:
+        n_cruz = 0
+    cross_done = False
+    try:
+        row_sf = db.execute(
+            "SELECT xml_crossref_completed_at FROM sped_files WHERE id = ?",
+            (file_id,),
+        ).fetchone()
+        if row_sf is not None:
+            v = row_sf[0] if isinstance(row_sf, tuple) else row_sf.get("xml_crossref_completed_at")
+            cross_done = bool(v)
+    except Exception:
+        cross_done = False
+    ctx.xml_cruzamento_executado = n_cruz > 0 or cross_done
+
     # -- Tabelas ausentes --
     ctx.tabelas_ausentes = _detect_missing_tables(loader)
 
@@ -353,22 +417,126 @@ def build_context(file_id: int, db: sqlite3.Connection) -> ValidationContext:
 
 
 # ──────────────────────────────────────────────
+# XML items por chave (enriquecimento C190)
+# ──────────────────────────────────────────────
+
+def _norm_cst_ctx(cst: str) -> str:
+    """Normaliza CST para 3 digitos (mesma logica de xml_service._norm_cst)."""
+    c = (cst or "").strip()
+    return c.zfill(3) if len(c) == 2 else c
+
+
+def _load_xml_items_by_chave(db: AuditConnection, file_id: int) -> dict:
+    """Carrega itens XML agrupados por chave_nfe e (CST, CFOP, ALIQ).
+
+    Retorna dict[chave_nfe] -> {
+        "doc": {"vl_doc": float, "vl_icms": float, ...},
+        "por_grupo": {
+            (cst, cfop, aliq): {
+                "vl_prod": float,
+                "vl_desc": float,
+                "vl_prod_liq": float,   # vl_prod - vl_desc
+                "vbc_icms": float,
+                "vl_icms": float,
+                "qtd_itens": int,
+            },
+        },
+    }
+    """
+    try:
+        rows = db.execute(
+            "SELECT x.chave_nfe, x.vl_doc, x.vl_icms, x.vl_icms_st, x.vl_ipi, "
+            "       i.cst_icms, i.cfop, i.aliq_icms, i.vl_prod, i.vl_desc, "
+            "       i.vbc_icms, i.vl_icms "
+            "FROM nfe_xmls x "
+            "JOIN nfe_itens i ON i.nfe_id = x.id "
+            "WHERE x.file_id = ? AND x.status = 'active'",
+            (file_id,),
+        ).fetchall()
+    except Exception:
+        return {}
+
+    if not rows:
+        return {}
+
+    result: dict[str, dict] = {}
+    for row in rows:
+        chave = row[0] if isinstance(row, tuple) else row["chave_nfe"]
+        if not chave:
+            continue
+
+        if chave not in result:
+            vl_doc = float(row[1] or 0) if isinstance(row, tuple) else float(row["vl_doc"] or 0)
+            vl_icms = float(row[2] or 0) if isinstance(row, tuple) else float(row["vl_icms"] or 0)
+            vl_icms_st = float(row[3] or 0) if isinstance(row, tuple) else float(row["vl_icms_st"] or 0)
+            vl_ipi = float(row[4] or 0) if isinstance(row, tuple) else float(row["vl_ipi"] or 0)
+            result[chave] = {
+                "doc": {
+                    "vl_doc": vl_doc,
+                    "vl_icms": vl_icms,
+                    "vl_icms_st": vl_icms_st,
+                    "vl_ipi": vl_ipi,
+                },
+                "por_grupo": {},
+            }
+
+        # Extrair campos do item
+        if isinstance(row, tuple):
+            cst_raw, cfop_raw, aliq_raw = row[5], row[6], row[7]
+            vl_prod = float(row[8] or 0)
+            vl_desc = float(row[9] or 0)
+            vbc = float(row[10] or 0)
+            vicms = float(row[11] or 0)
+        else:
+            cst_raw, cfop_raw, aliq_raw = row["cst_icms"], row["cfop"], row["aliq_icms"]
+            vl_prod = float(row["vl_prod"] or 0)
+            vl_desc = float(row["vl_desc"] or 0)
+            vbc = float(row["vbc_icms"] or 0)
+            vicms = float(row["vl_icms"] or 0)
+
+        cst = _norm_cst_ctx((cst_raw or "").strip())
+        cfop = (cfop_raw or "").strip()
+        aliq = round(float(aliq_raw or 0), 2)
+        grupo_key = (cst, cfop, aliq)
+
+        grupo = result[chave]["por_grupo"]
+        if grupo_key not in grupo:
+            grupo[grupo_key] = {
+                "vl_prod": 0.0,
+                "vl_desc": 0.0,
+                "vl_prod_liq": 0.0,
+                "vbc_icms": 0.0,
+                "vl_icms": 0.0,
+                "qtd_itens": 0,
+            }
+        g = grupo[grupo_key]
+        g["vl_prod"] += vl_prod
+        g["vl_desc"] += vl_desc
+        g["vl_prod_liq"] += max(0.0, vl_prod - vl_desc)
+        g["vbc_icms"] += vbc
+        g["vl_icms"] += vicms
+        g["qtd_itens"] += 1
+
+    return result
+
+
+# ──────────────────────────────────────────────
 # Helpers Stage 0 (Context-First)
 # ──────────────────────────────────────────────
 
-def _load_emitentes_sn(db: sqlite3.Connection) -> set:
+def _load_emitentes_sn(db: AuditConnection) -> set:
     """Carrega CNPJs de emitentes com CRT=1 (Simples Nacional) do historico."""
     try:
         rows = db.execute(
             "SELECT cnpj_emitente FROM emitentes_crt WHERE crt = 1"
         ).fetchall()
         return {r[0] if isinstance(r, tuple) else r["cnpj_emitente"] for r in rows}
-    except sqlite3.OperationalError:
+    except Exception:
         # Tabela pode nao existir antes da Migration 14
         return set()
 
 
-def _get_cliente_local_id(db: sqlite3.Connection, cnpj: str) -> int | None:
+def _get_cliente_local_id(db: AuditConnection, cnpj: str) -> int | None:
     """Busca ID do cliente na tabela local clientes (Migration 14)."""
     try:
         row = db.execute(
@@ -376,7 +544,7 @@ def _get_cliente_local_id(db: sqlite3.Connection, cnpj: str) -> int | None:
         ).fetchone()
         if row:
             return row[0] if isinstance(row, tuple) else row["id"]
-    except sqlite3.OperationalError:
+    except Exception:
         pass  # Tabela pode nao existir antes da Migration 14
     return None
 
@@ -399,7 +567,7 @@ def _compute_context_hash(ctx: "ValidationContext") -> str:
     """Calcula hash do contexto para invalidar cache IA quando contexto muda."""
     import hashlib
     raw = (
-        f"{ctx.regime.value}|{ctx.regime_source}|{ctx.uf_contribuinte}|"
+        f"{ctx.mode}|{ctx.regime.value}|{ctx.regime_source}|{ctx.uf_contribuinte}|"
         f"{ctx.periodo_ini}|{ctx.periodo_fim}|"
         f"{','.join(b.codigo for b in ctx.beneficios_ativos)}|"
         f"{len(ctx.active_rules)}"
@@ -408,7 +576,7 @@ def _compute_context_hash(ctx: "ValidationContext") -> str:
 
 
 def create_validation_run(
-    db: sqlite3.Connection, ctx: "ValidationContext"
+    db: AuditConnection, ctx: "ValidationContext"
 ) -> int:
     """Registra uma execucao de validacao na tabela validation_runs."""
     import json
@@ -427,13 +595,13 @@ def create_validation_run(
         )
         db.commit()
         return cursor.lastrowid
-    except sqlite3.OperationalError:
+    except Exception:
         # Tabela pode nao existir antes da Migration 14
         return 0
 
 
 def save_context_snapshot(
-    db: sqlite3.Connection, ctx: "ValidationContext"
+    db: AuditConnection, ctx: "ValidationContext"
 ) -> None:
     """Salva snapshot do contexto fiscal para audit trail."""
     import json
@@ -451,5 +619,5 @@ def save_context_snapshot(
              ctx.context_hash),
         )
         db.commit()
-    except sqlite3.OperationalError:
+    except Exception:
         pass  # Tabela pode nao existir antes da Migration 14

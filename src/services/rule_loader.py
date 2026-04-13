@@ -113,29 +113,43 @@ class RuleIndex:
     def get_severity(self, error_type: str) -> str | None:
         """Retorna severity da regra, ou None se nao encontrada."""
         rule = self._by_error_type.get(error_type)
-        return rule.get("severity") if rule else None
+        if rule:
+            return rule.get("severity")
+        if error_type.startswith("FM_"):
+            return "error"
+        return None
 
     def get_corrigivel(self, error_type: str) -> str | None:
         """Retorna corrigivel (automatico/proposta/investigar/impossivel)."""
         rule = self._by_error_type.get(error_type)
-        return rule.get("corrigivel") if rule else None
+        if rule:
+            return rule.get("corrigivel")
+        if error_type.startswith("FM_"):
+            return "automatico"
+        return None
 
     def get_certeza_impacto(self, error_type: str) -> tuple[str, str] | None:
         """Retorna (certeza, impacto) da regra, ou None."""
         rule = self._by_error_type.get(error_type)
-        if not rule:
-            return None
-        return (
-            rule.get("certeza", "objetivo"),
-            rule.get("impacto", "relevante"),
-        )
+        if rule:
+            return (
+                rule.get("certeza", "objetivo"),
+                rule.get("impacto", "relevante"),
+            )
+        if error_type.startswith("FM_"):
+            return ("objetivo", "relevante")
+        return None
 
     def is_error_type_active(self, error_type: str) -> bool:
         """True se o error_type esta em alguma regra ativa (vigente)."""
+        if error_type.startswith("FM_"):
+            return True
         return error_type in self._active_error_types
 
     def error_type_exists_in_yaml(self, error_type: str) -> bool:
         """True se o error_type existe em qualquer regra do YAML (ativa ou nao)."""
+        if error_type.startswith("FM_"):
+            return True
         return error_type in self._all_error_types
 
 

@@ -98,7 +98,7 @@ def _valid_payload(**overrides) -> dict:
 # ──────────────────────────────────────────────
 
 class TestJustificativaObrigatoria:
-    """Justificativa é campo obrigatório com mínimo de 20 caracteres."""
+    """Justificativa obrigatória: mínimo 20 caracteres (geral) ou 10 se rule_id começar com FM_."""
 
     def test_justificativa_vazia_retorna_422(self, client: TestClient):
         payload = _valid_payload(justificativa="")
@@ -120,6 +120,19 @@ class TestJustificativaObrigatoria:
         }
         resp = client.put("/api/files/1/records/1", json=payload)
         assert resp.status_code == 422
+
+    def test_justificativa_curta_fm_aceita_10_chars(self, client: TestClient):
+        """Regras FM_* (field_map) aceitam justificativa minima de 10 caracteres."""
+        payload = {
+            "field_no": 5,
+            "field_name": "QTD",
+            "new_value": "10.00",
+            "rule_id": "FM_XML004",
+            "correction_type": "deterministic",
+            "justificativa": "1234567890",
+        }
+        resp = client.put("/api/files/1/records/1", json=payload)
+        assert resp.status_code == 200
 
 
 class TestCamposProibidos:

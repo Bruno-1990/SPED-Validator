@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from src.services.rule_loader import RuleLoader
+from src.services.rule_loader import RuleIndex, RuleLoader
 
 
 @pytest.fixture
@@ -231,3 +231,15 @@ class TestRuleLoaderWithRealFile:
         )
         active_ids = {r["id"] for r in active}
         assert "ALIQ_001" not in active_ids
+
+
+class TestRuleIndexFmPrefix:
+    """Erros FM_* (field_map SPED x XML) sem entrada explícita no YAML."""
+
+    def test_fm_prefix_defaults(self) -> None:
+        idx = RuleIndex(active_rules=[], all_rules=[])
+        assert idx.get_severity("FM_XML004") == "error"
+        assert idx.get_corrigivel("FM_XML004") == "automatico"
+        assert idx.get_certeza_impacto("FM_XML004") == ("objetivo", "relevante")
+        assert idx.is_error_type_active("FM_XML004") is True
+        assert idx.error_type_exists_in_yaml("FM_XML004") is True

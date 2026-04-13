@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
-import sqlite3
+import logging
 from dataclasses import dataclass, field
 
+logger = logging.getLogger(__name__)
+
+from .db_types import AuditConnection
 from ..models import ValidationError
 from ..validator import load_field_definitions, validate_records
 from ..validators.apuracao_validator import validate_apuracao
@@ -90,9 +93,10 @@ def get_pipeline_progress(file_id: int) -> PipelineProgress | None:
 # ──────────────────────────────────────────────
 
 def run_pipeline(
-    db: sqlite3.Connection,
+    db: AuditConnection,
     file_id: int,
     doc_db_path: str | None = None,
+    validation_mode: str = "sped_only",
 ) -> PipelineProgress:
     """Executa o pipeline completo de validação em 4 estágios.
 
@@ -116,7 +120,7 @@ def run_pipeline(
         # Erros serao acumulados em memoria e trocados atomicamente ao final.
 
         # ── Stage 0: Montagem de Contexto (Context-First) ──
-        context = build_context(file_id, db)
+        context = build_context(file_id, db, validation_mode=validation_mode)
 
         # Registrar execucao e salvar snapshot (Migration 14)
         from .context_builder import create_validation_run, save_context_snapshot
@@ -173,11 +177,34 @@ def run_pipeline(
         cross_errors: list[ValidationError] = []
         progress.detail = "Cruzando C100 x C170 x C190, referencias 0150/0200, E110"
         cross_errors.extend(validate_cross_blocks(records, context=context))
+        progress.stage_progress = 15
+
+        if context.mode == "sped_xml" and context.has_xmls:
+            progress.detail = "Conferencia declarativa SPED x XML (field_map C100)..."
+            from ..validators.field_map_validator import validate_field_map_c100
+
+            cross_errors.extend(validate_field_map_c100(db, file_id, records, context))
+
         progress.stage_progress = 20
 
         progress.detail = "Recalculando ICMS, ICMS-ST, IPI, PIS/COFINS nos C170"
         cross_errors.extend(recalculate_taxes(records, context=context))
         progress.stage_progress = 45
+
+        if context.mode == "sped_xml" and context.has_xmls:
+            progress.detail = (
+                "Conferencia declarativa SPED x XML (field_map C170 itens, pos-recalculo interno)..."
+            )
+            from ..validators.field_map_validator import (
+                validate_field_map_c170,
+                validate_field_map_c190,
+            )
+
+            cross_errors.extend(validate_field_map_c170(db, file_id, records, context))
+            progress.detail = (
+                "Conferencia declarativa SPED x XML (field_map C190 agregado x XML)..."
+            )
+            cross_errors.extend(validate_field_map_c190(db, file_id, records, context))
 
         progress.detail = "Validando CST ICMS, isencoes e Bloco H"
         cross_errors.extend(validate_cst_and_exemptions(records, context=context))
@@ -277,6 +304,32 @@ def run_pipeline(
         progress.errors_by_stage["cruzamento"] = len(cross_errors)
         progress.total_errors += len(cross_errors)
 
+        # ── Estágio 2.5: Motor de Cruzamento XC (XML x SPED) ──
+        if context.mode == "sped_xml" and context.has_xmls:
+            progress.detail = "Motor de Cruzamento XC: construindo escopos e executando regras XC001-XC095"
+            try:
+                from .cross_engine import CrossValidationEngine
+                xc_engine = CrossValidationEngine(
+                    db, file_id,
+                    regime=context.regime.value if hasattr(context.regime, 'value') else str(context.regime),
+                    cod_ver=context.cod_ver,
+                    benefit_context=",".join(b.codigo for b in context.beneficios_ativos) if context.beneficios_ativos else "",
+                )
+                xc_findings = xc_engine.run()
+                xc_engine.persist_findings()
+                xc_engine.persist_to_legacy_table()
+                xc_summary = xc_engine.get_summary()
+                progress.errors_by_stage["cruzamento_xc"] = xc_summary.get("total_errors", 0)
+                progress.total_errors += xc_summary.get("total_errors", 0)
+                logger.info(
+                    "Motor XC: %d findings (%d erros, %d escopos)",
+                    xc_summary.get("total_findings", 0),
+                    xc_summary.get("total_errors", 0),
+                    xc_summary.get("total_scopes", 0),
+                )
+            except Exception as e:
+                logger.error("Erro no Motor de Cruzamento XC: %s", e, exc_info=True)
+
         db.execute(
             "UPDATE sped_files SET validation_stage = 'enriquecimento' WHERE id = ?",
             (file_id,),
@@ -336,11 +389,15 @@ def run_pipeline(
     except Exception:
         progress.done = True
         progress.stage = "erro"
-        db.execute(
-            "UPDATE sped_files SET status = 'error' WHERE id = ?",
-            (file_id,),
-        )
-        db.commit()
+        try:
+            db.rollback()
+            db.execute(
+                "UPDATE sped_files SET status = 'error' WHERE id = ?",
+                (file_id,),
+            )
+            db.commit()
+        except Exception:
+            pass
         raise
     finally:
         # Limpar após conclusão (com delay para SSE ler o estado final)
@@ -360,7 +417,12 @@ def _filter_by_vigencia(
     """Remove erros de regras fora da vigencia do periodo do arquivo."""
     if active_error_types is None:
         return errors
-    return [e for e in errors if e.error_type in active_error_types]
+    _keep = frozenset({"field_map_xml"})
+    return [
+        e
+        for e in errors
+        if e.error_type in active_error_types or e.categoria in _keep
+    ]
 
 
 def _deduplicate_errors(errors: list[ValidationError]) -> list[ValidationError]:
@@ -446,7 +508,7 @@ def _deduplicate_errors(errors: list[ValidationError]) -> list[ValidationError]:
 
 
 def _persist_stage_errors(
-    db: sqlite3.Connection,
+    db: AuditConnection,
     file_id: int,
     errors: list[ValidationError],
     rule_index=None,
@@ -499,7 +561,7 @@ def _persist_stage_errors(
 
 
 def _enrich_errors(
-    db: sqlite3.Connection,
+    db: AuditConnection,
     file_id: int,
     doc_db_path: str | None,
     progress: PipelineProgress,
@@ -584,6 +646,8 @@ def _enrich_errors(
             elif error_type == "CST_HIPOTESE" and sample["expected_value"]:
                 auto_correctable = 1
             elif error_type == "CALCULO_ARREDONDAMENTO" and sample["expected_value"]:
+                auto_correctable = 1
+            elif error_type.startswith("FM_") and sample.get("expected_value"):
                 auto_correctable = 1
 
         # Atualizar todos os erros do grupo

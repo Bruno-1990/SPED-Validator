@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  sped-db:
+    image: postgres:16-alpine
+    container_name: sped-db
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: sped
+      POSTGRES_PASSWORD: sped2026
+      POSTGRES_DB: sped_audit
+    volumes:
+      - sped-pgdata:/var/lib/postgresql/data
+      - ./scripts/pg_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sped -d sped_audit"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  sped-pgdata:

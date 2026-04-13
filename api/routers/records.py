@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import sqlite3
-
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.deps import get_db
+from src.services.db_types import AuditConnection
 from api.schemas.models import CorrectionRequest, PaginatedResponse, RecordInfo
 from src.services.correction_service import (
     CorrectionNotAllowed,
@@ -25,7 +24,7 @@ def list_records(
     status: str | None = None,
     page: int = 1,
     page_size: int = 100,
-    db: sqlite3.Connection = Depends(get_db),
+    db: AuditConnection = Depends(get_db),
 ) -> PaginatedResponse[RecordInfo]:
     """Lista registros do arquivo com filtros e paginação."""
     where = "WHERE file_id = ?"
@@ -57,7 +56,7 @@ def list_records(
 
 
 @router.get("/{record_id}", response_model=RecordInfo)
-def get_record(file_id: int, record_id: int, db: sqlite3.Connection = Depends(get_db)) -> RecordInfo:
+def get_record(file_id: int, record_id: int, db: AuditConnection = Depends(get_db)) -> RecordInfo:
     """Detalhe de um registro."""
     row = db.execute(
         "SELECT * FROM sped_records WHERE id = ? AND file_id = ?",
@@ -78,7 +77,7 @@ def update_record(
     file_id: int,
     record_id: int,
     update: CorrectionRequest,
-    db: sqlite3.Connection = Depends(get_db),
+    db: AuditConnection = Depends(get_db),
 ) -> dict:
     """Aplica correção em um campo do registro com aprovação humana obrigatória."""
     if update.field_name in _PROHIBITED_FIELDS:

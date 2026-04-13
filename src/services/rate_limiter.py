@@ -9,6 +9,7 @@ use Redis-backed rate limiter em vez desta implementação.
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from collections import defaultdict, deque
@@ -52,6 +53,12 @@ _upload_limiter = SlidingWindowRateLimiter(max_requests=10, window_seconds=60)
 _validation_limiter = SlidingWindowRateLimiter(max_requests=5, window_seconds=60)
 
 
+def _api_rate_limit_disabled() -> bool:
+    """Pytest / ambiente de CI: evita 429 em sequências longas de uploads/validações."""
+    v = (os.environ.get("DISABLE_API_RATE_LIMIT") or "").strip().lower()
+    return v in ("1", "true", "yes", "on")
+
+
 def get_client_id(request: Request) -> str:
     """Extrai identificador do cliente (IP real, considerando proxies)."""
     forwarded = request.headers.get("X-Forwarded-For")
@@ -61,6 +68,8 @@ def get_client_id(request: Request) -> str:
 
 
 def check_upload_rate_limit(request: Request) -> None:
+    if _api_rate_limit_disabled():
+        return
     client_id = get_client_id(request)
     allowed, retry_after = _upload_limiter.is_allowed(client_id)
     if not allowed:
@@ -76,6 +85,8 @@ def check_upload_rate_limit(request: Request) -> None:
 
 
 def check_validation_rate_limit(request: Request) -> None:
+    if _api_rate_limit_disabled():
+        return
     client_id = get_client_id(request)
     allowed, retry_after = _validation_limiter.is_allowed(client_id)
     if not allowed:

@@ -7,16 +7,15 @@ Regras implementadas:
 
 from __future__ import annotations
 
-import sqlite3
-
 from ..models import SpedRecord, ValidationError
+from ..services.db_types import AuditConnection
 from ..parser import group_by_register
 from .helpers import make_error
 
 
 def validate_retificador(
     records: list[SpedRecord],
-    db: sqlite3.Connection | None = None,
+    db: AuditConnection | None = None,
     file_id: int | None = None,
 ) -> list[ValidationError]:
     """Valida consistencia de retificadores SPED."""

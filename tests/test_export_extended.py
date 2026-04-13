@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from src.services.database import init_audit_db
+from src.validators.helpers import REGISTER_FIELDS, fields_to_dict
 from src.services.export_service import (
     _build_section6,
     export_corrected_sped,
@@ -335,3 +336,29 @@ class TestExportCorrectedSped:
         file_id = _insert_file(audit_db)
         result = export_corrected_sped(audit_db, file_id)
         assert result == "\n"
+
+    def test_export_rebuilds_from_fields_json_when_coherent(
+        self, audit_db: sqlite3.Connection,
+    ) -> None:
+        """Export alinha raw_line ao fields_json quando o JSON reflete o leiaute completo."""
+        file_id = _insert_file(audit_db)
+        ch = "2" * 44
+        fields_list = [
+            "C100", "0", "0", "", "55", "00", "1", "1", ch,
+            "01012024", "", "100,00",
+            "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0",
+        ]
+        assert len(fields_list) == len(REGISTER_FIELDS["C100"])
+        d = fields_to_dict("C100", fields_list)
+        d["VL_DOC"] = "999,99"
+        fj = json.dumps(d, ensure_ascii=False)
+        stale = "|C100|stub|wrong|"
+        audit_db.execute(
+            """INSERT INTO sped_records (file_id, line_number, register, block, fields_json, raw_line)
+               VALUES (?, 1, 'C100', 'C', ?, ?)""",
+            (file_id, fj, stale),
+        )
+        audit_db.commit()
+        result = export_corrected_sped(audit_db, file_id)
+        assert "999,99" in result
+        assert stale not in result

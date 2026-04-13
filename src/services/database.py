@@ -5,6 +5,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from src.services.db_types import AuditConnection
+
 _AUDIT_SCHEMA = """
 CREATE TABLE IF NOT EXISTS sped_files (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -409,6 +411,132 @@ _MIGRATIONS: dict[int, list[str]] = {
         "CREATE INDEX IF NOT EXISTS idx_nfe_xmls_crt ON nfe_xmls(crt_emitente)",
         "CREATE INDEX IF NOT EXISTS idx_nfe_xmls_periodo ON nfe_xmls(file_id, dentro_periodo)",
     ],
+    15: [
+        # Marca fim do cruzamento XML x SPED mesmo com 0 divergencias (nfe_cruzamento vazio)
+        "ALTER TABLE sped_files ADD COLUMN xml_crossref_completed_at TEXT",
+    ],
+    16: [
+        # ── Migration 16: Motor de Cruzamento v.FINAL ──
+
+        # Tabela de tipos de acao sugerida (spec seção 2.4)
+        """CREATE TABLE IF NOT EXISTS suggested_action_types (
+            code        TEXT PRIMARY KEY,
+            label_pt    TEXT NOT NULL,
+            description TEXT
+        )""",
+        """INSERT INTO suggested_action_types VALUES
+            ('corrigir_no_sped',          'Corrigir no SPED',           'Campo do arquivo EFD deve ser corrigido'),
+            ('revisar_xml_emissor',       'Revisar XML com emissor',    'Inconsistência na NF-e emitida'),
+            ('revisar_parametrizacao_erp','Revisar parametrização ERP', 'Regra de escrituração incorreta no sistema'),
+            ('revisar_cadastro',          'Revisar cadastro',           'Dado cadastral divergente ou ausente'),
+            ('revisar_beneficio',         'Revisar benefício fiscal',   'Aplicação incorreta de benefício'),
+            ('revisar_apuracao',          'Revisar apuração',           'Erro ou omissão no bloco de apuração'),
+            ('investigar',                'Investigar',                 'Indício não conclusivo — requer análise manual')
+            ON CONFLICT (code) DO NOTHING
+        """,
+
+        # Tabela principal: cross_validation_findings (spec seção 2.1)
+        """CREATE TABLE IF NOT EXISTS cross_validation_findings (
+            id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_id                 INTEGER NOT NULL REFERENCES sped_files(id),
+            document_scope_id       INTEGER,
+            chave_nfe               TEXT,
+
+            -- Identificação da regra
+            rule_id                 TEXT NOT NULL,
+            legacy_rule_id          TEXT,
+            rule_version            TEXT,
+            reference_pack_version  TEXT,
+            benefit_context_version TEXT,
+            layout_version_detected TEXT,
+            config_hash             TEXT,
+
+            -- Tipologia
+            error_type              TEXT NOT NULL,
+            rule_outcome            TEXT NOT NULL CHECK (rule_outcome IN (
+                                        'EXECUTED_ERROR', 'EXECUTED_OK', 'NOT_APPLICABLE',
+                                        'NOT_EXECUTED_MISSING_DATA', 'SUPPRESSED_BY_ROOT_CAUSE',
+                                        'NEUTRALIZED_BY_BENEFIT', 'AMBIGUOUS_MATCH'
+                                    )),
+            tipo_irregularidade     TEXT,
+
+            -- Severidade e confiança
+            severity                TEXT NOT NULL CHECK (severity IN (
+                                        'critico', 'error', 'warning', 'info'
+                                    )),
+            confidence              TEXT,
+
+            -- Localização SPED
+            sped_register           TEXT,
+            sped_field              TEXT,
+            value_sped              TEXT,
+
+            -- Localização XML
+            xml_field               TEXT,
+            value_xml               TEXT,
+
+            -- Evidências e contexto
+            description             TEXT,
+            evidence                TEXT,
+            regime_context          TEXT,
+            benefit_context         TEXT,
+
+            -- Ação sugerida
+            suggested_action        TEXT NOT NULL DEFAULT 'investigar',
+
+            -- Causa raiz e deduplicação
+            root_cause_group        TEXT,
+            is_derived              INTEGER DEFAULT 0,
+
+            -- Scores e priorização
+            risk_score              REAL,
+            technical_risk_score    REAL,
+            fiscal_impact_estimate  REAL,
+            action_priority         TEXT CHECK (action_priority IN ('P1','P2','P3','P4')),
+
+            -- Workflow de revisão humana
+            review_status           TEXT DEFAULT 'novo' CHECK (review_status IN (
+                                        'novo', 'em_revisao', 'justificado',
+                                        'corrigido', 'ignorado', 'falso_positivo'
+                                    )),
+            reviewed_by             TEXT,
+            reviewed_at             DATETIME,
+            review_reason           TEXT,
+            review_evidence_ref     TEXT,
+
+            created_at              DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_xvf_file ON cross_validation_findings(file_id)",
+        "CREATE INDEX IF NOT EXISTS idx_xvf_rule ON cross_validation_findings(file_id, rule_id)",
+        "CREATE INDEX IF NOT EXISTS idx_xvf_severity ON cross_validation_findings(file_id, severity)",
+        "CREATE INDEX IF NOT EXISTS idx_xvf_priority ON cross_validation_findings(file_id, action_priority)",
+        "CREATE INDEX IF NOT EXISTS idx_xvf_root_cause ON cross_validation_findings(root_cause_group)",
+        "CREATE INDEX IF NOT EXISTS idx_xvf_review ON cross_validation_findings(review_status)",
+
+        # Extensões na tabela document_scopes (se existir) ou campos no xml_match_index
+        "ALTER TABLE xml_match_index ADD COLUMN is_complementar INTEGER DEFAULT 0",
+        "ALTER TABLE xml_match_index ADD COLUMN xml_eligible INTEGER DEFAULT 1",
+        "ALTER TABLE xml_match_index ADD COLUMN xml_effective_version TEXT",
+        "ALTER TABLE xml_match_index ADD COLUMN xml_effective_event_set TEXT",
+        "ALTER TABLE xml_match_index ADD COLUMN xml_resolution_reason TEXT",
+
+        # Tabela field_equivalence_map (spec seção 2.3)
+        """CREATE TABLE IF NOT EXISTS field_equivalence_map (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            register_sped   TEXT NOT NULL,
+            field_sped      TEXT NOT NULL,
+            xml_xpath       TEXT,
+            calculo         TEXT,
+            fonte           TEXT,
+            tolerancia_abs  REAL DEFAULT 0.02,
+            tolerancia_rel  REAL DEFAULT 0.0,
+            leiaute_min     TEXT,
+            leiaute_max     TEXT,
+            vigencia_ini    DATE,
+            vigencia_fim    DATE,
+            UNIQUE (register_sped, field_sped, xml_xpath, leiaute_min)
+        )""",
+    ],
 }
 
 
@@ -437,8 +565,29 @@ def init_audit_db(db_path: str | Path) -> sqlite3.Connection:
     return conn
 
 
-def get_connection(db_path: str | Path) -> sqlite3.Connection:
-    """Abre conexão com o banco de auditoria existente."""
+def get_connection(db_path: str | Path = "") -> AuditConnection:
+    """Abre conexão com o banco de auditoria PostgreSQL.
+
+    Requer DATABASE_URL configurada no ambiente.
+    Fallback para SQLite apenas em ambiente de teste (sem DATABASE_URL).
+    """
+    import os
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url:
+        from .database_pg import get_pg_connection
+        return get_pg_connection(database_url)
+
+    # Fallback SQLite — apenas para testes locais sem PG
+    if not db_path:
+        raise RuntimeError(
+            "DATABASE_URL nao configurada. "
+            "Configure: DATABASE_URL=postgresql://sped:sped2026@localhost:5434/sped_audit"
+        )
     conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=30)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=30000")

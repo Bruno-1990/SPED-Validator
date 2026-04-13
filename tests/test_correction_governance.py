@@ -5,6 +5,7 @@ from src.services.correction_service import (
     _validate_correction_governance,
     CorrectionBlockedError,
     FIELDS_BLOCKED_FROM_AUTO_CORRECTION,
+    FIELDS_NO_AUTOMATICO_MESMO_COM_REF_XML,
 )
 
 
@@ -53,3 +54,32 @@ def test_blocks_auto_correction_of_cst_icms():
 def test_blocks_auto_correction_of_cfop():
     with pytest.raises(CorrectionBlockedError):
         _validate_correction_governance("CFOP", "automatico", "5101")
+
+
+def test_vl_icms_auto_permitido_com_ref_xml():
+    """Com referência XML, valores monetários podem ser automáticos (regra FM_*)."""
+    _validate_correction_governance(
+        "VL_ICMS", "automatico", "100,00", xml_ref_correction=True
+    )
+
+
+def test_num_doc_auto_bloqueado_mesmo_com_ref_xml():
+    with pytest.raises(CorrectionBlockedError, match="referência no XML"):
+        _validate_correction_governance(
+            "NUM_DOC", "automatico", "12345", xml_ref_correction=True
+        )
+
+
+def test_cfop_auto_bloqueado_mesmo_com_ref_xml():
+    with pytest.raises(CorrectionBlockedError, match="referência no XML"):
+        _validate_correction_governance(
+            "CFOP", "automatico", "5102", xml_ref_correction=True
+        )
+
+
+def test_proposta_permite_cfop_mesmo_com_ref_xml():
+    _validate_correction_governance("CFOP", "proposta", "5102", xml_ref_correction=True)
+
+
+def test_num_doc_consta_em_lista_xml_sem_auto():
+    assert "NUM_DOC" in FIELDS_NO_AUTOMATICO_MESMO_COM_REF_XML

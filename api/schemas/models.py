@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator
 
 T = TypeVar("T")
 
@@ -25,10 +25,21 @@ class PaginatedResponse(BaseModel, Generic[T]):
 # ──────────────────────────────────────────────
 
 class FileInfo(BaseModel):
+    model_config = ConfigDict(coerce_numbers_to_str=False)
+
     id: int
     filename: str
     hash_sha256: str
     upload_date: str | None = None
+
+    @field_validator("upload_date", mode="before")
+    @classmethod
+    def _coerce_upload_date(cls, v):  # noqa: N805
+        if v is None:
+            return v
+        if not isinstance(v, str):
+            return str(v)
+        return v
     period_start: str | None = None
     period_end: str | None = None
     company_name: str | None = None
@@ -79,16 +90,19 @@ class CorrectionRequest(BaseModel):
     field_name: str
     new_value: str
     error_id: int | None = None
-    justificativa: str
-    correction_type: Literal["deterministic", "assisted", "manual"]
     rule_id: str
+    correction_type: Literal["deterministic", "assisted", "manual"]
+    justificativa: str
 
     @field_validator("justificativa")
     @classmethod
-    def justificativa_min_length(cls, v: str) -> str:
-        if len(v.strip()) < 20:
-            raise ValueError("Justificativa deve ter no mínimo 20 caracteres")
-        return v.strip()
+    def justificativa_min_length(cls, v: str, info: ValidationInfo) -> str:
+        rid = str((info.data or {}).get("rule_id") or "")
+        min_len = 10 if rid.startswith("FM_") else 20
+        s = (v or "").strip()
+        if len(s) < min_len:
+            raise ValueError(f"Justificativa deve ter no mínimo {min_len} caracteres")
+        return s
 
 
 # ──────────────────────────────────────────────

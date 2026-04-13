@@ -284,11 +284,13 @@ class TestCorrectionService:
         ).fetchone()
         assert undo_correction(audit_db, corr[0]) is True
 
-        # Valor restaurado
+        # Valor restaurado (apply_correction pode expandir o JSON ao leiaute completo)
         restored = audit_db.execute(
             "SELECT fields_json FROM sped_records WHERE id = ?", (record_id,)
         ).fetchone()
-        assert json.loads(restored[0]) == original_fields
+        restored_dict = json.loads(restored[0])
+        for k, v in original_fields.items():
+            assert restored_dict.get(k) == v, k
 
     def test_undo_nonexistent(self, audit_db: sqlite3.Connection) -> None:
         assert undo_correction(audit_db, 999) is False

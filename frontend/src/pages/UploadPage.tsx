@@ -216,47 +216,42 @@ export default function UploadPage() {
     setXmlStats(statsAccum)
     setXmlUploading(false)
 
-    if (statsAccum.autorizadas + statsAccum.canceladas > 0) {
+    // Rodar cruzamento se teve XMLs novos OU se já existem XMLs vinculados (duplicatas de re-upload)
+    const temXmlsVinculados = statsAccum.autorizadas + statsAccum.canceladas + statsAccum.duplicadas > 0
+    if (temXmlsVinculados) {
       setCruzandoXml(true)
       setCruzPct(0)
+      setCruzLog(['Iniciando cruzamento XML x SPED...'])
 
-      const etapas = [
-        'Carregando XMLs e registros C100...',
-        'Verificando NF-e ausentes (XML001/XML002)...',
-        'Comparando valores: VL_DOC, VL_ICMS (XML003/XML004)...',
-        'Comparando VL_ICMS_ST, VL_IPI (XML005/XML006)...',
-        'Verificando NF-e canceladas (XML011)...',
-        'Contando itens C170 vs XML (XML012)...',
-        'Validando CNPJ participantes (XML013)...',
-        'Conferindo datas de emissao (XML014/XML015)...',
-        'Persistindo divergencias...',
-        'Gerando sugestoes de correcao...',
-      ]
-      setCruzLog([etapas[0]])
-
-      // Progresso visual enquanto aguarda resposta
-      let etapaIdx = 0
-      const timer = setInterval(() => {
-        etapaIdx++
-        if (etapaIdx < etapas.length) {
-          setCruzPct(Math.min(90, etapaIdx * 10))
-          setCruzLog(prev => [...prev, etapas[etapaIdx]])
-        }
-      }, 2500)
-
-      try {
-        const result = await api.cruzarXml(fileId!)
-        clearInterval(timer)
-        setCruzPct(100)
-        setCruzLog(prev => [...prev, `Concluido: ${result.divergencias.toLocaleString()} divergencias encontradas.`])
-        setCruzResult(result)
-      } catch {
-        clearInterval(timer)
-        setCruzLog(prev => [...prev, 'Erro no cruzamento.'])
-      }
-      setCruzandoXml(false)
+      await new Promise<void>((resolve) => {
+        api.cruzarXmlStream(
+          fileId!,
+          (pct, msg) => {
+            setCruzPct(pct)
+            setCruzLog(prev => {
+              if (prev.length > 0 && prev[prev.length - 1] === msg) return prev
+              return [...prev, msg]
+            })
+          },
+          (result) => {
+            setCruzPct(100)
+            setCruzLog(prev => [...prev, `Concluido: ${result.divergencias.toLocaleString()} divergencias XML + ${(result.total_erros_fiscal ?? 0).toLocaleString()} erros fiscais.`])
+            setCruzResult(result)
+            setCruzandoXml(false)
+            // Pipeline ja rodou no backend — navegar direto para resultados (sem validate=1)
+            navigate(`/files/${fileId}?mode=sped_xml`)
+            resolve()
+          },
+          (err) => {
+            setCruzLog(prev => [...prev, `Erro no cruzamento: ${err}`])
+            setError(`Cruzamento XML falhou: ${err}`)
+            setCruzandoXml(false)
+            resolve()
+          },
+        )
+      })
     }
-  }, [fileId])
+  }, [fileId, navigate])
 
   const uploadXmlsChunked = useCallback(async () => {
     if (!fileId || xmlFiles.length === 0) return
@@ -310,14 +305,15 @@ export default function UploadPage() {
 
   const irParaValidacao = useCallback(() => {
     if (!fileId) return
-    if (cruzResult) {
-      // Ja cruzou XMLs — ir direto sem revalidar SPED
-      navigate(`/files/${fileId}`)
-    } else {
-      // Sem XMLs — validar SPED normalmente
-      navigate(`/files/${fileId}?validate=1`)
-    }
-  }, [fileId, navigate, cruzResult])
+    // Com XML: pipeline ja rodou no backend (encadeado no cruzamento) — ir direto.
+    // Sem XML: disparar pipeline via validate=1.
+    const comXml = xmlStats !== null || cruzResult !== null
+    navigate(
+      comXml
+        ? `/files/${fileId}?mode=sped_xml`
+        : `/files/${fileId}?validate=1`,
+    )
+  }, [fileId, navigate, xmlStats, cruzResult])
 
   // ── Reset ──
 
@@ -496,57 +492,57 @@ export default function UploadPage() {
                 </button>
               </div>
 
-              {/* Progress bar durante upload */}
-              {xmlUploading && (
-                <div className="mb-3">
-                  <div className="flex justify-between text-xs text-gray-500 mb-1">
-                    <span>Enviando em lotes de {CHUNK_SIZE}...</span>
-                    <span>{xmlProgress.enviados.toLocaleString()} / {xmlProgress.total.toLocaleString()}</span>
+              {/* Barra em 3 fases: envio (0–33%) + cruzamento (33–100%). A auditoria completa é outra tela. */}
+              {(xmlUploading || cruzandoXml) && (() => {
+                const pctUpload = xmlProgress.total > 0
+                  ? Math.round((xmlProgress.enviados / xmlProgress.total) * (100 / 3))
+                  : 0
+                const pctTotal = xmlUploading
+                  ? pctUpload
+                  : Math.min(100, Math.round(100 / 3 + (cruzPct / 100) * (200 / 3)))
+                const faseLabel = xmlUploading
+                  ? `Passo 1 de 3: Enviando XMLs (${xmlProgress.enviados.toLocaleString()} / ${xmlProgress.total.toLocaleString()})`
+                  : 'Passo 2 de 3: Cruzando XML x SPED'
+                return (
+                  <div className="mb-3 bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                        {cruzandoXml && (
+                          <svg className="animate-spin h-4 w-4 text-blue-600" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                        )}
+                        {faseLabel}
+                      </span>
+                      <span className="text-sm font-semibold text-blue-600">{pctTotal}%</span>
+                    </div>
+                    <p className="text-xs text-slate-600">
+                      Passo 3 de 3 (próxima tela): auditoria fiscal completa do SPED — só inicia depois que o cruzamento acima terminar e você for redirecionado.
+                    </p>
+                    <div className="w-full bg-slate-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-300 ${xmlUploading ? 'bg-green-500' : 'bg-blue-500'}`}
+                        style={{ width: `${pctTotal}%` }}
+                      />
+                    </div>
+                    {cruzandoXml && cruzLog.length > 0 && (
+                      <div className="bg-slate-900 rounded-md p-3 max-h-32 overflow-y-auto flex flex-col-reverse">
+                        {[...cruzLog].reverse().map((msg, i) => (
+                          <p key={i} className={`font-mono text-xs leading-5 ${i === 0 ? 'text-green-400' : 'text-slate-500'}`}>
+                            <span className="text-slate-600 mr-1.5">{'>'}</span>{msg}
+                          </p>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${(xmlProgress.enviados / xmlProgress.total) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )}
+                )
+              })()}
 
-              {/* Stats após upload */}
-              {xmlStats && (
+              {/* Stats após upload (antes ou depois do cruzamento concluir) */}
+              {xmlStats && !xmlUploading && !cruzandoXml && (
                 <div className="text-sm text-gray-600 space-y-1 bg-green-50 border border-green-200 rounded p-3">
                   <p className="font-medium text-green-800">Upload concluido!</p>
                   <p>Autorizadas: {xmlStats.autorizadas} | Canceladas: {xmlStats.canceladas}</p>
                   {xmlStats.duplicadas > 0 && <p className="text-yellow-700">Duplicadas (ignoradas): {xmlStats.duplicadas}</p>}
                   {xmlStats.invalidos > 0 && <p className="text-red-600">Invalidos: {xmlStats.invalidos}</p>}
-                </div>
-              )}
-
-              {/* Cruzamento automatico — progress bar + log */}
-              {cruzandoXml && (
-                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                      <svg className="animate-spin h-4 w-4 text-blue-600" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                      Cruzando XML x SPED
-                    </span>
-                    <span className="text-sm font-semibold text-blue-600">{cruzPct}%</span>
-                  </div>
-                  <div className="w-full bg-slate-200 rounded-full h-2">
-                    <div
-                      className="bg-blue-500 h-2 rounded-full transition-all duration-500 ease-out"
-                      style={{ width: `${cruzPct}%` }}
-                    />
-                  </div>
-                  {cruzLog.length > 0 && (
-                    <div className="bg-slate-900 rounded-md p-3 max-h-32 overflow-y-auto flex flex-col-reverse">
-                      {[...cruzLog].reverse().map((msg, i) => (
-                        <p key={i} className={`font-mono text-xs leading-5 ${i === 0 ? 'text-green-400' : 'text-slate-500'}`}>
-                          <span className="text-slate-600 mr-1.5">{'>'}</span>{msg}
-                        </p>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -604,7 +600,11 @@ export default function UploadPage() {
               </>
             ) : xmlStats && !cruzandoXml ? (
               <button
-                onClick={irParaValidacao}
+                type="button"
+                onClick={() => {
+                  if (cruzResult !== null) navigate(`/files/${fileId}?validate=1&mode=sped_xml`)
+                  else irParaValidacao()
+                }}
                 className="flex-1 py-3 rounded-lg font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
               >
                 Continuar para Validacao

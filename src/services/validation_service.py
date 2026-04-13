@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import sqlite3
-
+from .db_types import AuditConnection
 from ..models import SpedRecord, ValidationError
 from ..validator import load_field_definitions, validate_records
 from .context_builder import build_context
@@ -66,7 +65,7 @@ from ..validators.tax_recalc import recalculate_taxes  # noqa: E402
 
 
 def run_full_validation(
-    db: sqlite3.Connection,
+    db: AuditConnection,
     file_id: int,
     doc_db_path: str | None = None,
 ) -> list[ValidationError]:
@@ -246,7 +245,7 @@ def _build_errors_where(
 
 
 def get_errors_count(
-    db: sqlite3.Connection,
+    db: AuditConnection,
     file_id: int,
     error_type: str | None = None,
     severity: str | None = None,
@@ -264,7 +263,7 @@ def get_errors_count(
 
 
 def get_errors(
-    db: sqlite3.Connection,
+    db: AuditConnection,
     file_id: int,
     error_type: str | None = None,
     severity: str | None = None,
@@ -287,7 +286,7 @@ def get_errors(
     return [dict(r) if hasattr(r, "keys") else {} for r in rows]
 
 
-def get_error_summary(db: sqlite3.Connection, file_id: int) -> dict:
+def get_error_summary(db: AuditConnection, file_id: int) -> dict:
     """Retorna resumo dos erros por tipo e severidade."""
     by_type = db.execute(
         """SELECT error_type, COUNT(*) as count
@@ -319,7 +318,7 @@ def get_error_summary(db: sqlite3.Connection, file_id: int) -> dict:
 # Helpers
 # ──────────────────────────────────────────────
 
-def _load_records(db: sqlite3.Connection, file_id: int) -> list[SpedRecord]:
+def _load_records(db: AuditConnection, file_id: int) -> list[SpedRecord]:
     """Reconstroi SpedRecords a partir do banco.
 
     Suporta tanto o formato novo (dict nomeado) quanto o legado (list).
@@ -357,6 +356,8 @@ def _severity_for(error_type: str, rule_index=None) -> str:
     1. rules.yaml (via RuleIndex) — fonte primária
     2. Fallback hardcoded — para error_types sem entrada no YAML
     """
+    if error_type.startswith("FM_"):
+        return "error"
     # 1. Tentar severidade do YAML
     if rule_index is not None:
         sev = rule_index.get_severity(error_type)
@@ -527,7 +528,7 @@ def _calc_materialidade(err: ValidationError) -> float:
         return 0.0
 
 
-def _persist_errors(db: sqlite3.Connection, file_id: int, errors: list[ValidationError], rule_index=None) -> None:
+def _persist_errors(db: AuditConnection, file_id: int, errors: list[ValidationError], rule_index=None) -> None:
     """Persiste erros de validação no banco."""
     # Limpar correções e erros anteriores (preservar erros de cruzamento XML)
     db.execute("DELETE FROM corrections WHERE file_id = ?", (file_id,))

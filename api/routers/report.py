@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import sqlite3
-
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 
 from api.deps import get_db
+from src.services.db_types import AuditConnection
 from src.services.export_service import (
     export_corrected_sped,
     export_errors_csv,
@@ -22,7 +21,7 @@ router = APIRouter(prefix="/api/files/{file_id}", tags=["report"])
 @router.get("/report/structured")
 def get_structured_report(
     file_id: int,
-    db: sqlite3.Connection = Depends(get_db),
+    db: AuditConnection = Depends(get_db),
 ) -> dict:
     """Relatório estruturado para renderização no frontend."""
     return export_report_structured(db, file_id)
@@ -32,7 +31,7 @@ def get_structured_report(
 def get_report(
     file_id: int,
     format: str = "md",
-    db: sqlite3.Connection = Depends(get_db),
+    db: AuditConnection = Depends(get_db),
 ) -> PlainTextResponse:
     """Gera relatório de auditoria.
 
@@ -54,7 +53,7 @@ def get_report(
 @router.get("/download")
 def download_corrected(
     file_id: int,
-    db: sqlite3.Connection = Depends(get_db),
+    db: AuditConnection = Depends(get_db),
 ) -> PlainTextResponse:
     """Baixa arquivo SPED corrigido (.txt pipe-delimited)."""
     content = export_corrected_sped(db, file_id)

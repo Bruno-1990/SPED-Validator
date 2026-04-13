@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import math
-import sqlite3
+from .db_types import AuditConnection
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ _CAT_SISTEMICO = {
 }
 
 
-def calculate_risk_score(db: sqlite3.Connection, file_id: int) -> float:
+def calculate_risk_score(db: AuditConnection, file_id: int) -> float:
     """Calcula score de risco fiscal 0-100.
 
     Formula ponderada:
@@ -120,7 +120,7 @@ def calculate_risk_score(db: sqlite3.Connection, file_id: int) -> float:
 
 
 def calculate_coverage_score(
-    db: sqlite3.Connection, file_id: int, run_id: int = 0,
+    db: AuditConnection, file_id: int, run_id: int = 0,
 ) -> float:
     """Calcula score de cobertura tri-dimensional 0-100.
 
@@ -141,7 +141,7 @@ def calculate_coverage_score(
             if row:
                 executed = row[0] or 0
                 skipped = row[1] or 0
-        except sqlite3.OperationalError:
+        except Exception:
             pass
 
     if executed == 0:
@@ -170,7 +170,7 @@ def calculate_coverage_score(
                 (file_id,),
             ).fetchone()[0]
             xml_pct = min(total_xmls / max(c100_count, 1), 1.0)
-    except sqlite3.OperationalError:
+    except Exception:
         pass
 
     # Itens reconciliados (simplificacao: % de C170 com alguma validacao)
@@ -193,17 +193,18 @@ def get_risk_label(score: float) -> str:
 
 
 def persist_scores(
-    db: sqlite3.Connection, file_id: int, run_id: int,
+    db: AuditConnection, file_id: int, run_id: int,
     risk_score: float, coverage_score: float,
 ) -> None:
     """Persiste scores na tabela validation_runs."""
     try:
+        now_fn = "NOW()" if type(db).__name__ == "PgConnection" else "datetime('now')"
         db.execute(
-            """UPDATE validation_runs
+            f"""UPDATE validation_runs
                SET risk_score = ?, coverage_score = ?, status = 'done',
-                   finished_at = datetime('now')
+                   finished_at = {now_fn}
                WHERE id = ?""",
             (risk_score, coverage_score, run_id),
         )
-    except sqlite3.OperationalError:
+    except Exception:
         pass  # Tabela pode nao existir pre-Migration 14

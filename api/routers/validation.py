@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-import sqlite3
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from api.deps import get_db, get_doc_db_path
@@ -22,17 +21,45 @@ from src.services.context_builder import TaxRegime, build_context
 from src.services.pipeline import PipelineProgress, cleanup_pipeline, get_pipeline_progress, run_pipeline
 from src.services.reference_loader import ReferenceLoader
 from src.services.rate_limiter import check_validation_rate_limit
+from src.services.db_types import AuditConnection
 from src.services.validation_service import get_error_summary, get_errors
 
 router = APIRouter(prefix="/api/files/{file_id}", tags=["validation"])
 
+_MODES = ("sped_only", "sped_xml")
+
+
+def _require_xml_for_sped_xml_mode(db: AuditConnection, file_id: int) -> None:
+    try:
+        row = db.execute(
+            "SELECT COUNT(*) FROM nfe_xmls WHERE file_id = ? AND status = 'active'",
+            (file_id,),
+        ).fetchone()
+        n = int(row[0] if row and row[0] is not None else 0)
+    except Exception:
+        n = 0
+    if n == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Modo sped_xml requer ao menos um XML NF-e ativo vinculado ao arquivo.",
+        )
+
 
 @router.post("/validate", response_model=ValidationResponse)
-def validate(file_id: int, request: Request, db: sqlite3.Connection = Depends(get_db)) -> ValidationResponse:
+def validate(
+    file_id: int,
+    request: Request,
+    db: AuditConnection = Depends(get_db),
+    mode: str = Query("sped_only", description="sped_only | sped_xml"),
+) -> ValidationResponse:
     """Executa validação completa do arquivo (síncrono, compatível com versão anterior)."""
     check_validation_rate_limit(request)
+    if mode not in _MODES:
+        raise HTTPException(status_code=400, detail=f"mode invalido; use {_MODES}")
+    if mode == "sped_xml":
+        _require_xml_for_sped_xml_mode(db, file_id)
     doc_db = get_doc_db_path()
-    progress = run_pipeline(db, file_id, doc_db_path=doc_db)
+    progress = run_pipeline(db, file_id, doc_db_path=doc_db, validation_mode=mode)
     cleanup_pipeline(file_id)
     return ValidationResponse(
         file_id=file_id,
@@ -42,7 +69,10 @@ def validate(file_id: int, request: Request, db: sqlite3.Connection = Depends(ge
 
 
 @router.get("/validate/stream")
-async def validate_stream(file_id: int) -> StreamingResponse:
+async def validate_stream(
+    file_id: int,
+    mode: str = Query("sped_only", description="sped_only | sped_xml"),
+) -> StreamingResponse:
     """Executa validação com streaming SSE de progresso em tempo real.
 
     Emite eventos:
@@ -55,13 +85,25 @@ async def validate_stream(file_id: int) -> StreamingResponse:
     from src.services.database import get_connection
 
     doc_db = str(DOC_DB_PATH) if DOC_DB_PATH.exists() else None
+    if mode not in _MODES:
+        raise HTTPException(status_code=400, detail=f"mode invalido; use {_MODES}")
 
     async def event_generator():  # type: ignore[no-untyped-def]
         # Executar pipeline em thread separada para não bloquear o event loop
         def _run() -> PipelineProgress:
             conn = get_connection(AUDIT_DB_PATH)
             try:
-                return run_pipeline(conn, file_id, doc_db_path=doc_db)
+                if mode == "sped_xml":
+                    cur = conn.execute(
+                        "SELECT COUNT(*) FROM nfe_xmls WHERE file_id = ? AND status = 'active'",
+                        (file_id,),
+                    ).fetchone()
+                    n = int(cur[0] if cur and cur[0] is not None else 0)
+                    if n == 0:
+                        raise ValueError(
+                            "Modo sped_xml requer ao menos um XML NF-e ativo vinculado ao arquivo."
+                        )
+                return run_pipeline(conn, file_id, doc_db_path=doc_db, validation_mode=mode)
             finally:
                 conn.close()
 
@@ -149,7 +191,7 @@ def list_errors(
     impacto: str | None = None,
     page: int = 1,
     page_size: int = 100,
-    db: sqlite3.Connection = Depends(get_db),
+    db: AuditConnection = Depends(get_db),
 ) -> PaginatedResponse[ValidationErrorInfo]:
     """Lista erros de validação com filtros e paginação."""
     from src.services.validation_service import get_errors_count
@@ -177,12 +219,12 @@ def list_errors(
 
 
 @router.get("/summary", response_model=ErrorSummary)
-def summary(file_id: int, db: sqlite3.Connection = Depends(get_db)) -> ErrorSummary:
+def summary(file_id: int, db: AuditConnection = Depends(get_db)) -> ErrorSummary:
     """Resumo dos erros por tipo e severidade."""
     return ErrorSummary(**get_error_summary(db, file_id))
 
 
-def _has_xml_cruzamento(db: sqlite3.Connection, file_id: int) -> bool:
+def _has_xml_cruzamento(db: AuditConnection, file_id: int) -> bool:
     """Verifica se o cruzamento XML foi executado (ha resultados persistidos)."""
     try:
         cnt = db.execute(
@@ -195,7 +237,16 @@ def _has_xml_cruzamento(db: sqlite3.Connection, file_id: int) -> bool:
             "SELECT COUNT(*) FROM validation_errors WHERE file_id = ? AND categoria = 'cruzamento_xml'",
             (file_id,),
         ).fetchone()[0]
-        return cnt2 > 0
+        if cnt2 > 0:
+            return True
+        row = db.execute(
+            "SELECT xml_crossref_completed_at FROM sped_files WHERE id = ?",
+            (file_id,),
+        ).fetchone()
+        if row is not None:
+            v = row[0] if isinstance(row, tuple) else row.get("xml_crossref_completed_at")
+            return bool(v)
+        return False
     except Exception:
         return False
 
@@ -203,11 +254,11 @@ def _has_xml_cruzamento(db: sqlite3.Connection, file_id: int) -> bool:
 @router.get("/audit-scope", response_model=AuditScope)
 def audit_scope(
     file_id: int,
-    db: sqlite3.Connection = Depends(get_db),
+    db: AuditConnection = Depends(get_db),
 ) -> AuditScope:
     """Dashboard de escopo da auditoria — MOD-11."""
 
-    context = build_context(file_id, db)
+    context = build_context(file_id, db, validation_mode="sped_xml")
 
     # Determinar tabelas externas disponíveis
     ref_loader = ReferenceLoader()
@@ -446,7 +497,7 @@ def resolve_finding(
     file_id: int,
     finding_id: int,
     body: dict,
-    db: sqlite3.Connection = Depends(get_db),
+    db: AuditConnection = Depends(get_db),
 ) -> dict:
     """Registra resolucao de um apontamento (aceitar/rejeitar/postergar/ciencia)."""
     from src.services.correction_service import resolve_finding as _resolve
@@ -475,7 +526,7 @@ def resolve_finding(
 @router.get("/findings/resolutions")
 def list_finding_resolutions(
     file_id: int,
-    db: sqlite3.Connection = Depends(get_db),
+    db: AuditConnection = Depends(get_db),
 ) -> list[dict]:
     """Lista resolucoes de apontamentos do arquivo."""
     from src.services.correction_service import get_finding_resolutions
@@ -486,7 +537,7 @@ def list_finding_resolutions(
 def dismiss_error(
     file_id: int,
     error_id: int,
-    db: sqlite3.Connection = Depends(get_db),
+    db: AuditConnection = Depends(get_db),
 ) -> dict:
     """Ignora (remove) um erro individual."""
     db.execute(
@@ -514,7 +565,7 @@ def dismiss_error(
 @router.delete("/errors")
 def dismiss_all_errors(
     file_id: int,
-    db: sqlite3.Connection = Depends(get_db),
+    db: AuditConnection = Depends(get_db),
 ) -> dict:
     """Ignora (remove) todos os erros abertos do arquivo."""
     deleted = db.execute(

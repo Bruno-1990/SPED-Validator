@@ -25,6 +25,8 @@ from src.services.context_builder import TaxRegime, ValidationContext  # noqa: E
 
 # BUG-004: API_KEY agora e obrigatoria. Configurar key de teste para todos os testes.
 os.environ["API_KEY"] = "test-api-key-for-pytest-minimum-32-chars!"
+# Evita 429 em suites que fazem muitos POST /upload ou validate/stream no mesmo "cliente".
+os.environ["DISABLE_API_RATE_LIMIT"] = "1"
 import api.auth  # noqa: E402, F401
 
 TEST_API_KEY = "test-api-key-for-pytest-minimum-32-chars!"

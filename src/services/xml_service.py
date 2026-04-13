@@ -10,10 +10,12 @@ import hashlib
 import json
 import logging
 import re
-import sqlite3
 import xml.etree.ElementTree as ET
 from datetime import date, datetime
 from pathlib import Path
+
+from .db_types import AuditConnection
+from ..validators.tolerance import tolerancia_proporcional
 
 logger = logging.getLogger(__name__)
 
@@ -269,6 +271,7 @@ def parse_nfe_xml(xml_bytes: bytes) -> dict | None:
 
         _raw_vl_prod = (_text(prod, "nfe:vProd", _NS) or _text(prod, "vProd")) if prod else None
         _raw_vl_desc = (_text(prod, "nfe:vDesc", _NS) or _text(prod, "vDesc")) if prod else None
+        _raw_qcom = (_text(prod, "nfe:qCom", _NS) or _text(prod, "qCom")) if prod else None
 
         item = {
             "num_item": int(det.attrib.get("nItem", 0)),
@@ -277,6 +280,7 @@ def parse_nfe_xml(xml_bytes: bytes) -> dict | None:
             "cfop": _norm_cfop(_text(prod, "nfe:CFOP", _NS) or _text(prod, "CFOP") if prod else ""),
             "vl_prod": _to_float(_raw_vl_prod or "0"),
             "vl_desc": _to_float(_raw_vl_desc or "0"),
+            "qtd": None if _raw_qcom is None or str(_raw_qcom).strip() == "" else _to_float(_raw_qcom),
             "_tracked": {
                 "vl_prod": {
                     "raw_value": _raw_vl_prod if _raw_vl_prod else None,
@@ -310,10 +314,14 @@ def parse_nfe_xml(xml_bytes: bytes) -> dict | None:
             _raw_vbc_icms = _text(icms_group, "nfe:vBC", _NS) or _text(icms_group, "vBC")
             _raw_aliq_icms = _text(icms_group, "nfe:pICMS", _NS) or _text(icms_group, "pICMS")
             _raw_vl_icms = _text(icms_group, "nfe:vICMS", _NS) or _text(icms_group, "vICMS")
+            _raw_vbcst = _text(icms_group, "nfe:vBCST", _NS) or _text(icms_group, "vBCST")
+            _raw_vicmsst = _text(icms_group, "nfe:vICMSST", _NS) or _text(icms_group, "vICMSST")
 
             item["vbc_icms"] = _to_float(_raw_vbc_icms)
             item["aliq_icms"] = _to_float(_raw_aliq_icms)
             item["vl_icms"] = _to_float(_raw_vl_icms)
+            item["vbc_icms_st"] = _to_float(_raw_vbcst or "0")
+            item["vl_icms_st"] = _to_float(_raw_vicmsst or "0")
 
             item["_tracked"]["vbc_icms"] = {
                 "raw_value": _raw_vbc_icms if _raw_vbc_icms else None,
@@ -331,7 +339,10 @@ def parse_nfe_xml(xml_bytes: bytes) -> dict | None:
                 "status": _track_status(_raw_vl_icms if _raw_vl_icms else None),
             }
         else:
-            item.update({"cst_icms": "", "vbc_icms": 0.0, "aliq_icms": 0.0, "vl_icms": 0.0})
+            item.update({
+                "cst_icms": "", "vbc_icms": 0.0, "aliq_icms": 0.0, "vl_icms": 0.0,
+                "vbc_icms_st": 0.0, "vl_icms_st": 0.0,
+            })
             item["_tracked"]["vbc_icms"] = {"raw_value": None, "source_xpath": ".//infNFe/det/imposto/ICMS/*/vBC", "status": "missing"}
             item["_tracked"]["aliq_icms"] = {"raw_value": None, "source_xpath": ".//infNFe/det/imposto/ICMS/*/pICMS", "status": "missing"}
             item["_tracked"]["vl_icms"] = {"raw_value": None, "source_xpath": ".//infNFe/det/imposto/ICMS/*/vICMS", "status": "missing"}
@@ -380,12 +391,40 @@ def parse_nfe_xml(xml_bytes: bytes) -> dict | None:
     return result
 
 
+def _is_pg(db) -> bool:
+    return type(db).__name__ == "PgConnection"
+
+
+def _upsert_emitente_crt(db, parsed: dict, crt_int: int, uf_emitente: str) -> None:
+    """Persiste CRT na tabela emitentes_crt."""
+    try:
+        db.execute("SAVEPOINT _upsert_crt")
+        db.execute(
+            """INSERT INTO emitentes_crt
+               (cnpj_emitente, crt, razao_social, uf_emitente, last_seen, fonte)
+               VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, 'xml')
+               ON CONFLICT (cnpj_emitente) DO UPDATE SET
+                 crt = EXCLUDED.crt,
+                 razao_social = EXCLUDED.razao_social,
+                 uf_emitente = EXCLUDED.uf_emitente,
+                 last_seen = CURRENT_TIMESTAMP""",
+            (parsed["cnpj_emitente"], crt_int,
+             parsed.get("nome_emitente", ""), uf_emitente),
+        )
+        db.execute("RELEASE SAVEPOINT _upsert_crt")
+    except Exception:
+        try:
+            db.execute("ROLLBACK TO SAVEPOINT _upsert_crt")
+        except Exception:
+            pass
+
+
 # ──────────────────────────────────────────────
 # Upload batch de XMLs
 # ──────────────────────────────────────────────
 
 def upload_nfe_xmls(
-    db: sqlite3.Connection,
+    db: AuditConnection,
     file_id: int,
     xml_files: list[tuple[str, bytes]],
     period_start: str | None = None,
@@ -471,7 +510,7 @@ def upload_nfe_xmls(
         c_sit = parsed.get("prot_cstat", "")
         uf_emitente = parsed.get("uf_emitente", "")
 
-        db.execute(
+        cur = db.execute(
             """INSERT INTO nfe_xmls
                (file_id, chave_nfe, numero_nfe, serie, cnpj_emitente,
                 cnpj_destinatario, dh_emissao, vl_doc, vl_icms, vl_icms_st,
@@ -490,20 +529,11 @@ def upload_nfe_xmls(
                 crt_int, uf_emitente, c_sit,
             ),
         )
-        nfe_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        nfe_id = cur.lastrowid
 
         # Persistir CRT na tabela incremental emitentes_crt (Fase 5)
         if crt_int and parsed.get("cnpj_emitente"):
-            try:
-                db.execute(
-                    """INSERT OR REPLACE INTO emitentes_crt
-                       (cnpj_emitente, crt, razao_social, uf_emitente, last_seen, fonte)
-                       VALUES (?, ?, ?, ?, datetime('now'), 'xml')""",
-                    (parsed["cnpj_emitente"], crt_int,
-                     parsed.get("nome_emitente", ""), uf_emitente),
-                )
-            except Exception:
-                pass  # Tabela pode nao existir pre-Migration 14
+            _upsert_emitente_crt(db, parsed, crt_int, uf_emitente)
 
         # Inserir itens
         for item in parsed["itens"]:
@@ -534,11 +564,133 @@ def upload_nfe_xmls(
 
 
 # ──────────────────────────────────────────────
-# Cruzamento XML vs SPED (17 regras)
+# C190 vs XML items (agrupamento por CST+CFOP+ALIQ)
+# ──────────────────────────────────────────────
+
+def _check_c190_vs_xml(
+    db: AuditConnection,
+    file_id: int,
+    nfe_id: int,
+    chave: str,
+    sped: dict,
+    findings: list[dict],
+    nf_label: str,
+) -> None:
+    """Compara C190 do SPED com itens XML agrupados por (CST, CFOP, ALIQ).
+
+    Agrupa itens XML (nfe_itens) pela mesma chave de consolidacao usada no C190
+    e compara VL_BC_ICMS e VL_ICMS. Diferenca alem da tolerancia gera finding.
+    """
+    record_id = sped["record_id"]
+    line_no = sped["line"]
+
+    # Buscar C190 filhos deste C100 (entre line_number do C100 e proximo C100/C990)
+    next_boundary = db.execute(
+        "SELECT MIN(line_number) FROM sped_records "
+        "WHERE file_id = ? AND register IN ('C100', 'C990') "
+        "AND line_number > ?",
+        (file_id, line_no),
+    ).fetchone()
+    max_line = next_boundary[0] if next_boundary and next_boundary[0] else 999999999
+
+    c190_rows = db.execute(
+        "SELECT fields_json FROM sped_records "
+        "WHERE file_id = ? AND register = 'C190' "
+        "AND line_number > ? AND line_number < ?",
+        (file_id, line_no, max_line),
+    ).fetchall()
+
+    if not c190_rows:
+        return
+
+    # Montar dict C190 por chave (CST, CFOP, ALIQ)
+    c190_by_key: dict[tuple, dict] = {}
+    for row in c190_rows:
+        f190 = json.loads(row[0]) if row[0] else {}
+        cst = _norm_cst(f190.get("CST_ICMS", "").strip())
+        cfop = f190.get("CFOP", "").strip()
+        try:
+            aliq = round(float(str(f190.get("ALIQ_ICMS", "0")).replace(",", ".")), 2)
+        except (ValueError, TypeError):
+            aliq = 0.0
+        key = (cst, cfop, aliq)
+        c190_by_key[key] = {
+            "VL_BC_ICMS": _to_float(f190.get("VL_BC_ICMS")),
+            "VL_ICMS": _to_float(f190.get("VL_ICMS")),
+            "VL_OPR": _to_float(f190.get("VL_OPR")),
+        }
+
+    # Carregar itens XML (nfe_itens) para esta NF-e
+    xml_items = db.execute(
+        "SELECT cst_icms, cfop, aliq_icms, vbc_icms, vl_icms FROM nfe_itens WHERE nfe_id = ?",
+        (nfe_id,),
+    ).fetchall()
+
+    if not xml_items:
+        return
+
+    # Agrupar itens XML pela mesma chave (CST, CFOP, ALIQ)
+    xml_by_key: dict[tuple, dict] = {}
+    for cst_raw, cfop_raw, aliq_raw, vbc, vicms in xml_items:
+        cst = _norm_cst((cst_raw or "").strip())
+        cfop = (cfop_raw or "").strip()
+        aliq = round(float(aliq_raw or 0), 2)
+        key = (cst, cfop, aliq)
+        if key not in xml_by_key:
+            xml_by_key[key] = {"VL_BC_ICMS": 0.0, "VL_ICMS": 0.0}
+        xml_by_key[key]["VL_BC_ICMS"] += float(vbc or 0)
+        xml_by_key[key]["VL_ICMS"] += float(vicms or 0)
+
+    # Comparar cada grupo C190 com o agrupamento XML
+    tol_base = 0.10  # tolerancia consolidacao
+    for key, c190_vals in c190_by_key.items():
+        cst_k, cfop_k, aliq_k = key
+        xml_vals = xml_by_key.get(key)
+
+        if not xml_vals:
+            # C190 existe no SPED mas sem itens XML correspondentes — skip
+            # (pode ser diferenca de normalizacao CST)
+            continue
+
+        # VL_BC_ICMS
+        diff_bc = abs(round(c190_vals["VL_BC_ICMS"] - xml_vals["VL_BC_ICMS"], 2))
+        tol = max(tol_base, tolerancia_proporcional(max(c190_vals["VL_BC_ICMS"], xml_vals["VL_BC_ICMS"])))
+        if diff_bc > tol:
+            findings.append(_finding(
+                file_id, nfe_id, chave, "XML_C190_DIVERGE", "high",
+                f"XML.soma(vBC) [{cst_k}/{cfop_k}/{aliq_k}%]",
+                f"{xml_vals['VL_BC_ICMS']:.2f}",
+                f"C190.VL_BC_ICMS [{cst_k}/{cfop_k}/{aliq_k}%]",
+                f"{c190_vals['VL_BC_ICMS']:.2f}",
+                diff_bc,
+                f"{nf_label}: C190 VL_BC_ICMS={c190_vals['VL_BC_ICMS']:.2f} vs "
+                f"XML soma(vBC)={xml_vals['VL_BC_ICMS']:.2f} "
+                f"(CST={cst_k} CFOP={cfop_k} ALIQ={aliq_k}%) dif=R${diff_bc:.2f}.",
+            ))
+
+        # VL_ICMS
+        diff_icms = abs(round(c190_vals["VL_ICMS"] - xml_vals["VL_ICMS"], 2))
+        tol_icms = max(tol_base, tolerancia_proporcional(max(c190_vals["VL_ICMS"], xml_vals["VL_ICMS"])))
+        if diff_icms > tol_icms:
+            findings.append(_finding(
+                file_id, nfe_id, chave, "XML_C190_DIVERGE", "high",
+                f"XML.soma(vICMS) [{cst_k}/{cfop_k}/{aliq_k}%]",
+                f"{xml_vals['VL_ICMS']:.2f}",
+                f"C190.VL_ICMS [{cst_k}/{cfop_k}/{aliq_k}%]",
+                f"{c190_vals['VL_ICMS']:.2f}",
+                diff_icms,
+                f"{nf_label}: C190 VL_ICMS={c190_vals['VL_ICMS']:.2f} vs "
+                f"XML soma(vICMS)={xml_vals['VL_ICMS']:.2f} "
+                f"(CST={cst_k} CFOP={cfop_k} ALIQ={aliq_k}%) dif=R${diff_icms:.2f}.",
+            ))
+
+
+# ──────────────────────────────────────────────
+# Cruzamento XML vs SPED (17 regras + C190)
 # ──────────────────────────────────────────────
 
 def cruzar_xml_vs_sped(
-    db: sqlite3.Connection,
+    db: AuditConnection,
     file_id: int,
     on_progress: callable | None = None,
 ) -> list[dict]:
@@ -553,12 +705,23 @@ def cruzar_xml_vs_sped(
 
     _emit(0, "Limpando cruzamento anterior...")
 
-    # Limpar cruzamento anterior (tabela propria + validation_errors)
-    db.execute("DELETE FROM nfe_cruzamento WHERE file_id = ?", (file_id,))
+    # Limpar apenas findings legacy (XML###), preservando XC### do Motor XC
+    db.execute(
+        "DELETE FROM nfe_cruzamento WHERE file_id = ? AND rule_id LIKE ?",
+        (file_id, "XML%"),
+    )
     db.execute(
         "DELETE FROM validation_errors WHERE file_id = ? AND categoria = 'cruzamento_xml'",
         (file_id,),
     )
+    # Reinicia marcador de fim de cruzamento (evita "executado" de rodada anterior)
+    try:
+        db.execute(
+            "UPDATE sped_files SET xml_crossref_completed_at = NULL WHERE id = ?",
+            (file_id,),
+        )
+    except Exception:
+        pass
 
     findings: list[dict] = []
 
@@ -606,7 +769,7 @@ def cruzar_xml_vs_sped(
         # Progresso de 20% a 80% durante o cruzamento
         if total_chaves > 0 and idx % max(1, total_chaves // 10) == 0:
             pct = 20 + int((idx / total_chaves) * 60)
-            _emit(pct, f"Regra XML001-XML015: {idx}/{total_chaves} chaves analisadas...")
+            _emit(pct, f"Cruzamento XML x SPED: {idx}/{total_chaves} chaves NF-e analisadas...")
 
         xml = xml_by_chave.get(chave)
         sped = sped_by_chave.get(chave)
@@ -712,7 +875,7 @@ def cruzar_xml_vs_sped(
         if cod_part:
             part_row = db.execute(
                 "SELECT fields_json FROM sped_records WHERE file_id = ? AND register = '0150' "
-                "AND fields_json LIKE ?",
+                "AND CAST(fields_json AS TEXT) LIKE ?",
                 (file_id, f'%"{cod_part}"%'),
             ).fetchone()
             if part_row:
@@ -739,6 +902,9 @@ def cruzar_xml_vs_sped(
                                      "dh_emissao", dt_xml, "C100.DT_E_S", dt_es_sped,
                                      None, f"Data XML ({dt_xml}) diverge de DT_E_S ({dt_es_sped})."))
 
+        # ── XML_C190_DIVERGE: Cruzamento C190 (SPED) vs itens agrupados (XML) ──
+        _check_c190_vs_xml(db, file_id, nfe_id, chave, sped, findings, _nf)
+
     _emit(80, f"Cruzamento concluido: {len(findings)} divergencias. Persistindo...")
 
     # Persistir
@@ -761,6 +927,16 @@ def cruzar_xml_vs_sped(
 
     _emit(100, f"Concluido: {len(findings)} divergencias encontradas.")
 
+    # Marca cruzamento concluído (mesmo com 0 divergências — senão nfe_cruzamento fica vazio e o contexto acha que não rodou)
+    try:
+        db.execute(
+            "UPDATE sped_files SET xml_crossref_completed_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (file_id,),
+        )
+        db.commit()
+    except Exception:
+        pass
+
     return findings
 
 
@@ -781,6 +957,7 @@ _CORRIGIVEL_POR_XML: dict[str, tuple[str, str, bool]] = {
     "XML002": (None, None, False),              # Ausente nos XMLs — não corrigível
     "XML013": (None, "0150", False),            # CNPJ participante — investigar
     "XML012": (None, None, False),              # Qtd itens — estrutural
+    "XML_C190_DIVERGE": (None, "C190", False),   # C190 vs XML — investigar
 }
 
 
@@ -913,6 +1090,17 @@ _LEGAL_BASIS_XML: dict[str, dict] = {
             "Mapeamento obrigatorio conforme cStat da SEFAZ."
         ),
     },
+    "XML_C190_DIVERGE": {
+        "fonte": "Guia Pratico EFD ICMS/IPI",
+        "artigo": "Registro C190 — Consolidacao por CST/CFOP/ALIQ",
+        "trecho": (
+            "C190 consolida os valores dos itens (C170) agrupados por CST_ICMS, "
+            "CFOP e aliquota. Os totais de VL_BC_ICMS e VL_ICMS devem ser "
+            "consistentes com os documentos fiscais de origem (NF-e). "
+            "Divergencia pode indicar erro de classificacao fiscal ou "
+            "escrituracao incorreta dos itens."
+        ),
+    },
 }
 
 _CAMPO_LABEL: dict[str, str] = {
@@ -978,6 +1166,13 @@ def _build_friendly_xml(
         return (
             f"NF-e {nf} **denegada** (cStat={f['valor_xml']}) escriturada como "
             f"ativa no SPED."
+        )
+    if rule_id == "XML_C190_DIVERGE":
+        return (
+            f"NF-e {nf}: **C190 diverge dos itens XML**. "
+            f"SPED informa **R$ {f['valor_sped']}**, "
+            f"XML totaliza **R$ {f['valor_xml']}** "
+            f"no grupo {f['campo_sped'].split('[')[-1].rstrip(']') if '[' in f['campo_sped'] else ''}."
         )
     # Fallback generico
     return f"NF-e {nf}: divergencia detectada — {f['message']}"
@@ -1081,11 +1276,28 @@ def _build_doc_suggestion_xml(
             f"Consulte a situacao da NF-e no portal da SEFAZ e ajuste o COD_SIT "
             f"conforme o mapeamento: Autorizada=00, Cancelada=02, Denegada=05."
         )
+    if rule_id == "XML_C190_DIVERGE":
+        campo_info = f['campo_sped'] if f.get('campo_sped') else "C190"
+        return (
+            f"O registro **C190** da NF-e {nf} apresenta divergencia no campo "
+            f"**{campo_info}** quando comparado com a soma dos itens do XML.\n\n"
+            f"SPED (C190): **R$ {f['valor_sped']}**\n"
+            f"XML (soma itens): **R$ {f['valor_xml']}**\n"
+            f"Diferenca: R$ {f.get('diferenca', '?')}\n\n"
+            f"Isso indica que a consolidacao dos itens no C190 nao reflete os "
+            f"documentos fiscais de origem. Pode ser erro de classificacao fiscal "
+            f"(CST/CFOP) ou divergencia nos valores dos itens.\n\n"
+            f"**Como corrigir:**\n"
+            f"Compare os itens do XML (det[]) com os registros C170 e C190 do SPED. "
+            f"Verifique se o agrupamento por CST+CFOP+Aliquota esta correto e se "
+            f"os valores de BC e ICMS dos itens foram escriturados corretamente. "
+            f"Recalcule o C190 a partir dos C170 corrigidos."
+        )
     return None
 
 
 def _gerar_erros_com_sugestao_xml(
-    db: sqlite3.Connection,
+    db: AuditConnection,
     file_id: int,
     findings: list[dict],
     sped_by_chave: dict[str, dict],

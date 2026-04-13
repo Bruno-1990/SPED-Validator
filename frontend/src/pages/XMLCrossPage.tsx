@@ -44,6 +44,7 @@ export default function XMLCrossPage() {
   const [uploading, setUploading] = useState(false)
   const [cruzando, setCruzando] = useState(false)
   const [error, setError] = useState('')
+  const [cruzModalOpen, setCruzModalOpen] = useState(false)
 
   const [uploadStats, setUploadStats] = useState<UploadStats | null>(null)
   const [cruzResult, setCruzResult] = useState<CruzamentoResult | null>(null)
@@ -65,6 +66,18 @@ export default function XMLCrossPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
+  useEffect(() => {
+    if (!cruzModalOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !cruzando) {
+        setCruzModalOpen(false)
+        setError('')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [cruzModalOpen, cruzando])
+
   // Upload XMLs
   const handleUpload = useCallback(async (files: FileList | File[]) => {
     setError('')
@@ -82,7 +95,7 @@ export default function XMLCrossPage() {
     }
   }, [fid])
 
-  // Cruzar
+  // Cruzar (disparado após confirmação no modal)
   const handleCruzar = useCallback(async () => {
     setError('')
     setCruzando(true)
@@ -91,6 +104,7 @@ export default function XMLCrossPage() {
       setCruzResult(result)
       const cruz = await api.getCruzamento(fid)
       setItems(cruz.divergencias as CruzamentoItem[])
+      setCruzModalOpen(false)
     } catch (e: any) {
       setError(e.message || 'Erro no cruzamento')
     } finally {
@@ -163,16 +177,22 @@ export default function XMLCrossPage() {
         </div>
       )}
 
-      {/* Error */}
-      {error && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{error}</div>}
+      {/* Erro fora do modal (ex.: upload) — no cruzamento o aviso fica dentro do modal */}
+      {error && !cruzModalOpen && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{error}</div>
+      )}
 
       {/* Botao cruzar */}
       {xmlCount > 0 && (
         <div className="flex items-center gap-4">
           <button
-            onClick={handleCruzar}
+            type="button"
+            onClick={() => {
+              setError('')
+              setCruzModalOpen(true)
+            }}
             disabled={cruzando}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-400 transition-colors"
+            className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
           >
             {cruzando ? 'Cruzando...' : 'Cruzar com SPED'}
           </button>
@@ -182,6 +202,88 @@ export default function XMLCrossPage() {
               {cruzResult.por_severidade.critical > 0 && <> &middot; <span className="text-red-600 font-bold">{cruzResult.por_severidade.critical} criticos</span></>}
             </span>
           )}
+        </div>
+      )}
+
+      {cruzModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-[2px]"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !cruzando) {
+              setCruzModalOpen(false)
+              setError('')
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cruz-xml-title"
+            className="relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/15"
+          >
+            <div
+              className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-sky-500"
+              aria-hidden
+            />
+            <div className="p-6 pt-7">
+              <div className="flex gap-4">
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+                  aria-hidden
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                    />
+                  </svg>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 id="cruz-xml-title" className="text-lg font-semibold text-slate-900 tracking-tight">
+                    Rodar cruzamento XML × SPED?
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                    Serão comparados os <span className="font-semibold text-slate-800">{xmlCount}</span> XML
+                    {xmlCount !== 1 ? 's' : ''} vinculados com o arquivo SPED <span className="font-mono text-slate-700">#{fid}</span>.
+                    Apontamentos anteriores deste tipo podem ser atualizados conforme as regras do motor.
+                  </p>
+                </div>
+              </div>
+
+              {error && (
+                <div
+                  role="alert"
+                  className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+                >
+                  {error}
+                </div>
+              )}
+
+              <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  disabled={cruzando}
+                  onClick={() => {
+                    setCruzModalOpen(false)
+                    setError('')
+                  }}
+                  className="inline-flex justify-center rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={cruzando}
+                  onClick={() => void handleCruzar()}
+                  className="inline-flex justify-center rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 transition-colors"
+                >
+                  {cruzando ? 'Cruzando…' : 'Sim, executar cruzamento'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

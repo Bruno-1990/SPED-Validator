@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import sqlite3
 import tempfile
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 
 from api.deps import get_db
+from src.services.db_types import AuditConnection
 from api.schemas.models import FileInfo, FileUploadResponse
 from config import MAX_UPLOAD_BYTES, MAX_UPLOAD_MB
 from src.services.file_service import clear_all_audit, clear_audit, delete_file, get_file, list_files, upload_file
@@ -24,7 +24,7 @@ def upload(
     request: Request,
     file: UploadFile,
     regime: str | None = None,
-    db: sqlite3.Connection = Depends(get_db),
+    db: AuditConnection = Depends(get_db),
 ) -> FileUploadResponse:
     """Upload de arquivo SPED EFD com limite configurável e leitura streaming.
 
@@ -83,21 +83,21 @@ def upload(
 
 
 @router.get("", response_model=list[FileInfo])
-def list_all(db: sqlite3.Connection = Depends(get_db)) -> list[FileInfo]:
+def list_all(db: AuditConnection = Depends(get_db)) -> list[FileInfo]:
     """Lista todos os arquivos processados."""
     files = list_files(db)
     return [FileInfo(**f) for f in files]
 
 
 @router.delete("/audit")
-def clear_all_audits(db: sqlite3.Connection = Depends(get_db)) -> dict:
+def clear_all_audits(db: AuditConnection = Depends(get_db)) -> dict:
     """Limpa todos os dados de validação/audit de TODOS os arquivos."""
     removed = clear_all_audit(db)
     return {"cleared": True, "removed": removed}
 
 
 @router.get("/{file_id}", response_model=FileInfo)
-def get_detail(file_id: int, db: sqlite3.Connection = Depends(get_db)) -> FileInfo:
+def get_detail(file_id: int, db: AuditConnection = Depends(get_db)) -> FileInfo:
     """Detalhes de um arquivo."""
     info = get_file(db, file_id)
     if not info:
@@ -106,7 +106,7 @@ def get_detail(file_id: int, db: sqlite3.Connection = Depends(get_db)) -> FileIn
 
 
 @router.delete("/{file_id}")
-def delete(file_id: int, db: sqlite3.Connection = Depends(get_db)) -> dict:
+def delete(file_id: int, db: AuditConnection = Depends(get_db)) -> dict:
     """Remove arquivo e todos os dados associados."""
     if not delete_file(db, file_id):
         raise HTTPException(status_code=404, detail="Arquivo não encontrado")
@@ -114,7 +114,7 @@ def delete(file_id: int, db: sqlite3.Connection = Depends(get_db)) -> dict:
 
 
 @router.delete("/{file_id}/audit")
-def clear_file_audit(file_id: int, db: sqlite3.Connection = Depends(get_db)) -> dict:
+def clear_file_audit(file_id: int, db: AuditConnection = Depends(get_db)) -> dict:
     """Limpa todos os dados de validação/audit, mantendo o arquivo e registros."""
     removed = clear_audit(db, file_id)
     if removed < 0:

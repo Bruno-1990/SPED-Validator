@@ -81,19 +81,34 @@ class ClienteInfo:
     encontrado: bool = False
 
 
+import time as _time
+
+# Cache: se MySQL falhou recentemente, nao tentar de novo por N segundos
+_mysql_fail_until: float = 0.0
+_MYSQL_BACKOFF_SECS = 30  # Espera 30s antes de tentar MySQL de novo apos falha
+
+
 def _get_mysql_connection():
     """Cria conexao com o MySQL usando as variaveis do config."""
+    global _mysql_fail_until
+    if _time.time() < _mysql_fail_until:
+        raise ConnectionError("MySQL em backoff")
+
     import mysql.connector
 
-    return mysql.connector.connect(
-        host=config.MYSQL_HOST,
-        port=config.MYSQL_PORT,
-        user=config.MYSQL_USER,
-        password=config.MYSQL_PASSWORD,
-        database=config.MYSQL_DATABASE,
-        charset="utf8mb4",
-        connect_timeout=5,
-    )
+    try:
+        return mysql.connector.connect(
+            host=config.MYSQL_HOST,
+            port=config.MYSQL_PORT,
+            user=config.MYSQL_USER,
+            password=config.MYSQL_PASSWORD,
+            database=config.MYSQL_DATABASE,
+            charset="utf8mb4",
+            connect_timeout=2,
+        )
+    except Exception:
+        _mysql_fail_until = _time.time() + _MYSQL_BACKOFF_SECS
+        raise
 
 
 def _parse_beneficios(raw: Any) -> list[str]:

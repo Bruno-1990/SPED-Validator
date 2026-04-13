@@ -22,11 +22,26 @@ from api.routers.clientes import router as clientes_router  # noqa: E402
 from api.routers.xml import router as xml_router  # noqa: E402
 from api.routers.ai import router as ai_router  # noqa: E402
 
+import logging
+import traceback
+
+from fastapi.responses import JSONResponse
+from starlette.requests import Request as StarletteRequest
+
+_logger = logging.getLogger("api")
+
 app = FastAPI(
     title="SPED EFD Audit API",
     description="API de auditoria e validação de arquivos SPED EFD",
     version="0.2.0",
 )
+
+
+@app.exception_handler(Exception)
+async def _unhandled(request: StarletteRequest, exc: Exception) -> JSONResponse:
+    tb = traceback.format_exception(type(exc), exc, exc.__traceback__)
+    _logger.error("Unhandled: %s\n%s", exc, "".join(tb))
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 # CORS — permitir frontend local
 app.add_middleware(
@@ -68,5 +83,5 @@ def preload_model() -> None:
 
 @app.get("/api/health")
 def health() -> dict:
-    """Health check."""
-    return {"status": "ok", "version": "0.2.0"}
+    """Health check público (sem API Key) — usado pelo frontend para exibir versão da API."""
+    return {"status": "ok", "version": app.version}

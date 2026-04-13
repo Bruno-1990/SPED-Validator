@@ -19,7 +19,7 @@ function renderBold(text: string) {
 
 const STAGE_LABELS: Record<string, string> = {
   estrutural: 'Analise Estrutural',
-  cruzamento: 'Cruzamento de Dados',
+  cruzamento: 'Cruzamento fiscal (SPED)',
   enriquecimento: 'Consultando Base Legal',
   concluido: 'Concluido',
 }
@@ -39,6 +39,8 @@ export default function FileDetailPage() {
   const { fileId } = useParams<{ fileId: string }>()
   const [searchParams] = useSearchParams()
   const autoValidate = searchParams.get('validate') === '1'
+  const fromXml = searchParams.get('fromXml') === '1'
+  const validateMode = searchParams.get('mode') === 'sped_xml' ? 'sped_xml' as const : 'sped_only' as const
   const id = Number(fileId)
   const [file, setFile] = useState<FileInfo | null>(null)
   const [summary, setSummary] = useState<ErrorSummary | null>(null)
@@ -56,22 +58,20 @@ export default function FileDetailPage() {
     if (f.status === 'validated') {
       const [s, fiscalErrors, xmlErrors] = await Promise.all([
         api.getSummary(id),
-        api.getErrors(id, { limit: '2000' }),
-        api.getErrors(id, { limit: '2000', categoria: 'cruzamento_xml' }),
+        api.getErrors(id, { page_size: '2000' }),
+        api.getErrors(id, { page_size: '2000', categoria: 'cruzamento_xml' }),
       ])
       const allErrors = [...fiscalErrors, ...xmlErrors]
       setSummary(s)
       setErrorItems(allErrors.filter(e => e.severity === 'critical' || e.severity === 'error'))
       setAlertItems(allErrors.filter(e => e.severity === 'warning' || e.severity === 'info'))
     } else if (f.status === 'parsed') {
-      // Carregar erros XML se ja existem (cruzamento feito antes da validacao SPED)
+      // Erros de cruzamento XML persistidos (apos upload na UploadPage, sem pipeline ainda)
       try {
-        const xmlErrors = await api.getErrors(id, { limit: '2000', categoria: 'cruzamento_xml' })
-        if (xmlErrors.length > 0) {
-          setErrorItems(xmlErrors.filter(e => e.severity === 'critical' || e.severity === 'error'))
-          setAlertItems(xmlErrors.filter(e => e.severity === 'warning' || e.severity === 'info'))
-        }
-      } catch { /* XML errors may not exist yet */ }
+        const xmlErrors = await api.getErrors(id, { page_size: '2000', categoria: 'cruzamento_xml' })
+        setErrorItems(xmlErrors.filter(e => e.severity === 'critical' || e.severity === 'error'))
+        setAlertItems(xmlErrors.filter(e => e.severity === 'warning' || e.severity === 'info'))
+      } catch { /* sem erros XML ainda */ }
     }
   }, [id])
 
@@ -79,9 +79,13 @@ export default function FileDetailPage() {
 
   const autoValidatedRef = useRef(false)
   useEffect(() => {
-    if (autoValidate && file && file.status === 'parsed' && !autoValidatedRef.current) {
-      autoValidatedRef.current = true
-      handleValidateStream()
+    if (autoValidate && file && !autoValidatedRef.current) {
+      // Disparar validacao automatica tanto para arquivos novos (parsed)
+      // quanto para re-validacao apos upload de novos XMLs (validated)
+      if (file.status === 'parsed' || file.status === 'validated') {
+        autoValidatedRef.current = true
+        handleValidateStream()
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoValidate, file])
@@ -97,17 +101,21 @@ export default function FileDetailPage() {
 
     let done = false
 
-    const es = api.validateStream(id, (event: PipelineEvent) => {
-      setPipelineEvent(event)
-      if (event.type === 'done') {
-        done = true
-        setValidating(false)
-        loadData()
-      } else if (event.type === 'error') {
-        done = true
-        setValidating(false)
-      }
-    })
+    const es = api.validateStream(
+      id,
+      (event: PipelineEvent) => {
+        setPipelineEvent(event)
+        if (event.type === 'done') {
+          done = true
+          setValidating(false)
+          loadData()
+        } else if (event.type === 'error') {
+          done = true
+          setValidating(false)
+        }
+      },
+      { mode: validateMode },
+    )
 
     // Fallback: se a conexao SSE fechar sem evento 'done',
     // fazer polling para verificar se o pipeline terminou
@@ -129,7 +137,7 @@ export default function FileDetailPage() {
     }, 5000)
 
     eventSourceRef.current = es
-  }, [id, loadData])
+  }, [id, loadData, validateMode])
 
   useEffect(() => {
     return () => { eventSourceRef.current?.close() }
@@ -138,11 +146,15 @@ export default function FileDetailPage() {
   // Auto-navigate to errors/alerts tab when data loads
   useEffect(() => {
     if (validating) return
+    if (fromXml && (errorItems.length > 0 || alertItems.length > 0)) {
+      setTab('errors')
+      return
+    }
     if (errorItems.length > 0) setTab('errors')
     else if (alertItems.length > 0) setTab('alerts')
     else if (file?.status === 'validated') setTab('summary')
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [errorItems.length, alertItems.length])
+  }, [errorItems.length, alertItems.length, fromXml, validating])
 
   const handleDeleteFile = useCallback(async () => {
     if (!confirm(`Excluir este arquivo e todos os dados associados?`)) return
@@ -182,7 +194,15 @@ export default function FileDetailPage() {
             disabled={validating}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
           >
-            {validating ? 'Validando...' : file.status === 'validated' ? 'Revalidar' : 'Validar'}
+            {validating
+              ? 'Validando...'
+              : file.status === 'validated'
+                ? 'Revalidar'
+                : autoValidate && file.status === 'parsed'
+                  ? 'Validar'
+                  : (fromXml || errorItems.some(e => e.categoria === 'cruzamento_xml'))
+                    ? 'Validar SPED completo'
+                    : 'Validar'}
           </button>
           {file.status === 'validated' && (
             <a href={api.downloadSped(id)} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
@@ -221,15 +241,18 @@ export default function FileDetailPage() {
         </div>
       </div>
 
-      {/* Banner: erros XML carregados mas SPED nao validado */}
-      {file.status === 'parsed' && !validating && errorItems.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 flex items-center justify-between">
+      {/* Banner: pos-upload XML — divergencias listadas; pipeline SPED e opcional neste momento */}
+      {file.status === 'parsed' && !validating && fromXml && !autoValidate && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <p className="text-blue-800 font-medium text-sm">Cruzamento XML x SPED concluido</p>
-            <p className="text-blue-600 text-xs mt-0.5">A validacao interna do SPED ainda nao foi executada. Clique em "Validar" para executar a auditoria completa.</p>
+            <p className="text-blue-600 text-xs mt-0.5">
+              As divergencias entre XML e SPED estao na aba Erros (e Alertas, se houver).
+              A etapa seguinte e a auditoria fiscal completa do arquivo SPED — execute quando quiser.
+            </p>
           </div>
-          <button onClick={handleValidateStream} className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 whitespace-nowrap ml-4">
-            Validar SPED
+          <button onClick={handleValidateStream} className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 whitespace-nowrap shrink-0 self-start sm:self-auto">
+            Validar SPED completo
           </button>
         </div>
       )}
@@ -241,7 +264,7 @@ export default function FileDetailPage() {
       {validating && pipelineEvent && <PipelineProgressPanel event={pipelineEvent} />}
 
       {/* Tabs */}
-      {(file.status === 'validated' || errorItems.length > 0 || alertItems.length > 0) && !validating && (
+      {(file.status === 'validated' || fromXml || errorItems.length > 0 || alertItems.length > 0) && !validating && (
         <>
           <div className="flex gap-1 border-b mb-4 overflow-x-auto">
             {([
@@ -786,6 +809,12 @@ function ErrorCard({
             {isCorrected && <span className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">Corrigido</span>}
           </div>
           <p className="text-sm text-gray-800">{renderBold(displayMessage)}</p>
+          {legalBasis && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              <span className="font-medium text-gray-500">Base legal:</span> {legalBasis.fonte}
+              {legalBasis.artigo && <span> — {legalBasis.artigo}</span>}
+            </p>
+          )}
           {/* Inline correction preview + confidence */}
           {!isCorrected && error.expected_value && error.value && (
             <div className="mt-1.5 flex items-center gap-3 flex-wrap">

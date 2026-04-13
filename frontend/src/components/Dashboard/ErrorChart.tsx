@@ -36,8 +36,8 @@ export default function ErrorChart({ fileId }: Props) {
   useEffect(() => {
     setLoading(true)
     Promise.all([
-      api.getErrors(fileId, { limit: '5000' }),
-      api.getErrors(fileId, { limit: '5000', categoria: 'cruzamento_xml' }),
+      api.getErrors(fileId, { page_size: '5000' }),
+      api.getErrors(fileId, { page_size: '5000', categoria: 'cruzamento_xml' }),
     ])
       .then(([fiscalErrors, xmlErrors]) => {
         const errors: ValidationError[] = [...fiscalErrors, ...xmlErrors]

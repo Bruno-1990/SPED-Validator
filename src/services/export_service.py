@@ -9,10 +9,14 @@ from __future__ import annotations
 import csv
 import io
 import json
-import sqlite3
 from datetime import datetime
 
+from .db_types import AuditConnection
+
 from config import ENGINE_VERSION
+
+from ..validators.helpers import REGISTER_FIELDS, fields_to_dict
+from .sped_line_format import ordered_fields_dict, rebuild_raw_line
 
 # --------------------------------------------------------------------------- #
 #  Constantes
@@ -60,7 +64,7 @@ _REFERENCE_TABLES = [
 # --------------------------------------------------------------------------- #
 
 
-def _file_info(db: sqlite3.Connection, file_id: int) -> dict | None:
+def _file_info(db: AuditConnection, file_id: int) -> dict | None:
     """Retorna metadados do arquivo como dict, ou None."""
     row = db.execute("SELECT * FROM sped_files WHERE id = ?", (file_id,)).fetchone()
     if not row:
@@ -93,7 +97,7 @@ def _build_section1(info: dict, audit_dt: str) -> dict:
     }
 
 
-def _build_section2(db: sqlite3.Connection, file_id: int) -> dict:
+def _build_section2(db: AuditConnection, file_id: int) -> dict:
     """SEÇÃO 2 — Cobertura da Auditoria."""
     # Determinar quais checks rodaram (se há erros desse tipo no DB)
     error_types = {
@@ -146,7 +150,7 @@ def _build_section2(db: sqlite3.Connection, file_id: int) -> dict:
     }
 
 
-def _build_section3(db: sqlite3.Connection, file_id: int) -> dict:
+def _build_section3(db: AuditConnection, file_id: int) -> dict:
     """SEÇÃO 3 — Sumário de Achados."""
     # Por severidade
     sev_rows = db.execute(
@@ -206,7 +210,7 @@ def _build_section3(db: sqlite3.Connection, file_id: int) -> dict:
     }
 
 
-def _build_section4(db: sqlite3.Connection, file_id: int) -> list[dict]:
+def _build_section4(db: AuditConnection, file_id: int) -> list[dict]:
     """SEÇÃO 4 — Achados Detalhados (ordenados por impacto)."""
     rows = db.execute(
         """SELECT line_number, register, field_name, value, expected_value,
@@ -244,7 +248,7 @@ def _build_section4(db: sqlite3.Connection, file_id: int) -> list[dict]:
     return achados
 
 
-def _build_section5(db: sqlite3.Connection, file_id: int) -> list[dict]:
+def _build_section5(db: AuditConnection, file_id: int) -> list[dict]:
     """SEÇÃO 5 — Correções Aplicadas."""
     rows = db.execute(
         """SELECT c.field_name, c.old_value, c.new_value,
@@ -291,7 +295,7 @@ def _build_section6(checks_nao_realizados: list[str], audit_dt: str) -> dict:
 # --------------------------------------------------------------------------- #
 
 
-def generate_report(db: sqlite3.Connection, file_id: int) -> dict:
+def generate_report(db: AuditConnection, file_id: int) -> dict:
     """Gera relatório completo com as 6 seções obrigatórias (MOD-20).
 
     Retorna dict com keys: secao1..secao6 + metadata para compatibilidade.
@@ -327,7 +331,7 @@ def generate_report(db: sqlite3.Connection, file_id: int) -> dict:
 # --------------------------------------------------------------------------- #
 
 
-def export_report_structured(db: sqlite3.Connection, file_id: int) -> dict:
+def export_report_structured(db: AuditConnection, file_id: int) -> dict:
     """Gera relatório estruturado para renderização no frontend."""
     file_info = db.execute("SELECT * FROM sped_files WHERE id = ?", (file_id,)).fetchone()
     if not file_info:
@@ -452,7 +456,7 @@ def export_report_structured(db: sqlite3.Connection, file_id: int) -> dict:
 # --------------------------------------------------------------------------- #
 
 
-def export_report_markdown(db: sqlite3.Connection, file_id: int) -> str:
+def export_report_markdown(db: AuditConnection, file_id: int) -> str:
     """Gera relatório de auditoria em Markdown com 6 seções obrigatórias."""
     report = generate_report(db, file_id)
     if "error" in report:
@@ -561,7 +565,7 @@ def export_report_markdown(db: sqlite3.Connection, file_id: int) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def export_errors_csv(db: sqlite3.Connection, file_id: int) -> str:
+def export_errors_csv(db: AuditConnection, file_id: int) -> str:
     """Exporta erros de validação como CSV com rodapé legal."""
     report = generate_report(db, file_id)
     if "error" in report:
@@ -594,7 +598,7 @@ def export_errors_csv(db: sqlite3.Connection, file_id: int) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def export_errors_json(db: sqlite3.Connection, file_id: int) -> str:
+def export_errors_json(db: AuditConnection, file_id: int) -> str:
     """Exporta relatório completo como JSON com rodapé legal."""
     report = generate_report(db, file_id)
     if "error" in report:
@@ -608,11 +612,48 @@ def export_errors_json(db: sqlite3.Connection, file_id: int) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def export_corrected_sped(db: sqlite3.Connection, file_id: int) -> str:
-    """Gera arquivo SPED corrigido (pipe-delimited) a partir dos registros no banco."""
+def _line_for_sped_export(register: str, fields_json: str, raw_line: str) -> str:
+    """Monta uma linha de saída: prioriza fields_json + leiaute quando coerente; senão raw_line."""
+    names = REGISTER_FIELDS.get(register)
+    if not names:
+        return raw_line
+    try:
+        parsed = json.loads(fields_json)
+    except (json.JSONDecodeError, TypeError):
+        return raw_line
+    if isinstance(parsed, list):
+        fields = fields_to_dict(register, parsed)
+    elif isinstance(parsed, dict):
+        fields = dict(parsed)
+    else:
+        return raw_line
+    if fields.get("REG") != register:
+        return raw_line
+    mapped = sum(1 for n in names if n in fields)
+    if mapped < max(3, len(names) // 4):
+        return raw_line
+    ordered = ordered_fields_dict(register, fields)
+    return rebuild_raw_line(register, ordered)
+
+
+def export_corrected_sped(db: AuditConnection, file_id: int) -> str:
+    """Gera arquivo SPED corrigido (pipe-delimited) a partir dos registros no banco.
+
+    Para registros com leiaute conhecido e ``fields_json`` preenchido pelo parser,
+    reconstrói ``raw_line`` na ordem oficial (alinhado a ``apply_correction``).
+    Caso contrário preserva ``raw_line`` (ex.: testes mínimos ou registros extensos).
+    """
     rows = db.execute(
-        """SELECT raw_line FROM sped_records
+        """SELECT register, fields_json, raw_line FROM sped_records
            WHERE file_id = ? ORDER BY line_number""",
         (file_id,),
     ).fetchall()
-    return "\n".join(r[0] for r in rows) + "\n"
+    lines = [
+        _line_for_sped_export(
+            r[0] if isinstance(r, tuple) else r["register"],
+            r[1] if isinstance(r, tuple) else r["fields_json"],
+            r[2] if isinstance(r, tuple) else r["raw_line"],
+        )
+        for r in rows
+    ]
+    return "\n".join(lines) + "\n"

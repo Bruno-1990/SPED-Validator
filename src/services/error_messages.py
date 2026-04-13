@@ -395,7 +395,12 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
             "C190 não fecha com a soma dos itens C170 "
             "no registro {register} (linha {line})."
         ),
-        "guidance": f"Clique em Corrigir para ajustar. {_DETALHE}",
+        "guidance": (
+            "Compare os valores de C190 com a soma dos C170 agrupados por CST+CFOP+Aliquota. "
+            "Quando XMLs estao disponiveis, o valor do XML serve como referencia cruzada "
+            "para identificar se o erro esta nos itens (C170) ou no totalizador (C190). "
+            f"Verifique tambem o rateio de despesas (frete, seguro, outras) do C100. {_DETALHE}"
+        ),
         "icon": "sigma",
     },
     "C190_COMBINACAO_INCOMPATIVEL": {
@@ -677,6 +682,17 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
         "friendly": "CST {value} incompativel com regime tributario detectado na linha {line}.",
         "guidance": "Empresa SN deve usar CSOSN (101-900). Empresa Normal deve usar CST Tabela A (00-90).",
         "icon": "alert-circle",
+    },
+    "XML_C190_DIVERGE": {
+        "friendly": (
+            "C190 diverge dos itens XML no grupo CST/CFOP/ALIQ "
+            "do registro {register} (linha {line})."
+        ),
+        "guidance": (
+            "Compare os itens do XML com C170/C190 do SPED. "
+            "Verifique agrupamento CST+CFOP+Aliquota e recalcule."
+        ),
+        "icon": "sigma",
     },
 }
 

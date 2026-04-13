@@ -10,10 +10,11 @@ Governanca de correcoes:
 from __future__ import annotations
 
 import json
-import sqlite3
 
+from .db_types import AuditConnection
 from ..validators.helpers import REGISTER_FIELDS, fields_to_dict
 from .rule_loader import RuleLoader
+from .sped_line_format import format_value_for_sped_field, ordered_fields_dict, rebuild_raw_line
 
 
 class CorrectionNotAllowed(Exception):
@@ -46,6 +47,14 @@ FIELDS_BLOCKED_FROM_AUTO_CORRECTION: frozenset[str] = frozenset({
     "DT_DOC",
 })
 
+# Mesmo com divergência SPED↔XML (field_map), não aplicar correção **automática**
+# sem revisão humana — identificação do documento e classificação fiscal.
+FIELDS_NO_AUTOMATICO_MESMO_COM_REF_XML: frozenset[str] = frozenset({
+    "CHV_NFE", "CHV_CTE", "CNPJ", "CPF", "IE",
+    "NUM_DOC", "SER", "COD_MOD",
+    "CST_ICMS", "CSOSN", "CST_PIS", "CST_COFINS", "CST_IPI", "CFOP",
+})
+
 
 # Cache rule_id -> corrigivel
 _corrigivel_cache: dict[str, str] | None = None
@@ -68,6 +77,8 @@ def _validate_correction_governance(
     field_name: str,
     corrigivel: str,
     new_value: str,
+    *,
+    xml_ref_correction: bool = False,
 ) -> None:
     """Valida a governança antes de aplicar uma correção.
 
@@ -76,12 +87,27 @@ def _validate_correction_governance(
     """
     field_upper = field_name.upper()
 
-    # Bloco 1: campo bloqueado para automação
-    if corrigivel == "automatico" and field_upper in FIELDS_BLOCKED_FROM_AUTO_CORRECTION:
+    # Bloco 1: campo bloqueado para automação (exceção: referência explícita do XML / field_map)
+    if (
+        corrigivel == "automatico"
+        and field_upper in FIELDS_BLOCKED_FROM_AUTO_CORRECTION
+        and not xml_ref_correction
+    ):
         raise CorrectionBlockedError(
             f"Campo {field_name!r} não pode ser corrigido automaticamente. "
             f"Este campo requer validação humana. "
             f"Use corrigivel=proposta e forneça uma justificativa."
+        )
+
+    # Bloco 1b: referência XML não autoriza automático para identificação/classificação
+    if (
+        corrigivel == "automatico"
+        and xml_ref_correction
+        and field_upper in FIELDS_NO_AUTOMATICO_MESMO_COM_REF_XML
+    ):
+        raise CorrectionBlockedError(
+            "Este campo não pode ser alterado automaticamente mesmo com referência no XML; "
+            "use correção assistida (proposta) com justificativa."
         )
 
     # Bloco 2: impossível = nunca pode ser corrigido automaticamente
@@ -138,7 +164,7 @@ def _field_name_for(register: str, field_no: int) -> str | None:
 
 
 def apply_correction(
-    db: sqlite3.Connection,
+    db: AuditConnection,
     file_id: int,
     record_id: int,
     field_no: int,
@@ -155,11 +181,45 @@ def apply_correction(
     Respeita governanca: bloqueia correcao para regras investigar/impossivel,
     exige justificativa para regras proposta.
     """
+    xml_ref_correction = False
+    err_type_db = ""
+    if error_id:
+        try:
+            row_e = db.execute(
+                "SELECT categoria, error_type FROM validation_errors WHERE id = ? AND file_id = ?",
+                (error_id, file_id),
+            ).fetchone()
+        except Exception as exc:
+            if "categoria" not in str(exc).lower() and "no such column" not in str(exc).lower():
+                raise
+            row_e2 = db.execute(
+                "SELECT error_type FROM validation_errors WHERE id = ? AND file_id = ?",
+                (error_id, file_id),
+            ).fetchone()
+            if row_e2:
+                et = row_e2[0] if isinstance(row_e2, tuple) else row_e2["error_type"]
+                row_e = (None, et)
+            else:
+                row_e = None
+        if row_e:
+            cat = row_e[0] if isinstance(row_e, tuple) else row_e["categoria"]
+            err_type_db = row_e[1] if isinstance(row_e, tuple) else row_e["error_type"]
+            err_type_db = str(err_type_db or "")
+            if (cat or "") == "field_map_xml" or err_type_db.startswith("FM_"):
+                xml_ref_correction = True
+
+    if xml_ref_correction and (
+        not justificativa or len((justificativa or "").strip()) < 10
+    ):
+        justificativa = "Correcao alinhada ao valor de referencia da NF-e (XML)."
+
     _enforce_corrigivel(rule_id, justificativa)
 
     # Governança de campos sensíveis
     corrigivel = _get_corrigivel(rule_id)
-    _validate_correction_governance(field_name, corrigivel, new_value)
+    _validate_correction_governance(
+        field_name, corrigivel, new_value, xml_ref_correction=xml_ref_correction
+    )
 
     row = db.execute(
         "SELECT fields_json, register FROM sped_records WHERE id = ? AND file_id = ?",
@@ -168,27 +228,30 @@ def apply_correction(
     if not row:
         return False
 
-    fields = _ensure_dict(row[0], row[1])
+    register = row[1] if isinstance(row, tuple) else row["register"]
+    fields = _ensure_dict(row[0], register)
 
     # Resolver nome do campo: preferir field_name passado, senao converter de field_no
     fname = field_name
     if fname not in fields:
-        resolved = _field_name_for(row[1], field_no)
+        resolved = _field_name_for(register, field_no)
         if resolved and resolved in fields:
             fname = resolved
         else:
             return False
 
     old_value = fields[fname]
-    fields[fname] = new_value
+    new_fmt = format_value_for_sped_field(register, fname, new_value, old_value)
+    fields[fname] = new_fmt
+    fields_ordered = ordered_fields_dict(register, fields)
 
     # Atualizar registro
-    new_raw = "|" + "|".join(fields.values()) + "|"
+    new_raw = rebuild_raw_line(register, fields_ordered)
     db.execute(
         """UPDATE sped_records
            SET fields_json = ?, raw_line = ?, status = 'corrected'
            WHERE id = ?""",
-        (json.dumps(fields, ensure_ascii=False), new_raw, record_id),
+        (json.dumps(fields_ordered, ensure_ascii=False), new_raw, record_id),
     )
 
     # Salvar historico
@@ -197,7 +260,7 @@ def apply_correction(
            (file_id, record_id, field_no, field_name, old_value, new_value, error_id,
             justificativa, correction_type, rule_id)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (file_id, record_id, field_no, field_name, old_value, new_value, error_id,
+        (file_id, record_id, field_no, field_name, old_value, new_fmt, error_id,
          justificativa, correction_type, rule_id),
     )
 
@@ -214,7 +277,7 @@ def apply_correction(
     log_details = json.dumps({
         "field_name": field_name,
         "old_value": old_value,
-        "new_value": new_value,
+        "new_value": new_fmt,
         "justificativa": justificativa,
         "correction_type": correction_type,
         "rule_id": rule_id,
@@ -231,7 +294,7 @@ def apply_correction(
 
 
 def resolve_finding(
-    db: sqlite3.Connection,
+    db: AuditConnection,
     file_id: int,
     finding_id: int,
     rule_id: str,
@@ -284,7 +347,7 @@ def resolve_finding(
     return True
 
 
-def get_finding_resolutions(db: sqlite3.Connection, file_id: int) -> list[dict]:
+def get_finding_resolutions(db: AuditConnection, file_id: int) -> list[dict]:
     """Lista resolucoes de apontamentos para um arquivo."""
     rows = db.execute(
         "SELECT * FROM finding_resolutions WHERE file_id = ? ORDER BY resolved_at DESC",
@@ -293,7 +356,7 @@ def get_finding_resolutions(db: sqlite3.Connection, file_id: int) -> list[dict]:
     return [dict(r) if hasattr(r, "keys") else {} for r in rows]
 
 
-def get_corrections(db: sqlite3.Connection, file_id: int) -> list[dict]:
+def get_corrections(db: AuditConnection, file_id: int) -> list[dict]:
     """Lista todas as correcoes aplicadas em um arquivo."""
     rows = db.execute(
         """SELECT * FROM corrections WHERE file_id = ? ORDER BY applied_at DESC""",
@@ -302,7 +365,7 @@ def get_corrections(db: sqlite3.Connection, file_id: int) -> list[dict]:
     return [dict(r) if hasattr(r, "keys") else {} for r in rows]
 
 
-def undo_correction(db: sqlite3.Connection, correction_id: int) -> bool:
+def undo_correction(db: AuditConnection, correction_id: int) -> bool:
     """Desfaz uma correcao, restaurando o valor original."""
     row = db.execute(
         "SELECT file_id, record_id, field_no, old_value, error_id FROM corrections WHERE id = ?",
@@ -322,12 +385,14 @@ def undo_correction(db: sqlite3.Connection, correction_id: int) -> bool:
 
     fields = _ensure_dict(rec_row[0], rec_row[1])
 
+    register = rec_row[1]
     # Resolver nome do campo
-    fname = _field_name_for(rec_row[1], field_no)
+    fname = _field_name_for(register, field_no)
     if fname and fname in fields:
         fields[fname] = old_value
 
-    new_raw = "|" + "|".join(fields.values()) + "|"
+    # raw_line na ordem do leiaute; fields_json preserva as chaves já persistidas (sem inflar o JSON)
+    new_raw = rebuild_raw_line(register, ordered_fields_dict(register, fields))
     db.execute(
         "UPDATE sped_records SET fields_json = ?, raw_line = ?, status = 'pending' WHERE id = ?",
         (json.dumps(fields, ensure_ascii=False), new_raw, record_id),

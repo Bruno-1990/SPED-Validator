@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 
 const navItems = [
@@ -10,6 +10,16 @@ const navItems = [
 export default function Layout() {
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [apiHealth, setApiHealth] = useState<'loading' | { version: string } | 'offline'>('loading')
+
+  useEffect(() => {
+    fetch('/api/health')
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: { status?: string; version?: string }) =>
+        setApiHealth({ version: typeof d.version === 'string' ? d.version : '?' }),
+      )
+      .catch(() => setApiHealth('offline'))
+  }, [])
 
   return (
     <div className="min-h-screen flex">
@@ -70,6 +80,30 @@ export default function Layout() {
         <main className="flex-1 p-4 md:p-6 overflow-auto">
           <Outlet />
         </main>
+
+        <footer className="shrink-0 border-t border-gray-200 bg-gray-50/80 px-4 py-2 text-[11px] text-gray-500 md:px-6">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>
+              Interface <span className="font-mono text-gray-600">v{__APP_VERSION__}</span>
+            </span>
+            {apiHealth === 'loading' && <span className="text-gray-400">· API…</span>}
+            {apiHealth === 'offline' && (
+              <span className="text-amber-700">
+                · API offline — confira se o backend está no ar e o proxy <code className="rounded bg-gray-200 px-0.5">/api</code>
+              </span>
+            )}
+            {apiHealth !== 'loading' && apiHealth !== 'offline' && (
+              <span>
+                · API <span className="font-mono text-gray-600">v{apiHealth.version}</span>
+              </span>
+            )}
+            <span className="hidden sm:inline text-gray-400">
+              · Chave: <code className="rounded bg-gray-200 px-1 text-gray-600">VITE_API_KEY</code> no{' '}
+              <code className="rounded bg-gray-200 px-1">frontend/.env.local</code> ={' '}
+              <code className="rounded bg-gray-200 px-1">API_KEY</code> do backend
+            </span>
+          </div>
+        </footer>
       </div>
     </div>
   )

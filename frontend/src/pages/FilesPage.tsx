@@ -41,6 +41,7 @@ export default function FilesPage() {
         <h2 className="text-2xl font-bold">Arquivos Processados</h2>
         {files.length > 0 && (
           <button
+            type="button"
             onClick={handleDeleteAll}
             className="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700"
           >

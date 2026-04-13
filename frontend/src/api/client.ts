@@ -1,12 +1,17 @@
 import type { AuditScope, AuditScopeRaw, CorrectionSuggestion, CrossValidationItem, ErrorSummary, FileInfo, GeneratedRule, PipelineEvent, RecordInfo, RuleSummary, SearchResult, StructuredReport, ValidationError, ValidationResponse } from '../types/sped'
 
-const BASE = '/api'
-const API_KEY = 'sped-audit-dev-key-2026-central-contabil'
+/** Base da API: igual ao proxy (`/api`) ou valor de `VITE_API_BASE` no build. */
+export const API_BASE = (import.meta.env.VITE_API_BASE || '/api').replace(/\/$/, '') || '/api'
+
+/** Chave alinhada ao `API_KEY` do backend — defina `VITE_API_KEY` em `.env.local`. */
+const API_KEY =
+  (import.meta.env.VITE_API_KEY && String(import.meta.env.VITE_API_KEY).trim()) ||
+  'sped-audit-dev-key-2026-central-contabil'
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers)
   headers.set('X-API-Key', API_KEY)
-  const res = await fetch(`${BASE}${url}`, { ...options, headers })
+  const res = await fetch(`${API_BASE}${url}`, { ...options, headers })
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(error.detail || `HTTP ${res.status}`)
@@ -28,11 +33,19 @@ export const api = {
   clearAudit: (id: number) => request<{ cleared: boolean; removed: number }>(`/files/${id}/audit`, { method: 'DELETE' }),
   clearAllAudit: () => request<{ cleared: boolean; removed: number }>('/files/audit', { method: 'DELETE' }),
 
-  // Validation
-  validate: (fileId: number) => request<ValidationResponse>(`/files/${fileId}/validate`, { method: 'POST' }),
+  // Validation (mode: sped_only default | sped_xml — exige XMLs ativos)
+  validate: (fileId: number, mode: 'sped_only' | 'sped_xml' = 'sped_only') => {
+    const qs = mode !== 'sped_only' ? `?mode=${encodeURIComponent(mode)}` : ''
+    return request<ValidationResponse>(`/files/${fileId}/validate${qs}`, { method: 'POST' })
+  },
 
-  validateStream: (fileId: number, onEvent: (event: PipelineEvent) => void): EventSource => {
-    const es = new EventSource(`${BASE}/files/${fileId}/validate/stream?api_key=${API_KEY}`)
+  validateStream: (
+    fileId: number,
+    onEvent: (event: PipelineEvent) => void,
+    opts?: { mode?: 'sped_only' | 'sped_xml' },
+  ): EventSource => {
+    const mode = opts?.mode && opts.mode !== 'sped_only' ? `&mode=${encodeURIComponent(opts.mode)}` : ''
+    const es = new EventSource(`${API_BASE}/files/${fileId}/validate/stream?api_key=${encodeURIComponent(API_KEY)}${mode}`)
 
     es.addEventListener('progress', (e) => {
       onEvent({ type: 'progress', ...JSON.parse(e.data) })
@@ -165,7 +178,7 @@ export const api = {
       bloco_k: 'Bloco K (Produção)',
       bloco_c_servicos: 'Bloco C (Serviços)',
       retificador: 'Retificador',
-      xml_crossref: 'Cruzamento NF-e XML',
+      xml_crossref: 'Cruzamento XML x SPED (NF-e)',
     }
     return {
       coverage_pct: raw.cobertura_estimada_pct,
@@ -205,10 +218,15 @@ export const api = {
   // Report
   getStructuredReport: (fileId: number) => request<StructuredReport>(`/files/${fileId}/report/structured`),
   getReport: async (fileId: number, format: string = 'md'): Promise<string> => {
-    const res = await fetch(`${BASE}/files/${fileId}/report?format=${format}`)
+    const res = await fetch(`${API_BASE}/files/${fileId}/report?format=${format}`, {
+      headers: { 'X-API-Key': API_KEY },
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return res.text()
   },
-  downloadSped: (fileId: number) => `${BASE}/files/${fileId}/download`,
+  /** URL para `<a href>` / `window.open` — inclui `api_key` (SSE/download não enviam header). */
+  downloadSped: (fileId: number) =>
+    `${API_BASE}/files/${fileId}/download?api_key=${encodeURIComponent(API_KEY)}`,
 
   // XML NF-e cross-reference
   uploadXmls: async (fileId: number, files: File[], modoPeriodo?: string): Promise<{
@@ -223,8 +241,8 @@ export const api = {
   },
   listXmls: (fileId: number) => request<{file_id: number; total: number; autorizadas: number; canceladas: number; xmls: any[]}>(`/files/${fileId}/xml`),
   cruzarXml: (fileId: number) => request<{file_id: number; xmls_analisados: number; divergencias: number; por_severidade: Record<string, number>}>(`/files/${fileId}/xml/cruzar`, { method: 'POST' }),
-  cruzarXmlStream: (fileId: number, onProgress: (pct: number, msg: string) => void, onDone: (result: {divergencias: number; por_severidade: Record<string, number>}) => void, onError?: (err: string) => void): EventSource => {
-    const es = new EventSource(`${BASE}/files/${fileId}/xml/cruzar/stream?api_key=${API_KEY}`)
+  cruzarXmlStream: (fileId: number, onProgress: (pct: number, msg: string) => void, onDone: (result: {divergencias: number; por_severidade: Record<string, number>; total_erros_fiscal?: number; pipeline_completo?: boolean; status?: string}) => void, onError?: (err: string) => void): EventSource => {
+    const es = new EventSource(`${API_BASE}/files/${fileId}/xml/cruzar/stream?api_key=${encodeURIComponent(API_KEY)}`)
     es.addEventListener('progress', (e) => {
       const d = JSON.parse(e.data)
       onProgress(d.pct, d.msg)
@@ -234,9 +252,13 @@ export const api = {
       onDone(d)
       es.close()
     })
-    es.addEventListener('error', (e) => {
-      if (e instanceof MessageEvent) {
-        onError?.(JSON.parse(e.data).error)
+    // Erros do servidor: evento dedicado (evita confundir com o `error` nativo ao encerrar o stream).
+    es.addEventListener('cruzar_error', (e) => {
+      try {
+        const d = JSON.parse((e as MessageEvent).data)
+        onError?.(d.error ?? 'Erro no cruzamento')
+      } catch {
+        onError?.('Erro no cruzamento')
       }
       es.close()
     })

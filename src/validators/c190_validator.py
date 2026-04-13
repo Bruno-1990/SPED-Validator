@@ -61,7 +61,7 @@ def validate_c190(
     errors: list[ValidationError] = []
     loader = context.reference_loader if context else None
 
-    errors.extend(_check_c190_001(groups))
+    errors.extend(_check_c190_001(groups, context))
     errors.extend(_check_c190_002(groups, loader))
 
     return errors
@@ -73,6 +73,7 @@ def validate_c190(
 
 def _check_c190_001(
     groups: dict[str, list[SpedRecord]],
+    context: ValidationContext | None = None,
 ) -> list[ValidationError]:
     """Reconstroi VL_OPR do C190 a partir dos C170 + rateio de despesas do C100.
 
@@ -109,11 +110,22 @@ def _check_c190_001(
         elif r.register == "C190" and current_c100 is not None:
             doc_c190[current_c100.line_number].append(r)
 
+    # Dados XML para referencia cruzada (quando disponivel)
+    xml_by_chave = (context.xml_by_chave or {}) if context else {}
+
     for c100_line, c190_recs in doc_c190.items():
         c100 = doc_c100.get(c100_line)
         items = doc_c170.get(c100_line, [])
         if not c100 or not items:
             continue
+
+        # Buscar dados XML desta NF-e (pela chave do C100)
+        xml_doc = None
+        if xml_by_chave:
+            chv_nfe = get_field(c100, "CHV_NFE").strip().replace(" ", "")
+            if chv_nfe.startswith("NFe"):
+                chv_nfe = chv_nfe[3:]
+            xml_doc = xml_by_chave.get(chv_nfe)
 
         # Despesas e parcelas adicionais do C100 que integram VL_OPR
         # Pelo Guia Pratico, VL_OPR pode incluir frete, seguro, outras despesas,
@@ -208,19 +220,41 @@ def _check_c190_001(
                 if despesa_rateada > 0:
                     composicao += f" + despesas_rateadas={despesa_rateada:.2f}"
 
+                # Referencia cruzada com XML (quando disponivel)
+                # Nota: a validacao C190 vs C170 e COMPLEMENTAR ao cruzamento XML,
+                # nao substituta. C190 vs C170 verifica integridade interna do SPED.
+                # C190 vs XML (field_map) verifica se SPED bate com a fonte autoritativa.
+                # Ambas devem rodar sempre, independentemente de xml_cruzamento_executado.
+                xml_ref = ""
+                xml_diagnostico = ""
+                if xml_doc and xml_doc.get("por_grupo"):
+                    xml_grupo = xml_doc["por_grupo"].get(key)
+                    if xml_grupo:
+                        xml_vl = xml_grupo["vl_prod_liq"]
+                        xml_ref = f" | XML soma(vProd-vDesc)={xml_vl:.2f}"
+                        diff_xml_c190 = abs(vl_opr_c190 - xml_vl)
+                        diff_xml_c170 = abs(vl_opr_esperado - xml_vl)
+                        if diff_xml_c190 < diff_xml_c170:
+                            xml_diagnostico = " XML confirma C190 — provavel erro nos itens C170."
+                        elif diff_xml_c170 < diff_xml_c190:
+                            xml_diagnostico = " XML confirma C170 — provavel erro no totalizador C190."
+                        else:
+                            xml_diagnostico = " XML diverge de ambos — revisar XML, C170 e C190."
+
                 errors.append(make_error(
-                    c190, "VL_OPR", "C190_DIVERGE_C170",
-                    (
-                        f"C190 (CST={cst_c190} CFOP={cfop_c190} ALIQ={aliq_c190:.2f}%): "
-                        f"VL_OPR={vl_opr_c190:.2f} diverge do valor reconstruido "
-                        f"{vl_opr_esperado:.2f} (dif={diff_opr:.2f}). "
-                        f"Composicao: {composicao}. "
-                        f"Confianca: alta (100 pontos)."
-                    ),
-                    field_no=5,
-                    value=f"{vl_opr_c190:.2f}",
-                    expected_value=f"{vl_opr_esperado:.2f}",
-                ))
+                        c190, "VL_OPR", "C190_DIVERGE_C170",
+                        (
+                            f"C190 (CST={cst_c190} CFOP={cfop_c190} ALIQ={aliq_c190:.2f}%): "
+                            f"VL_OPR={vl_opr_c190:.2f} diverge do valor reconstruido "
+                            f"{vl_opr_esperado:.2f} (dif={diff_opr:.2f}). "
+                            f"Composicao: {composicao}."
+                            f"{xml_ref}{xml_diagnostico}"
+                            f" Confianca: alta (100 pontos)."
+                        ),
+                        field_no=5,
+                        value=f"{vl_opr_c190:.2f}",
+                        expected_value=f"{vl_opr_esperado:.2f}",
+                    ))
 
             # -- Validacao 2: VL_ICMS do C190 vs soma dos C170.VL_ICMS --
             # Nao recalcular BC x ALIQ pois arredondamento item a item gera
@@ -230,19 +264,37 @@ def _check_c190_001(
             if soma_icms_c170 > 0 or vl_icms_c190 > 0:
                 diff_icms = abs(soma_icms_c170 - vl_icms_c190)
                 if diff_icms > tol_consol:
+                    # Referencia cruzada XML para VL_ICMS (complementar, nao substituta)
+                    xml_ref_icms = ""
+                    xml_diag_icms = ""
+                    if xml_doc and xml_doc.get("por_grupo"):
+                        xml_grupo_icms = xml_doc["por_grupo"].get(key)
+                        if xml_grupo_icms:
+                            xml_vicms = xml_grupo_icms["vl_icms"]
+                            xml_ref_icms = f" | XML soma(vICMS)={xml_vicms:.2f}"
+                            d_xml_c190 = abs(vl_icms_c190 - xml_vicms)
+                            d_xml_c170 = abs(soma_icms_c170 - xml_vicms)
+                            if d_xml_c190 < d_xml_c170:
+                                xml_diag_icms = " XML confirma C190 — provavel erro nos itens C170."
+                            elif d_xml_c170 < d_xml_c190:
+                                xml_diag_icms = " XML confirma C170 — provavel erro no totalizador C190."
+                            else:
+                                xml_diag_icms = " XML diverge de ambos — revisar XML, C170 e C190."
+
                     errors.append(make_error(
-                        c190, "VL_ICMS", "C190_DIVERGE_C170",
-                        (
-                            f"C190 (CST={cst_c190} CFOP={cfop_c190}): "
-                            f"VL_ICMS={vl_icms_c190:.2f} diverge da soma dos "
-                            f"C170.VL_ICMS={soma_icms_c170:.2f} "
-                            f"(dif={diff_icms:.2f}). "
-                            f"Confianca: alta (100 pontos)."
-                        ),
-                        field_no=7,
-                        value=f"{vl_icms_c190:.2f}",
-                        expected_value=f"{soma_icms_c170:.2f}",
-                    ))
+                            c190, "VL_ICMS", "C190_DIVERGE_C170",
+                            (
+                                f"C190 (CST={cst_c190} CFOP={cfop_c190}): "
+                                f"VL_ICMS={vl_icms_c190:.2f} diverge da soma dos "
+                                f"C170.VL_ICMS={soma_icms_c170:.2f} "
+                                f"(dif={diff_icms:.2f})."
+                                f"{xml_ref_icms}{xml_diag_icms}"
+                                f" Confianca: alta (100 pontos)."
+                            ),
+                            field_no=7,
+                            value=f"{vl_icms_c190:.2f}",
+                            expected_value=f"{soma_icms_c170:.2f}",
+                        ))
 
     return errors
 

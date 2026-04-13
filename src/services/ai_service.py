@@ -15,12 +15,13 @@ import hashlib
 import json
 import logging
 import os
-import sqlite3
 from datetime import datetime
+
+from .db_types import AuditConnection
 
 logger = logging.getLogger(__name__)
 
-PROMPT_VERSION = 1
+PROMPT_VERSION = 2
 MODEL_DEFAULT = "gpt-4o-mini"
 
 
@@ -37,15 +38,18 @@ def _build_cache_key(
     ind_oper: str = "",
     campo_principal: str = "",
     valor_encontrado: str = "",
+    valor_esperado: str = "",
 ) -> str:
-    """Gera hash SHA256 da chave ampliada (Fase 6 fix: inclui valor_encontrado).
+    """Gera hash SHA256 da chave ampliada (valor SPED + valor esperado/XML).
 
-    Correcao: sem valor_encontrado, CST 040 e CST 090 no mesmo campo
-    compartilhavam a mesma explicacao (cache hit incorreto).
+    Discrimina CST diferentes e divergencias SPED x XML com mesmo error_type.
     """
-    # Hash parcial do valor para discriminar sem expor dado sensivel
     valor_hash = hashlib.md5(str(valor_encontrado).encode()).hexdigest()[:8] if valor_encontrado else ""
-    raw = f"{rule_id}|{error_type}|{regime}|{uf}|{beneficio_codigo}|{ind_oper}|{campo_principal}|{valor_hash}"
+    exp_hash = hashlib.md5(str(valor_esperado).encode()).hexdigest()[:8] if valor_esperado else ""
+    raw = (
+        f"{rule_id}|{error_type}|{regime}|{uf}|{beneficio_codigo}|{ind_oper}|"
+        f"{campo_principal}|{valor_hash}|{exp_hash}"
+    )
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
@@ -54,7 +58,7 @@ def _build_cache_key(
 # ──────────────────────────────────────────────
 
 def get_cached_explanation(
-    db: sqlite3.Connection,
+    db: AuditConnection,
     error_type: str,
     regime: str = "",
     uf: str = "",
@@ -62,11 +66,20 @@ def get_cached_explanation(
     ind_oper: str = "",
     campo_principal: str = "",
     rule_id: str = "",
+    value: str = "",
+    expected_value: str = "",
 ) -> dict | None:
     """Busca explicação no cache. Retorna dict ou None se não encontrar."""
     chave_hash = _build_cache_key(
-        rule_id or error_type, error_type, regime, uf,
-        beneficio_codigo, ind_oper, campo_principal,
+        rule_id or error_type,
+        error_type,
+        regime,
+        uf,
+        beneficio_codigo,
+        ind_oper,
+        campo_principal,
+        value,
+        expected_value,
     )
 
     row = db.execute(
@@ -99,7 +112,7 @@ def get_cached_explanation(
 # ──────────────────────────────────────────────
 
 def generate_explanation(
-    db: sqlite3.Connection,
+    db: AuditConnection,
     error_type: str,
     message: str,
     regime: str = "",
@@ -119,7 +132,16 @@ def generate_explanation(
     """
     # 1. Tentar cache
     cached = get_cached_explanation(
-        db, error_type, regime, uf, beneficio_codigo, ind_oper, campo_principal, rule_id,
+        db,
+        error_type,
+        regime,
+        uf,
+        beneficio_codigo,
+        ind_oper,
+        campo_principal,
+        rule_id,
+        value,
+        expected_value,
     )
     if cached:
         return cached
@@ -169,23 +191,58 @@ def generate_explanation(
 
     # 3. Salvar no cache
     chave_hash = _build_cache_key(
-        rule_id or error_type, error_type, regime, uf,
-        beneficio_codigo, ind_oper, campo_principal,
+        rule_id or error_type,
+        error_type,
+        regime,
+        uf,
+        beneficio_codigo,
+        ind_oper,
+        campo_principal,
+        value,
+        expected_value,
     )
 
     try:
-        db.execute(
-            """INSERT OR REPLACE INTO ai_error_cache
-               (chave_hash, rule_id, error_type, regime, uf, beneficio_codigo,
-                ind_oper, campo_principal, explicacao_texto, sugestao_texto,
-                modelo_usado, prompt_version, rule_version, gerado_em, hits)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
-            (
-                chave_hash, rule_id, error_type, regime, uf, beneficio_codigo,
-                ind_oper, campo_principal, explicacao, sugestao,
-                MODEL_DEFAULT, PROMPT_VERSION, 1, datetime.now().isoformat(),
-            ),
-        )
+        if type(db).__name__ == "PgConnection":
+            db.execute(
+                """INSERT INTO ai_error_cache
+                   (chave_hash, rule_id, error_type, regime, uf, beneficio_codigo,
+                    ind_oper, campo_principal, explicacao_texto, sugestao_texto,
+                    modelo_usado, prompt_version, rule_version, gerado_em, hits)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                   ON CONFLICT (chave_hash) DO UPDATE SET
+                     explicacao_texto = EXCLUDED.explicacao_texto,
+                     sugestao_texto = EXCLUDED.sugestao_texto,
+                     modelo_usado = EXCLUDED.modelo_usado,
+                     gerado_em = EXCLUDED.gerado_em,
+                     hits = 0""",
+                (
+                    chave_hash, rule_id, error_type, regime, uf, beneficio_codigo,
+                    ind_oper, campo_principal, explicacao, sugestao,
+                    MODEL_DEFAULT, PROMPT_VERSION, 1, datetime.now().isoformat(),
+                ),
+            )
+        else:
+            db.execute(
+                """INSERT INTO ai_error_cache
+                   (chave_hash, rule_id, error_type, regime, uf, beneficio_codigo,
+                    ind_oper, campo_principal, explicacao_texto, sugestao_texto,
+                    modelo_usado, prompt_version, rule_version, gerado_em, hits)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                   ON CONFLICT (chave_hash) DO UPDATE SET
+                    explicacao_texto = EXCLUDED.explicacao_texto,
+                    sugestao_texto = EXCLUDED.sugestao_texto,
+                    modelo_usado = EXCLUDED.modelo_usado,
+                    prompt_version = EXCLUDED.prompt_version,
+                    rule_version = EXCLUDED.rule_version,
+                    gerado_em = EXCLUDED.gerado_em,
+                    hits = 0""",
+                (
+                    chave_hash, rule_id, error_type, regime, uf, beneficio_codigo,
+                    ind_oper, campo_principal, explicacao, sugestao,
+                    MODEL_DEFAULT, PROMPT_VERSION, 1, datetime.now().isoformat(),
+                ),
+            )
         db.commit()
     except Exception:
         logger.warning("Erro ao salvar cache de IA", exc_info=True)
@@ -233,9 +290,15 @@ def _build_prompt(
     if severity:
         parts.append(f"Severidade: {severity}")
     if value:
-        parts.append(f"Valor encontrado: {value}")
+        parts.append(f"Valor declarado no SPED (campo): {value}")
     if expected:
-        parts.append(f"Valor esperado: {expected}")
+        if error_type.startswith("FM_"):
+            parts.append(
+                "Referência extraída da NF-e (XML) vinculada por CHV_NFE — "
+                f"valor de confronto: {expected}"
+            )
+        else:
+            parts.append(f"Valor esperado / de referência: {expected}")
     parts.append("\nExplique este erro para o contador e sugira como corrigir.")
     return "\n".join(parts)
 
@@ -258,7 +321,7 @@ def _parse_response(content: str) -> tuple[str, str]:
 # Estatísticas do cache
 # ──────────────────────────────────────────────
 
-def get_cache_stats(db: sqlite3.Connection) -> dict:
+def get_cache_stats(db: AuditConnection) -> dict:
     """Retorna estatísticas do cache de IA."""
     total = db.execute("SELECT COUNT(*) FROM ai_error_cache").fetchone()[0]
     total_hits = db.execute("SELECT COALESCE(SUM(hits), 0) FROM ai_error_cache").fetchone()[0]
