@@ -1057,17 +1057,23 @@ function ErrorCard({
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
             {/* Explicacao principal */}
             {error.doc_suggestion ? (
-              <div className="text-sm text-gray-800 whitespace-pre-line leading-relaxed">
-                {error.doc_suggestion.split('**Como corrigir:**').map((part, i) =>
-                  i === 0 ? (
-                    <p key={i}>{renderBold(part.trim())}</p>
-                  ) : (
-                    <div key={i} className="mt-3 pt-3 border-t border-blue-200">
-                      <span className="font-semibold text-blue-800">Como corrigir: </span>
-                      <span className="text-gray-700">{renderBold(part.trim())}</span>
-                    </div>
-                  )
-                )}
+              <div className="text-sm text-gray-800 whitespace-pre-line leading-relaxed space-y-2">
+                {error.doc_suggestion.split(/\*\*(O que foi encontrado|Por que isso importa|Como corrigir|Base legal):\*\*/g).map((part, i) => {
+                  const trimmed = part.trim()
+                  if (!trimmed) return null
+                  // Partes impares sao os titulos capturados pelo regex
+                  if (['O que foi encontrado', 'Por que isso importa', 'Como corrigir', 'Base legal'].includes(trimmed)) {
+                    const colors: Record<string, string> = {
+                      'O que foi encontrado': 'text-red-700',
+                      'Por que isso importa': 'text-amber-700',
+                      'Como corrigir': 'text-blue-800',
+                      'Base legal': 'text-gray-600',
+                    }
+                    return <p key={i} className={`font-semibold mt-2 ${colors[trimmed] || 'text-gray-700'}`}>{trimmed}:</p>
+                  }
+                  // Conteudo da secao
+                  return <p key={i} className="text-gray-700 ml-0">{renderBold(trimmed)}</p>
+                })}
               </div>
             ) : error.friendly_message ? (
               <p className="text-sm text-gray-800 whitespace-pre-line">{renderBold(error.friendly_message)}</p>

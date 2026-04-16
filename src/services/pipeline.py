@@ -341,7 +341,7 @@ def run_pipeline(
         progress.stage_progress = 0
         progress.detail = "Gerando mensagens amigaveis e buscando base legal"
 
-        _enrich_errors(db, file_id, doc_db_path, progress, rule_index=rule_index)
+        _enrich_errors(db, file_id, doc_db_path, progress, rule_index=rule_index, context=context)
         progress.stage_progress = 100
 
         # ── Calculo de Scores (Fase 6) ──
@@ -566,11 +566,15 @@ def _enrich_errors(
     doc_db_path: str | None,
     progress: PipelineProgress,
     rule_index=None,
+    context=None,
 ) -> None:
-    """Enriquece erros com mensagens amigáveis e base legal.
+    """Enriquece erros com mensagens amigáveis, base legal e explicacao IA.
 
     Agrupa erros por (error_type, register, field_name) para evitar buscas
     redundantes — ex: 500 erros iguais fazem apenas 1 busca.
+
+    Se OPENAI_API_KEY configurada, gera doc_suggestion via IA com contexto
+    fiscal (regime, UF, beneficio). Resultado cacheado em ai_error_cache.
     """
     rows = db.execute(
         """SELECT id, error_type, register, field_name, field_no, value,
@@ -650,6 +654,24 @@ def _enrich_errors(
             elif error_type.startswith("FM_") and sample.get("expected_value"):
                 auto_correctable = 1
 
+        # Gerar doc_suggestion via IA (1 por grupo, cacheado)
+        ai_doc_suggestion = None
+        if _has_openai_key():
+            regime_str = ""
+            uf_str = ""
+            beneficio_str = ""
+            if context:
+                regime_str = context.regime.value if hasattr(context.regime, 'value') else str(context.regime or "")
+                uf_str = context.uf_contribuinte or ""
+                beneficio_str = ", ".join(context.beneficios_ativos) if context.beneficios_ativos else ""
+
+            ai_doc_suggestion = _generate_ai_doc_suggestion(
+                db, error_type, sample["message"], register, field_name,
+                sample["value"], sample["expected_value"],
+                regime_str, uf_str, beneficio_str,
+                guidance,
+            )
+
         # Atualizar todos os erros do grupo
         for entry in entries:
             # Personalizar mensagem com dados específicos de cada erro
@@ -666,9 +688,20 @@ def _enrich_errors(
             if error_type in ("CALCULO_DIVERGENTE", "SOMA_DIVERGENTE") and not entry["expected_value"]:
                 entry_auto = 0
 
-            # Usar a mensagem tecnica original como "Como corrigir"
-            # (mais especifica que o guidance generico)
-            doc_suggestion = f"{entry_friendly}\n\n**Como corrigir:** {entry['message']}"
+            # doc_suggestion: IA quando disponivel, senao fallback
+            if ai_doc_suggestion:
+                # Personalizar com valores especificos deste erro
+                doc_suggestion = ai_doc_suggestion
+                if entry["value"] and entry["value"] != sample["value"]:
+                    doc_suggestion = doc_suggestion.replace(
+                        sample["value"], entry["value"]
+                    )
+                if entry["expected_value"] and entry["expected_value"] != sample["expected_value"]:
+                    doc_suggestion = doc_suggestion.replace(
+                        sample["expected_value"], entry["expected_value"]
+                    )
+            else:
+                doc_suggestion = f"{entry_friendly}\n\n**Como corrigir:** {entry['message']}"
 
             db.execute(
                 """UPDATE validation_errors
@@ -729,6 +762,146 @@ def _search_legal_basis(
 
     except Exception:
         return None
+
+
+_openai_key_checked = False
+_openai_key_available = False
+
+
+def _has_openai_key() -> bool:
+    """Verifica se OPENAI_API_KEY esta configurada (cached)."""
+    global _openai_key_checked, _openai_key_available
+    if not _openai_key_checked:
+        import os
+        _openai_key_available = bool(os.getenv("OPENAI_API_KEY"))
+        _openai_key_checked = True
+    return _openai_key_available
+
+
+_AI_SYSTEM_PROMPT = """Voce e um auditor fiscal especializado em SPED EFD ICMS/IPI.
+Gere uma explicacao estruturada para um erro de validacao.
+
+FORMATO OBRIGATORIO (use exatamente esses marcadores):
+
+**O que foi encontrado:**
+[Descreva o erro em 1-2 frases claras, citando valores e campos]
+
+**Por que isso importa:**
+[Explique o impacto fiscal em 1-2 frases — credito indevido, omissao, risco de autuacao]
+
+**Como corrigir:**
+[Instrucoes objetivas de correcao, citando campos e registros especificos]
+
+**Base legal:**
+[Cite a legislacao aplicavel — LC 87/96, Guia Pratico EFD, RICMS, etc.]
+
+REGRAS:
+- Portugues brasileiro, linguagem acessivel ao contador
+- Seja direto e especifico — cite campos, valores e registros
+- Use **negrito** para destacar campos, valores e termos importantes
+- Nunca afirme categoricamente — use "possivelmente", "verificar se"
+- Maximo 200 palavras total"""
+
+
+def _generate_ai_doc_suggestion(
+    db: AuditConnection,
+    error_type: str,
+    message: str,
+    register: str,
+    field_name: str,
+    value: str,
+    expected_value: str,
+    regime: str,
+    uf: str,
+    beneficio: str,
+    guidance: str,
+) -> str | None:
+    """Gera doc_suggestion via OpenAI com cache. Retorna None se falhar."""
+    import os
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return None
+
+    # Tentar cache primeiro
+    from .ai_service import get_cached_explanation, PROMPT_VERSION
+    cached = get_cached_explanation(
+        db, error_type, regime, uf,
+        campo_principal=field_name,
+        rule_id=error_type,
+        value=value,
+        expected_value=expected_value,
+    )
+    if cached and cached.get("explicacao"):
+        return cached["explicacao"]
+
+    # Montar prompt com contexto rico
+    parts = [
+        f"Tipo de erro: {error_type}",
+        f"Registro SPED: {register}",
+        f"Campo: {field_name}" if field_name else "",
+        f"Mensagem tecnica: {message}",
+        f"Valor no SPED: {value}" if value else "",
+        f"Valor esperado/XML: {expected_value}" if expected_value else "",
+        f"Regime tributario: {regime}" if regime else "",
+        f"UF do contribuinte: {uf}" if uf else "",
+        f"Beneficio fiscal: {beneficio}" if beneficio else "",
+        f"Orientacao base: {guidance}" if guidance else "",
+    ]
+    user_prompt = "\n".join(p for p in parts if p)
+
+    try:
+        import openai
+        client = openai.OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": _AI_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.2,
+            max_tokens=600,
+        )
+        content = response.choices[0].message.content or ""
+    except Exception as e:
+        logger.warning("Falha ao gerar doc_suggestion via IA: %s", e)
+        return None
+
+    if not content.strip():
+        return None
+
+    # Salvar no cache
+    from .ai_service import _build_cache_key
+    from datetime import datetime
+    chave_hash = _build_cache_key(
+        error_type, error_type, regime, uf,
+        campo_principal=field_name,
+        valor_encontrado=value,
+        valor_esperado=expected_value,
+    )
+    try:
+        db.execute(
+            """INSERT INTO ai_error_cache
+               (chave_hash, rule_id, error_type, regime, uf, beneficio_codigo,
+                ind_oper, campo_principal, explicacao_texto, sugestao_texto,
+                modelo_usado, prompt_version, rule_version, gerado_em, hits)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+               ON CONFLICT (chave_hash) DO UPDATE SET
+                explicacao_texto = EXCLUDED.explicacao_texto,
+                modelo_usado = EXCLUDED.modelo_usado,
+                gerado_em = EXCLUDED.gerado_em,
+                hits = 0""",
+            (
+                chave_hash, error_type, error_type, regime, uf, beneficio,
+                "", field_name, content, "",
+                "gpt-4o-mini", PROMPT_VERSION, 1, datetime.now().isoformat(),
+            ),
+        )
+        db.commit()
+    except Exception:
+        logger.warning("Falha ao salvar cache IA", exc_info=True)
+
+    return content
 
 
 def cleanup_pipeline(file_id: int) -> None:
