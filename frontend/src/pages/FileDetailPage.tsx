@@ -447,37 +447,157 @@ interface ListProps {
   onRevalidate: () => void
 }
 
-function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileId, onReload }: ListProps) {
-  const openItems = items.filter(e => e.status === 'open')
-  const [showCorrected, setShowCorrected] = useState(false)
-  const [filterSeverity, setFilterSeverity] = useState<string>('')
-  const [filterRegister, setFilterRegister] = useState<string>('')
-  const [filterCerteza, setFilterCerteza] = useState<string>('')
-  const [sortBy, setSortBy] = useState<string>('severity')
+// ── Helpers para agrupamento por error_type ──
 
-  // Compute unique values for filters
-  const allRegisters = [...new Set(items.map(e => e.register))].sort()
+/** Labels descritivos para error_types conhecidos */
+const ERROR_TYPE_LABELS: Record<string, string> = {
+  // Cruzamento XML vs SPED
+  XML001: 'NF-e ausente no SPED',
+  XML002: 'NF-e sem XML correspondente',
+  XML003: 'Valor do documento divergente (VL_DOC)',
+  XML004: 'Valor ICMS divergente (VL_ICMS)',
+  XML005: 'Valor ICMS-ST divergente (VL_ICMS_ST)',
+  XML006: 'Valor IPI divergente (VL_IPI)',
+  XML012: 'Quantidade de itens divergente',
+  NF_CANCELADA_ESCRITURADA: 'NF-e cancelada escriturada como ativa',
+  NF_DENEGADA_ESCRITURADA: 'NF-e denegada escriturada como ativa',
+  COD_SIT_DIVERGENTE_XML: 'Situacao do documento divergente (COD_SIT)',
+  // ST
+  ST_APURACAO_INCONSISTENTE: 'Apuracao ST inconsistente com documentos',
+  ST_APURACAO_DIVERGENTE: 'Apuracao ST divergente (E210 vs docs)',
+  ST_CST60_DEBITO_INDEVIDO: 'CST 60 com debito indevido de ST',
+  ST_BC_MENOR_QUE_ITEM: 'Base ST menor que valor do item',
+  ST_MISTURA_DIFAL: 'Mistura ST com DIFAL',
+  ST_MVA_DIVERGENTE: 'Base/valor ST diverge do MVA',
+  ST_MVA_AUSENTE: 'Produto com ST mas BC zerada',
+  ST_MVA_NCM_SEM_ST: 'NCM sujeito a ST sem retencao',
+  ST_ALIQ_INCORRETA: 'Aliquota ST diverge da tabela',
+  // Apuracao
+  APURACAO_DEBITO_DIVERGENTE: 'Debitos divergentes na apuracao (E110)',
+  APURACAO_CREDITO_DIVERGENTE: 'Creditos divergentes na apuracao (E110)',
+  APURACAO_SALDO_DIVERGENTE: 'Saldo divergente na apuracao (E110)',
+  // Beneficios / Ajustes
+  BENEFICIO_VALOR_DESPROPORCIONAL: 'Beneficio fiscal desproporcional',
+  BENEFICIO_SOBREPOSICAO: 'Sobreposicao de beneficios',
+  AJUSTE_CODIGO_GENERICO: 'Ajuste com codigo generico (E111)',
+  AJUSTE_NUMERICO_SEM_VALIDADE_JURIDICA: 'Ajuste sem validade juridica',
+  AJUSTE_SEM_RASTREABILIDADE: 'Ajuste sem rastreabilidade (E112/E113)',
+  AJUSTE_SOMA_DIVERGENTE: 'Soma dos ajustes diverge do E110',
+  AJUSTE_UF_INCOMPATIVEL: 'Codigo de ajuste incompativel com UF',
+  // Simples Nacional
+  SN_PERFIL_INVALIDO: 'Perfil invalido para Simples Nacional',
+  SN_CREDITO_INCONSISTENTE: 'Credito ICMS inconsistente no SN',
+  // Estrutural
+  CAMPO_OBRIGATORIO: 'Campo obrigatorio ausente',
+  VALOR_INVALIDO: 'Valor invalido',
+  REGISTRO_DUPLICADO: 'Registro duplicado',
+  REFERENCIA_INVALIDA: 'Referencia a registro inexistente',
+  // Inventario
+  INVENTARIO_VL_ZERO: 'Item no inventario com valor zero',
+  INVENTARIO_QTD_EXCESSIVA: 'Quantidade excessiva no inventario',
+  INVENTARIO_ITEM_NAO_CADASTRADO: 'Item do inventario sem cadastro (0200)',
+  // Bloco K
+  K_BLOCO_SEM_MOVIMENTO_COM_REGISTROS: 'Bloco K sem movimento com registros',
+  K_REF_ITEM_INEXISTENTE: 'Bloco K referencia item inexistente',
+  K_QTD_NEGATIVA: 'Bloco K com quantidade negativa',
+  K_ORDEM_SEM_COMPONENTES: 'Ordem de producao sem componentes',
+  // C190
+  C190_SOMA_DIVERGENTE: 'Soma C190 diverge do C100',
+  // Encadeamento
+  ENCADEAMENTO_VL_DOC: 'Soma itens diverge do documento',
+  // Checklist / Meta
+  CHECKLIST_INCOMPLETO: 'Checklist de auditoria incompleto',
+  CLASSIFICACAO_TIPO_ERRO: 'Classificacao de tipo de erro',
+  ACHADO_LIMITADO_AO_SPED: 'Achado limitado ao SPED',
+  AMOSTRAGEM_MATERIALIDADE: 'Amostragem por materialidade',
+}
 
-  // Apply filters
-  const baseItems = showCorrected ? items : openItems
-  const filteredItems = baseItems.filter(e => {
-    if (filterSeverity && e.severity !== filterSeverity) return false
-    if (filterRegister && e.register !== filterRegister) return false
-    if (filterCerteza && (e.certeza || '') !== filterCerteza) return false
-    return true
-  })
+/** Gera label amigavel a partir do error_type */
+function friendlyTypeLabel(errorType: string): string {
+  if (ERROR_TYPE_LABELS[errorType]) return ERROR_TYPE_LABELS[errorType]
 
-  // Sort
+  // Fallback: converter snake_case para titulo
+  return errorType
+    .replace(/^(XML|FM|ST|SN|RET|K)_/, '$1 — ')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .replace(/\bXml\b/g, 'XML')
+    .replace(/\bSt\b/g, 'ST')
+    .replace(/\bIcms\b/g, 'ICMS')
+    .replace(/\bIpi\b/g, 'IPI')
+    .replace(/\bBc\b/g, 'BC')
+    .replace(/\bMva\b/g, 'MVA')
+    .replace(/\bCst\b/g, 'CST')
+    .replace(/\bCfop\b/g, 'CFOP')
+    .replace(/\bNfe\b/g, 'NF-e')
+    .replace(/\bSped\b/g, 'SPED')
+}
+
+interface ErrorGroup {
+  errorType: string
+  label: string
+  items: ValidationError[]
+  openCount: number
+  correctableCount: number
+  maxSeverity: string
+}
+
+function buildGroups(items: ValidationError[]): ErrorGroup[] {
+  const map = new Map<string, ValidationError[]>()
+  for (const e of items) {
+    const list = map.get(e.error_type) || []
+    list.push(e)
+    map.set(e.error_type, list)
+  }
+
   const severityOrder: Record<string, number> = { critical: 0, error: 1, warning: 2, info: 3 }
-  const displayItems = [...filteredItems].sort((a, b) => {
-    if (sortBy === 'severity') return (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9)
-    if (sortBy === 'register') return a.register.localeCompare(b.register)
-    if (sortBy === 'type') return a.error_type.localeCompare(b.error_type)
-    if (sortBy === 'line') return a.line_number - b.line_number
-    return 0
+
+  const groups: ErrorGroup[] = []
+  for (const [errorType, groupItems] of map.entries()) {
+    const openCount = groupItems.filter(e => e.status === 'open').length
+    const correctableCount = groupItems.filter(e => e.auto_correctable && e.expected_value && e.status === 'open').length
+    let maxSeverity = 'info'
+    for (const e of groupItems) {
+      if ((severityOrder[e.severity] ?? 9) < (severityOrder[maxSeverity] ?? 9)) {
+        maxSeverity = e.severity
+      }
+    }
+    groups.push({ errorType, label: friendlyTypeLabel(errorType), items: groupItems, openCount, correctableCount, maxSeverity })
+  }
+
+  // Ordenar: mais severo primeiro, depois por quantidade
+  groups.sort((a, b) => {
+    const sa = severityOrder[a.maxSeverity] ?? 9
+    const sb = severityOrder[b.maxSeverity] ?? 9
+    if (sa !== sb) return sa - sb
+    return b.openCount - a.openCount
   })
 
-  const autoCorrectableCount = openItems.filter(e => e.auto_correctable && e.expected_value).length
+  return groups
+}
+
+function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileId, onReload }: ListProps) {
+  const [activeGroup, setActiveGroup] = useState<string | null>(null)
+  const [showCorrected, setShowCorrected] = useState(false)
+
+  // Agrupar por error_type
+  const baseItems = showCorrected ? items : items.filter(e => e.status === 'open')
+  const groups = buildGroups(baseItems)
+
+  // Selecionar primeiro grupo por default
+  const currentGroupKey = activeGroup && groups.some(g => g.errorType === activeGroup) ? activeGroup : (groups[0]?.errorType ?? null)
+  const currentGroup = groups.find(g => g.errorType === currentGroupKey)
+  const groupItems = currentGroup?.items ?? []
+
+  // Ordenar itens do grupo por severidade e linha
+  const severityOrder: Record<string, number> = { critical: 0, error: 1, warning: 2, info: 3 }
+  const displayItems = [...groupItems].sort((a, b) => {
+    const sv = (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9)
+    if (sv !== 0) return sv
+    return a.line_number - b.line_number
+  })
+
+  const totalOpen = items.filter(e => e.status === 'open').length
   const correctedCount = items.filter(e => e.status === 'corrected').length
 
   // RecordDetail / FieldEditor state
@@ -488,7 +608,6 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
 
   const handleOpenRecordDetail = async (error: ValidationError) => {
     if (!error.record_id) return
-    // If clicking the same error that's already expanded, close it
     if (selectedRecord && selectedRecord.id === error.record_id && !editingField) {
       setSelectedRecord(null)
       setSelectedRecordErrors([])
@@ -499,7 +618,6 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
     try {
       const record = await api.getRecord(fileId, error.record_id!)
       setSelectedRecord(record)
-      // Gather all errors for this record
       const recordErrors = items.filter(e => e.record_id === error.record_id)
       setSelectedRecordErrors(recordErrors)
     } catch { /* */ }
@@ -543,21 +661,27 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
     } catch { /* */ }
   }
 
-  const handleDismissAll = async () => {
-    if (!confirm(`Ignorar todos os ${openItems.length} apontamentos abertos?`)) return
+  // Ignorar grupo inteiro
+  const [dismissingGroup, setDismissingGroup] = useState(false)
+  const handleDismissGroup = async () => {
+    if (!currentGroupKey || !currentGroup) return
+    if (!confirm(`Ignorar todos os ${currentGroup.openCount} apontamentos do grupo "${currentGroup.label}"?`)) return
+    setDismissingGroup(true)
     try {
-      await api.dismissAllErrors(fileId)
+      await api.dismissErrorGroup(fileId, currentGroupKey)
       onReload()
     } catch { /* */ }
+    setDismissingGroup(false)
   }
 
-  const [correctingAll, setCorrectingAll] = useState(false)
-
-  const handleCorrectAll = async () => {
-    const correctable = openItems.filter(e => e.auto_correctable && e.expected_value && e.record_id)
+  // Corrigir grupo inteiro
+  const [correctingGroup, setCorrectingGroup] = useState(false)
+  const handleCorrectGroup = async () => {
+    if (!currentGroup) return
+    const correctable = currentGroup.items.filter(e => e.auto_correctable && e.expected_value && e.record_id && e.status === 'open')
     if (correctable.length === 0) return
-    if (!confirm(`Aplicar ${correctable.length} correcoes sugeridas?`)) return
-    setCorrectingAll(true)
+    if (!confirm(`Aplicar ${correctable.length} correcoes do grupo "${currentGroup.label}"?`)) return
+    setCorrectingGroup(true)
     try {
       for (const error of correctable) {
         await api.updateRecord(fileId, error.record_id!, {
@@ -569,157 +693,156 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
       }
       onReload()
     } catch { /* */ }
-    setCorrectingAll(false)
+    setCorrectingGroup(false)
   }
 
   const isError = variant === 'error'
 
+  const sevColor = (sev: string) =>
+    sev === 'critical' ? 'bg-red-500' :
+    sev === 'error' ? 'bg-orange-500' :
+    sev === 'warning' ? 'bg-yellow-400' : 'bg-blue-400'
+
   return (
     <div>
-      {/* Banner */}
-      {openItems.length > 0 && (
+      {/* Banner resumo */}
+      {totalOpen > 0 && (
         <div className={`rounded p-4 mb-4 ${isError ? 'bg-red-50 border border-red-200' : 'bg-yellow-50 border border-yellow-200'}`}>
           <span className={`font-semibold ${isError ? 'text-red-800' : 'text-yellow-800'}`}>
-            {openItems.length} {isError ? 'erro' : 'alerta'}{openItems.length !== 1 ? 's' : ''}
-            {isError ? ' precisam de correcao' : ' para revisao'}
+            {totalOpen} {isError ? 'erro' : 'alerta'}{totalOpen !== 1 ? 's' : ''} em {groups.length} grupo{groups.length !== 1 ? 's' : ''}
           </span>
+          {correctedCount > 0 && (
+            <label className="flex items-center gap-2 text-sm text-gray-500 mt-2">
+              <input type="checkbox" checked={showCorrected} onChange={e => setShowCorrected(e.target.checked)} />
+              Incluir corrigidos ({correctedCount})
+            </label>
+          )}
         </div>
       )}
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        {isError && autoCorrectableCount > 0 && (
-          <button
-            onClick={handleCorrectAll}
-            disabled={correctingAll}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm font-semibold disabled:opacity-50"
-          >
-            {correctingAll ? 'Corrigindo...' : `Corrigir Todos (${autoCorrectableCount})`}
-          </button>
-        )}
-        {openItems.length > 0 && (
-          <button
-            onClick={handleDismissAll}
-            className="text-sm text-gray-500 px-3 py-1 rounded border border-gray-300 hover:bg-gray-100"
-          >
-            Ignorar Todos ({openItems.length})
-          </button>
-        )}
-        {correctedCount > 0 && (
-          <label className="flex items-center gap-2 text-sm text-gray-500 ml-auto">
-            <input type="checkbox" checked={showCorrected} onChange={e => setShowCorrected(e.target.checked)} />
-            Mostrar corrigidos ({correctedCount})
-          </label>
-        )}
-      </div>
-
-      {/* Filters */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginBottom: '16px', padding: '12px', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <label style={{ fontSize: '13px', color: '#6b7280', fontWeight: 500 }}>Severidade:</label>
-          <select
-            value={filterSeverity}
-            onChange={e => setFilterSeverity(e.target.value)}
-            style={{ fontSize: '13px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
-          >
-            <option value="">Todos</option>
-            <option value="critical">Critico</option>
-            <option value="error">Erro</option>
-            <option value="warning">Aviso</option>
-            <option value="info">Info</option>
-          </select>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <label style={{ fontSize: '13px', color: '#6b7280', fontWeight: 500 }}>Registro:</label>
-          <select
-            value={filterRegister}
-            onChange={e => setFilterRegister(e.target.value)}
-            style={{ fontSize: '13px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
-          >
-            <option value="">Todos</option>
-            {allRegisters.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <label style={{ fontSize: '13px', color: '#6b7280', fontWeight: 500 }}>Certeza:</label>
-          <select
-            value={filterCerteza}
-            onChange={e => setFilterCerteza(e.target.value)}
-            style={{ fontSize: '13px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
-          >
-            <option value="">Todos</option>
-            <option value="erro_objetivo">Erro Objetivo</option>
-            <option value="inconsistencia">Inconsistencia</option>
-            <option value="indicio">Indicio</option>
-          </select>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <label style={{ fontSize: '13px', color: '#6b7280', fontWeight: 500 }}>Ordenar:</label>
-          <select
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value)}
-            style={{ fontSize: '13px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
-          >
-            <option value="severity">Severidade</option>
-            <option value="register">Registro</option>
-            <option value="type">Tipo</option>
-            <option value="line">Linha</option>
-          </select>
-        </div>
-        <span style={{ fontSize: '13px', color: '#6b7280', marginLeft: 'auto' }}>
-          {displayItems.length} de {baseItems.length} apontamentos
-        </span>
-      </div>
-
-      {/* Cards */}
-      <div className="space-y-2">
-        {displayItems.map((e) => (
-          <div key={e.id}>
-            <ErrorCard
-              error={e}
-              variant={variant}
-              expanded={expandedError === e.id}
-              onToggle={() => onToggleExpand(expandedError === e.id ? null : e.id)}
-              onCorrect={() => handleCorrect(e)}
-              onDismiss={() => handleDismiss(e.id)}
-              onOpenRecord={() => handleOpenRecordDetail(e)}
-              loadingRecord={loadingRecord === e.record_id}
-            />
-            {/* RecordDetail inline below the card */}
-            {selectedRecord && selectedRecord.id === e.record_id && !editingField && (
-              <RecordDetail
-                record={selectedRecord}
-                errors={selectedRecordErrors}
-                onClose={() => { setSelectedRecord(null); setSelectedRecordErrors([]) }}
-                onFieldClick={handleFieldClick}
-              />
-            )}
-            {/* FieldEditor + SuggestionPanel inline below the card */}
-            {editingField && selectedRecord && selectedRecord.id === e.record_id && (
-              <div className="flex flex-col md:flex-row gap-4 items-start">
-                <div className="flex-1 min-w-0 w-full">
-                  <FieldEditor
-                    record={selectedRecord}
-                    fieldName={editingField.fieldName}
-                    error={editingField.error}
-                    onSave={handleFieldSave}
-                    onCancel={() => setEditingField(null)}
-                  />
-                </div>
-                <SuggestionPanel
-                  error={editingField.error}
-                  onSearch={(query) => api.searchDocs(query, editingField.error.field_name || undefined, editingField.error.register)}
-                />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {displayItems.length === 0 && (
+      {groups.length === 0 && (
         <p className="text-gray-500 text-center py-8">
           {isError ? 'Nenhum erro encontrado.' : 'Nenhum alerta encontrado.'}
         </p>
+      )}
+
+      {groups.length > 0 && (
+        <div className="flex gap-0">
+          {/* Sidebar com abas de grupos */}
+          <div className="w-72 flex-shrink-0 border-r border-gray-200 pr-0 space-y-0.5 max-h-[75vh] overflow-y-auto">
+            {groups.map(g => {
+              const isActive = g.errorType === currentGroupKey
+              return (
+                <button
+                  key={g.errorType}
+                  onClick={() => { setActiveGroup(g.errorType); setSelectedRecord(null); setEditingField(null) }}
+                  className={`w-full text-left px-3 py-2.5 rounded-l-lg transition-colors text-sm ${
+                    isActive
+                      ? 'bg-white border border-r-0 border-gray-200 shadow-sm font-medium'
+                      : 'hover:bg-gray-50 text-gray-600'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${sevColor(g.maxSeverity)}`} />
+                    <span className="truncate flex-1" title={g.label}>{g.label}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                      g.openCount === 0 ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-600'
+                    }`}>
+                      {g.openCount}
+                    </span>
+                  </div>
+                  {g.correctableCount > 0 && (
+                    <div className="text-xs text-green-600 mt-0.5 ml-4">
+                      {g.correctableCount} corrigive{g.correctableCount !== 1 ? 'is' : 'l'}
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Conteudo do grupo selecionado */}
+          <div className="flex-1 min-w-0 pl-4">
+            {currentGroup && (
+              <>
+                {/* Header do grupo com acoes */}
+                <div className="flex flex-wrap items-center gap-3 mb-4 pb-3 border-b border-gray-200">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-800">{currentGroup.label}</h3>
+                    <p className="text-xs text-gray-500 mt-0.5 font-mono">{currentGroup.errorType}</p>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    {currentGroup.correctableCount > 0 && (
+                      <button
+                        onClick={handleCorrectGroup}
+                        disabled={correctingGroup}
+                        className="bg-green-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {correctingGroup ? 'Corrigindo...' : `Corrigir Grupo (${currentGroup.correctableCount})`}
+                      </button>
+                    )}
+                    {currentGroup.openCount > 0 && (
+                      <button
+                        onClick={handleDismissGroup}
+                        disabled={dismissingGroup}
+                        className="text-sm text-gray-500 px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-100 disabled:opacity-50"
+                      >
+                        {dismissingGroup ? 'Ignorando...' : `Ignorar Grupo (${currentGroup.openCount})`}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Cards do grupo */}
+                <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
+                  {displayItems.map((e) => (
+                    <div key={e.id}>
+                      <ErrorCard
+                        error={e}
+                        variant={variant}
+                        expanded={expandedError === e.id}
+                        onToggle={() => onToggleExpand(expandedError === e.id ? null : e.id)}
+                        onCorrect={() => handleCorrect(e)}
+                        onDismiss={() => handleDismiss(e.id)}
+                        onOpenRecord={() => handleOpenRecordDetail(e)}
+                        loadingRecord={loadingRecord === e.record_id}
+                      />
+                      {selectedRecord && selectedRecord.id === e.record_id && !editingField && (
+                        <RecordDetail
+                          record={selectedRecord}
+                          errors={selectedRecordErrors}
+                          onClose={() => { setSelectedRecord(null); setSelectedRecordErrors([]) }}
+                          onFieldClick={handleFieldClick}
+                        />
+                      )}
+                      {editingField && selectedRecord && selectedRecord.id === e.record_id && (
+                        <div className="flex flex-col md:flex-row gap-4 items-start">
+                          <div className="flex-1 min-w-0 w-full">
+                            <FieldEditor
+                              record={selectedRecord}
+                              fieldName={editingField.fieldName}
+                              error={editingField.error}
+                              onSave={handleFieldSave}
+                              onCancel={() => setEditingField(null)}
+                            />
+                          </div>
+                          <SuggestionPanel
+                            error={editingField.error}
+                            onSearch={(query) => api.searchDocs(query, editingField.error.field_name || undefined, editingField.error.register)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {displayItems.length === 0 && (
+                  <p className="text-gray-400 text-center py-6 text-sm">Todos os apontamentos deste grupo foram tratados.</p>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
@@ -808,7 +931,7 @@ function ErrorCard({
             {error.certeza === 'indicio' && <span className="px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700">Indicio</span>}
             {isCorrected && <span className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">Corrigido</span>}
           </div>
-          <p className="text-sm text-gray-800">{renderBold(displayMessage)}</p>
+          <p className="text-sm text-gray-800 whitespace-pre-line">{renderBold(displayMessage)}</p>
           {legalBasis && (
             <p className="text-xs text-gray-400 mt-0.5">
               <span className="font-medium text-gray-500">Base legal:</span> {legalBasis.fonte}
@@ -893,7 +1016,7 @@ function ErrorCard({
                 )}
               </div>
             ) : error.friendly_message ? (
-              <p className="text-sm text-gray-800">{renderBold(error.friendly_message)}</p>
+              <p className="text-sm text-gray-800 whitespace-pre-line">{renderBold(error.friendly_message)}</p>
             ) : null}
 
             {/* Dados do erro */}

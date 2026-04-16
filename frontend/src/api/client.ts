@@ -81,6 +81,9 @@ export const api = {
   dismissAllErrors: (fileId: number) =>
     request<{ dismissed: number; total_errors: number }>(`/files/${fileId}/errors`, { method: 'DELETE' }),
 
+  dismissErrorGroup: (fileId: number, errorType: string) =>
+    request<{ dismissed: number; error_type: string; total_errors: number }>(`/files/${fileId}/errors/group/${encodeURIComponent(errorType)}`, { method: 'DELETE' }),
+
   // Records
   getRecords: async (fileId: number, params?: Record<string, string>): Promise<RecordInfo[]> => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : ''

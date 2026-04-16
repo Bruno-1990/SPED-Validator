@@ -51,11 +51,17 @@ def _e200(uf: str = "SP") -> SpedRecord:
 
 
 def _e210(vl_st: str = "234.00") -> SpedRecord:
-    """Registro E210 — apuracao ST com valor."""
-    # Campos simplificados: 0:REG 1:IND_MOV 2:VL_SLD_CRED_ANT ...
+    """Registro E210 — apuracao ST com valor.
+
+    Layout: REG, IND_MOV_ST, VL_SLD_CRED_ANT_ST, VL_DEVOL_ST,
+            VL_RESSARC_ST, VL_OUT_CRED_ST, VL_AJ_CREDITOS_ST,
+            VL_RETENCAO_ST, VL_OUT_DEB_ST, VL_AJ_DEBITOS_ST,
+            VL_SLD_DEV_ANT_ST, VL_DEDUCOES_ST, VL_ICMS_RECOL_ST,
+            VL_SLD_CRED_ST_TRANSPORTAR, DEB_ESP_ST
+    """
     return rec("E210", [
-        "E210", "0", vl_st, "0", "0", "0", vl_st, "0", "0",
-        "0", "0", vl_st, "0", "0",
+        "E210", "0", "0", "0", "0", "0", "0", vl_st, "0", "0",
+        vl_st, "0", vl_st, "0", "0",
     ], line=101)
 
 

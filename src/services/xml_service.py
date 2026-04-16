@@ -317,11 +317,17 @@ def parse_nfe_xml(xml_bytes: bytes) -> dict | None:
             _raw_vbcst = _text(icms_group, "nfe:vBCST", _NS) or _text(icms_group, "vBCST")
             _raw_vicmsst = _text(icms_group, "nfe:vICMSST", _NS) or _text(icms_group, "vICMSST")
 
+            # cBenef e vICMSDeson — mapeamento XML→SPED (E115/C197/E111)
+            _raw_cbenef = _text(icms_group, "nfe:cBenef", _NS) or _text(icms_group, "cBenef")
+            _raw_vl_icms_deson = _text(icms_group, "nfe:vICMSDeson", _NS) or _text(icms_group, "vICMSDeson")
+
             item["vbc_icms"] = _to_float(_raw_vbc_icms)
             item["aliq_icms"] = _to_float(_raw_aliq_icms)
             item["vl_icms"] = _to_float(_raw_vl_icms)
             item["vbc_icms_st"] = _to_float(_raw_vbcst or "0")
             item["vl_icms_st"] = _to_float(_raw_vicmsst or "0")
+            item["cbenef"] = (_raw_cbenef or "").strip()
+            item["vl_icms_deson"] = _to_float(_raw_vl_icms_deson or "0")
 
             item["_tracked"]["vbc_icms"] = {
                 "raw_value": _raw_vbc_icms if _raw_vbc_icms else None,
@@ -338,14 +344,27 @@ def parse_nfe_xml(xml_bytes: bytes) -> dict | None:
                 "source_xpath": ".//infNFe/det/imposto/ICMS/*/vICMS",
                 "status": _track_status(_raw_vl_icms if _raw_vl_icms else None),
             }
+            item["_tracked"]["cbenef"] = {
+                "raw_value": _raw_cbenef if _raw_cbenef else None,
+                "source_xpath": ".//infNFe/det/imposto/ICMS/*/cBenef",
+                "status": _track_status(_raw_cbenef if _raw_cbenef else None),
+            }
+            item["_tracked"]["vl_icms_deson"] = {
+                "raw_value": _raw_vl_icms_deson if _raw_vl_icms_deson else None,
+                "source_xpath": ".//infNFe/det/imposto/ICMS/*/vICMSDeson",
+                "status": _track_status(_raw_vl_icms_deson if _raw_vl_icms_deson else None),
+            }
         else:
             item.update({
                 "cst_icms": "", "vbc_icms": 0.0, "aliq_icms": 0.0, "vl_icms": 0.0,
                 "vbc_icms_st": 0.0, "vl_icms_st": 0.0,
+                "cbenef": "", "vl_icms_deson": 0.0,
             })
             item["_tracked"]["vbc_icms"] = {"raw_value": None, "source_xpath": ".//infNFe/det/imposto/ICMS/*/vBC", "status": "missing"}
             item["_tracked"]["aliq_icms"] = {"raw_value": None, "source_xpath": ".//infNFe/det/imposto/ICMS/*/pICMS", "status": "missing"}
             item["_tracked"]["vl_icms"] = {"raw_value": None, "source_xpath": ".//infNFe/det/imposto/ICMS/*/vICMS", "status": "missing"}
+            item["_tracked"]["cbenef"] = {"raw_value": None, "source_xpath": ".//infNFe/det/imposto/ICMS/*/cBenef", "status": "missing"}
+            item["_tracked"]["vl_icms_deson"] = {"raw_value": None, "source_xpath": ".//infNFe/det/imposto/ICMS/*/vICMSDeson", "status": "missing"}
 
         # IPI
         _raw_vl_ipi = None
@@ -541,8 +560,9 @@ def upload_nfe_xmls(
                 """INSERT INTO nfe_itens
                    (nfe_id, num_item, cod_produto, ncm, cfop, vl_prod, vl_desc,
                     cst_icms, vbc_icms, aliq_icms, vl_icms, cst_ipi, vl_ipi,
-                    cst_pis, vl_pis, cst_cofins, vl_cofins)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    cst_pis, vl_pis, cst_cofins, vl_cofins,
+                    cbenef, vl_icms_deson)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     nfe_id, item["num_item"], item["cod_produto"], item["ncm"],
                     item["cfop"], item["vl_prod"], item["vl_desc"],
@@ -550,6 +570,7 @@ def upload_nfe_xmls(
                     item["vl_icms"], item.get("cst_ipi", ""), item.get("vl_ipi", 0),
                     item.get("cst_pis", ""), item.get("vl_pis", 0),
                     item.get("cst_cofins", ""), item.get("vl_cofins", 0),
+                    item.get("cbenef", ""), item.get("vl_icms_deson", 0),
                 ),
             )
 
@@ -780,7 +801,7 @@ def cruzar_xml_vs_sped(
             nf_label = f"NF {num}" if num else f"Chave {chave[:20]}..."
             findings.append(_finding(file_id, xml[0], chave, "XML001", "critical",
                                      "chave_nfe", chave, "C100.CHV_NFE", "(ausente)",
-                                     None, f"{nf_label}: NF-e presente no XML mas ausente na escrituracao SPED."))
+                                     None, f"NF-e presente no XML mas ausente na escrituracao SPED.\nChave: {chave}"))
             continue
 
         # XML002: NF-e no SPED mas ausente nos XMLs
@@ -1122,9 +1143,11 @@ def _build_friendly_xml(
     label = _CAMPO_LABEL.get(campo_sped or "", campo_sped or f["campo_sped"])
 
     if rule_id == "XML001":
+        chave = f.get("chave_nfe", "")
         return (
             f"NF-e {nf} presente no XML mas **ausente na escrituracao SPED**. "
-            f"A nota fiscal foi emitida/recebida mas nao consta no arquivo."
+            f"A nota fiscal foi emitida/recebida mas nao consta no arquivo.\n"
+            f"Chave NF-e: **{chave}**"
         )
     if rule_id == "XML002":
         return (

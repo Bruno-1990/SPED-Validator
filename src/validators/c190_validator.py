@@ -134,15 +134,19 @@ def _check_c190_001(
         vl_seg = to_float(get_field(c100, F_C100_VL_SEG))
         vl_out_da = to_float(get_field(c100, F_C100_VL_OUT_DA))
         vl_ipi = to_float(get_field(c100, F_C100_VL_IPI))
-        vl_icms_st = to_float(get_field(c100, F_C100_VL_ICMS_ST))
-        despesas_explicitas = vl_frt + vl_seg + vl_out_da + vl_ipi + vl_icms_st
+        vl_icms_st_c100 = to_float(get_field(c100, F_C100_VL_ICMS_ST))
+        despesas_explicitas = vl_frt + vl_seg + vl_out_da + vl_ipi + vl_icms_st_c100
 
-        # Residual: parcelas que compõem VL_DOC mas nao estao discriminadas
-        # (ex: ICMS-ST embutido no preco em CST 060, diferenças de arredondamento)
+        # VL_DOC e VL_MERC para calcular residual
         vl_doc = to_float(get_field(c100, F_C100_VL_DOC))
         vl_merc = to_float(get_field(c100, F_C100_VL_MERC))
+
+        # Residual: parcelas que compõem VL_DOC mas nao estao discriminadas
+        # nos campos individuais do C100 (ex: ICMS-ST embutido quando
+        # C100.VL_ICMS_ST=0, diferencas de arredondamento).
+        # Isso ocorre frequentemente em entradas com ST (CFOP 2403) onde
+        # o ICMS-ST esta no preco mas o C100 nao detalha no campo VL_ICMS_ST.
         residual_doc = max(0.0, vl_doc - vl_merc - despesas_explicitas) if vl_doc > 0 else 0.0
-        despesas_comuns = despesas_explicitas + residual_doc
 
         # Base total liquida do documento para rateio
         base_rateio_doc = 0.0
@@ -170,6 +174,14 @@ def _check_c190_001(
 
         qtd_combinacoes = len(c170_vl_liq)
 
+        # ── Estrategia de validacao VL_OPR ──
+        # Em vez de reconstruir VL_OPR combinacao a combinacao (rateio
+        # proporcional e estimativa imprecisa), validamos o TOTAL:
+        # soma de todos os C190.VL_OPR deve ser igual a VL_DOC do C100.
+        # Isso e garantido pelo leiaute SPED e nao depende de rateio.
+        soma_vl_opr_c190 = sum(to_float(get_field(c, F_C190_VL_OPR)) for c in c190_recs)
+        total_ok = vl_doc > 0 and abs(soma_vl_opr_c190 - vl_doc) <= 0.02
+
         # Validar cada C190
         for c190 in c190_recs:
             cst_c190 = get_field(c190, F_C190_CST)
@@ -187,15 +199,14 @@ def _check_c190_001(
                 # Combinacao no C190 sem itens C170 correspondentes
                 continue
 
-            # Calcular rateio de despesas comuns
-            if despesas_comuns > 0 and base_rateio_doc > 0:
+            # Calcular despesas distribuiveis (frete+seguro+outras+IPI)
+            despesas_rateavel = vl_frt + vl_seg + vl_out_da + vl_ipi
+            if despesas_rateavel > 0 and base_rateio_doc > 0:
                 if qtd_combinacoes == 1:
-                    # Unica combinacao: 100% das despesas
-                    despesa_rateada = despesas_comuns
+                    despesa_rateada = despesas_rateavel
                 else:
-                    # Multiplas combinacoes: rateio proporcional
                     peso = soma_itens / base_rateio_doc
-                    despesa_rateada = round(despesas_comuns * peso, 2)
+                    despesa_rateada = round(despesas_rateavel * peso, 2)
             else:
                 despesa_rateada = 0.0
 
@@ -207,12 +218,21 @@ def _check_c190_001(
                                     round(to_float(get_field(it, F_C170_ALIQ_ICMS)), 2)) == key)
             tol_consol = get_tolerance("consolidacao", n_items=n_itens_combo)
 
-            # Quando há residual (despesas não explícitas no C100), o rateio
-            # proporcional é estimativa — o emitente pode ter distribuído de
-            # forma diferente. Aumentar tolerância em função da despesa rateada.
-            if residual_doc > 0 and despesa_rateada > 0:
-                # Tolerância adicional: 5% da despesa rateada para esta combinação
-                tol_consol = max(tol_consol, despesa_rateada * 0.05)
+            # Quando ha residual nao explicado (VL_DOC > VL_MERC + despesas),
+            # o emitente pode ter distribuido ICMS-ST, IPI embutido ou outros
+            # componentes de forma NAO proporcional nos C190.
+            # Se o total de C190 bate com VL_DOC, a distribuicao interna
+            # e prerrogativa do contribuinte — nao apontar como erro.
+            if residual_doc > 0 and total_ok:
+                # Aceitar diferenca ate o valor do residual por combinacao,
+                # ja que a distribuicao interna do ST/IPI nao e padronizada.
+                # Margem +0.01 para absorver imprecisao de ponto flutuante.
+                tol_consol = max(tol_consol, residual_doc + 0.01)
+
+            # ICMS-ST do C100: quando explicitado, tambem incorpora ao VL_OPR.
+            # O rateio de ST nao e proporcional — vai para CFOPs especificos.
+            if vl_icms_st_c100 > 0 and total_ok:
+                tol_consol = max(tol_consol, vl_icms_st_c100)
 
             diff_opr = abs(vl_opr_c190 - vl_opr_esperado)
             if diff_opr > tol_consol:

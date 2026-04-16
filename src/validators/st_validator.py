@@ -279,14 +279,10 @@ def validate_st_mva(
 
 
 def _sum_e210(e210_records: list[SpedRecord]) -> float:
-    """Soma VL_ST dos registros E210."""
+    """Soma VL_RETENCAO_ST de todos os registros E210."""
     total = 0.0
     for rec in e210_records:
-        # E210: campo 1 = UF, campo 12 = VL_ICMS_RECOL_ST (posicao varia)
-        # Simplificacao: verificar se ha qualquer valor > 0 nos campos numericos
-        values = list(rec.fields.values())
-        for val in values[2:15]:
-            v = to_float(val.strip() if val else "")
-            if v > 0:
-                return v
+        vl = to_float(get_field(rec, "VL_RETENCAO_ST"))
+        if vl > 0:
+            total += vl
     return total

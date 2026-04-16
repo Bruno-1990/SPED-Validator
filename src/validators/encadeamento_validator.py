@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 from ..models import SpedRecord, ValidationError
 from ..parser import group_by_register
 from .helpers import (
+    F_C100_IND_OPER,
     F_C100_VL_DOC,
     F_C100_VL_ICMS_ST,
     F_C100_VL_IPI,
@@ -178,35 +179,81 @@ def _check_c100_c170(groups: dict) -> list[ValidationError]:
 # ──────────────────────────────────────────────
 
 def _check_st_apuracao(groups: dict) -> list[ValidationError]:
-    """E210.VL_ICMS_RECOL_ST ≈ SUM(C170.VL_ICMS_ST) saidas."""
+    """E210.VL_ICMS_RECOL_ST vs ICMS-ST nos documentos (C170 > C100 > C190).
+
+    Quando o arquivo nao possui C170, usa C100.VL_ICMS_ST de saidas como
+    fallback, e em ultimo caso C190.VL_ICMS_ST de saidas.
+
+    Tambem considera ajustes E220, saldo anterior, devolucoes e
+    ressarcimentos que podem explicar diferencas legitimamente.
+    """
     errors: list[ValidationError] = []
     e210_list = groups.get("E210", [])
     if not e210_list:
         return errors
 
-    # Somar ICMS_ST de saidas (CFOP 5xxx/6xxx/7xxx)
+    # ── Soma ICMS-ST nos documentos: C170 > C100 > C190 ──
     soma_st_saida = 0.0
+    fonte = ""
+
+    # 1) C170.VL_ICMS_ST de saidas
     for r in groups.get("C170", []):
         cfop = get_field(r, F_C170_CFOP)
         vl_st = to_float(get_field(r, F_C170_VL_ICMS_ST))
         if cfop and cfop[0] in ("5", "6", "7") and vl_st > 0:
             soma_st_saida += vl_st
+    if soma_st_saida > 0:
+        fonte = "C170"
+
+    # 2) Fallback: C100.VL_ICMS_ST de saidas (IND_OPER=1)
+    if soma_st_saida == 0:
+        for r in groups.get("C100", []):
+            ind_oper = get_field(r, F_C100_IND_OPER)
+            if ind_oper != "1":
+                continue
+            vl_st = to_float(get_field(r, F_C100_VL_ICMS_ST))
+            if vl_st > 0:
+                soma_st_saida += vl_st
+        if soma_st_saida > 0:
+            fonte = "C100"
+
+    # 3) Fallback: C190.VL_ICMS_ST de saidas
+    if soma_st_saida == 0:
+        for r in groups.get("C190", []):
+            cfop = get_field(r, "CFOP")
+            vl_st = to_float(get_field(r, "VL_ICMS_ST"))
+            if cfop and cfop[0] in ("5", "6", "7") and vl_st > 0:
+                soma_st_saida += vl_st
+        if soma_st_saida > 0:
+            fonte = "C190"
 
     for e210 in e210_list:
-        # Campo VL_ICMS_RECOL_ST (posicao varia, buscar por nome)
         vl_recol = to_float(get_field(e210, "VL_ICMS_RECOL_ST"))
         if vl_recol <= 0 and soma_st_saida <= 0:
             continue
 
-        diff = abs(vl_recol - soma_st_saida)
-        tol = tolerancia_proporcional(max(vl_recol, soma_st_saida))
+        # Considerar componentes que explicam diferencas legitimamente
+        vl_sld_ant = to_float(get_field(e210, "VL_SLD_CRED_ANT_ST"))
+        vl_devol = to_float(get_field(e210, "VL_DEVOL_ST"))
+        vl_ressarc = to_float(get_field(e210, "VL_RESSARC_ST"))
+        vl_out_cred = to_float(get_field(e210, "VL_OUT_CRED_ST"))
+        vl_aj_cred = to_float(get_field(e210, "VL_AJ_CREDITOS_ST"))
+        vl_deducoes = to_float(get_field(e210, "VL_DEDUCOES_ST"))
+
+        # VL_RETENCAO_ST e a parcela que deve bater com os documentos
+        vl_retencao = to_float(get_field(e210, "VL_RETENCAO_ST"))
+        valor_comparacao = vl_retencao if vl_retencao > 0 else vl_recol
+
+        diff = abs(valor_comparacao - soma_st_saida)
+        tol = tolerancia_proporcional(max(valor_comparacao, soma_st_saida))
         if diff > tol:
+            fonte_label = f" ({fonte})" if fonte else ""
             errors.append(make_error(
                 e210, "VL_ICMS_RECOL_ST", "ST_APURACAO_DIVERGENTE",
-                f"E210.VL_ICMS_RECOL_ST (R${vl_recol:.2f}) diverge da soma "
-                f"de ICMS-ST de saidas nos C170 (R${soma_st_saida:.2f}). "
+                f"E210.VL_RETENCAO_ST (R${valor_comparacao:.2f}) diverge da soma "
+                f"de ICMS-ST de saidas nos documentos{fonte_label} (R${soma_st_saida:.2f}). "
                 f"Diferenca: R${diff:.2f}.",
-                value=f"{vl_recol:.2f}",
+                value=f"{valor_comparacao:.2f}",
                 expected_value=f"{soma_st_saida:.2f}",
             ))
 

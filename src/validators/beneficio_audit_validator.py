@@ -24,6 +24,8 @@ from .helpers import (
     F_0150_UF,
     F_0200_COD_ITEM,
     F_C100_COD_PART,
+    F_C100_IND_OPER,
+    F_C100_VL_ICMS_ST,
     F_C170_ALIQ_ICMS,
     F_C170_CFOP,
     F_C170_COD_ITEM,
@@ -698,36 +700,158 @@ def _check_beneficio_desproporcional(ctx: _BeneficioContext) -> list[ValidationE
 # ──────────────────────────────────────────────
 
 def _check_st_apuracao(ctx: _BeneficioContext) -> list[ValidationError]:
-    """C170 com CST ST vs E210 apuracao ST."""
+    """Verifica consistencia entre ICMS-ST nos documentos e apuracao E210.
+
+    Hierarquia de fontes para soma de ICMS-ST nos documentos:
+      1) C170.VL_ICMS_ST (itens) — mais granular, preferido
+      2) C100.VL_ICMS_ST (totalizador do documento) — fallback quando C170 ausente
+      3) C190.VL_ICMS_ST (resumo CST/CFOP) — fallback final
+
+    O E210 pode conter valores que nao vem apenas dos documentos:
+      - VL_SLD_CRED_ANT_ST (saldo credor anterior)
+      - VL_DEVOL_ST (devolucoes)
+      - VL_RESSARC_ST (ressarcimentos)
+      - VL_OUT_CRED_ST / VL_AJ_CREDITOS_ST (ajustes via E220)
+      - VL_OUT_DEB_ST / VL_AJ_DEBITOS_ST (ajustes via E220)
+      - VL_DEDUCOES_ST / DEB_ESP_ST
+
+    Por isso, comparamos com VL_RETENCAO_ST (debito de ST gerado pelas
+    retencoes nos documentos), que e a parcela que deve bater com os docs.
+    """
     if not ctx.e210_presente:
         return []
 
-    # Soma VL_ICMS de C170 com CST indicando ST
-    vl_icms_st_c170 = 0.0
-    count_st = 0
+    # ── Coletar todos os E210 por UF (via E200 pai) ──
+    e210_por_uf: list[tuple[SpedRecord, str, float]] = []
+    e200_uf_map: dict[int, str] = {}
+    for r in ctx.groups.get("E200", []):
+        uf = get_field(r, "UF")
+        e200_uf_map[r.line_number] = uf
+
+    for r in ctx.groups.get("E210", []):
+        # Encontrar E200 pai (linha imediatamente anterior)
+        uf = ""
+        for e200_line in sorted(e200_uf_map.keys(), reverse=True):
+            if e200_line < r.line_number:
+                uf = e200_uf_map[e200_line]
+                break
+        vl_retencao = to_float(get_field(r, "VL_RETENCAO_ST"))
+        if vl_retencao > 0:
+            e210_por_uf.append((r, uf, vl_retencao))
+
+    if not e210_por_uf:
+        return []
+
+    # ── Soma ICMS-ST nos documentos (C170 > C100 > C190) ──
+    vl_st_docs = 0.0
+    fonte = ""
+    count_docs = 0
+
+    # Tentar C170 primeiro
     for r in ctx.groups.get("C170", []):
-        cst = get_field(r, F_C170_CST_ICMS)
-        if trib(cst) in CST_ST:
-            vl_icms_st_c170 += to_float(get_field(r, F_C170_VL_ICMS))
-            count_st += 1
+        vl = to_float(get_field(r, "VL_ICMS_ST"))
+        if vl > 0:
+            vl_st_docs += vl
+            count_docs += 1
+    if count_docs > 0:
+        fonte = "C170"
 
-    if count_st == 0:
+    # Fallback: C100.VL_ICMS_ST (saidas)
+    if count_docs == 0:
+        for r in ctx.groups.get("C100", []):
+            ind_oper = get_field(r, F_C100_IND_OPER)
+            if ind_oper != "1":
+                continue
+            vl = to_float(get_field(r, F_C100_VL_ICMS_ST))
+            if vl > 0:
+                vl_st_docs += vl
+                count_docs += 1
+        if count_docs > 0:
+            fonte = "C100"
+
+    # Fallback: C190.VL_ICMS_ST (saidas CFOP 5xxx/6xxx/7xxx)
+    if count_docs == 0:
+        for r in ctx.groups.get("C190", []):
+            cfop = get_field(r, F_C190_CFOP)
+            if cfop and cfop[0] in ("5", "6", "7"):
+                vl = to_float(get_field(r, "VL_ICMS_ST"))
+                if vl > 0:
+                    vl_st_docs += vl
+                    count_docs += 1
+        if count_docs > 0:
+            fonte = "C190"
+
+    # ── Considerar ajustes E220 ──
+    vl_ajustes_cred_st = 0.0
+    vl_ajustes_deb_st = 0.0
+    for r in ctx.groups.get("E220", []):
+        vl_aj = to_float(get_field(r, "VL_AJ_APUR"))
+        cod_aj = get_field(r, "COD_AJ_APUR")
+        # Codigos de ajuste: 3o digito indica debito (0) ou credito (1)
+        if cod_aj and len(cod_aj) >= 3:
+            if cod_aj[2] == "1":
+                vl_ajustes_cred_st += vl_aj
+            else:
+                vl_ajustes_deb_st += vl_aj
+
+    # ── Comparar: soma total E210 vs docs ──
+    vl_total_e210 = sum(vl for _, _, vl in e210_por_uf)
+
+    # Se docs e E210 batem, tudo OK
+    tol = get_tolerance("apuracao_e110")
+    if abs(vl_st_docs - vl_total_e210) <= tol:
         return []
 
-    if abs(vl_icms_st_c170 - ctx.e210_vl_sld_st) <= get_tolerance("apuracao_e110"):
+    # Se nao ha documentos com ST mas E210 tem retencao,
+    # verificar se ajustes E220 explicam a diferenca
+    if count_docs == 0 and (vl_ajustes_deb_st > 0 or vl_ajustes_cred_st > 0):
+        # Ajustes podem explicar o valor — nao eh inconsistencia dos docs
         return []
 
-    return [make_generic_error(
-        "ST_APURACAO_INCONSISTENTE",
-        (
-            f"ICMS-ST nos documentos (C170, {count_st} itens) soma "
-            f"R$ {vl_icms_st_c170:,.2f}, mas a apuracao ST (E210) indica "
-            f"saldo de R$ {ctx.e210_vl_sld_st:,.2f}. Verifique a consistencia "
-            f"entre os documentos e a apuracao da substituicao tributaria."
-        ),
-        register="E210",
-        value=f"C170_ST={vl_icms_st_c170:,.2f} E210={ctx.e210_vl_sld_st:,.2f}",
-    )]
+    # Se documentos existem e a diferenca pode ser explicada por
+    # saldo anterior, devolucoes e ajustes, nao apontar
+    for e210_rec, _, vl_retencao in e210_por_uf:
+        vl_sld_ant = to_float(get_field(e210_rec, "VL_SLD_CRED_ANT_ST"))
+        vl_devol = to_float(get_field(e210_rec, "VL_DEVOL_ST"))
+        vl_ressarc = to_float(get_field(e210_rec, "VL_RESSARC_ST"))
+        vl_out_cred = to_float(get_field(e210_rec, "VL_OUT_CRED_ST"))
+        vl_aj_cred = to_float(get_field(e210_rec, "VL_AJ_CREDITOS_ST"))
+        if vl_sld_ant > 0 or vl_devol > 0 or vl_ressarc > 0 or vl_out_cred > 0 or vl_aj_cred > 0:
+            # Existem creditos/ajustes que podem explicar a diferenca
+            return []
+
+    # ── Gerar erro com informacao completa ──
+    errors: list[ValidationError] = []
+    ufs_str = ", ".join(uf or "?" for _, uf, _ in e210_por_uf)
+    e210_rec = e210_por_uf[0][0]
+
+    if count_docs == 0:
+        msg = (
+            f"E210 indica retencao de ST de R$ {vl_total_e210:,.2f} (UF: {ufs_str}), "
+            f"porem nao foram localizados valores de ICMS-ST nos documentos "
+            f"(C100/C170/C190). Verifique se o montante decorre de saldo anterior, "
+            f"ajustes (E220), ressarcimento, devolucao ou outro lancamento "
+            f"especifico de ST. Caso nao exista fundamento fiscal, a apuracao "
+            f"pode estar inconsistente."
+        )
+        val = f"docs_ST=0.00 E210_retencao={vl_total_e210:,.2f}"
+    else:
+        msg = (
+            f"ICMS-ST nos documentos ({fonte}, {count_docs} registros) soma "
+            f"R$ {vl_st_docs:,.2f}, mas a retencao ST no E210 indica "
+            f"R$ {vl_total_e210:,.2f} (UF: {ufs_str}). "
+            f"Diferenca: R$ {abs(vl_st_docs - vl_total_e210):,.2f}. "
+            f"Verifique a consistencia entre documentos e apuracao ST."
+        )
+        val = f"{fonte}_ST={vl_st_docs:,.2f} E210_retencao={vl_total_e210:,.2f}"
+
+    errors.append(make_error(
+        e210_rec, "VL_RETENCAO_ST", "ST_APURACAO_INCONSISTENTE",
+        msg,
+        value=val,
+    ))
+
+    return errors
 
 
 # ──────────────────────────────────────────────

@@ -157,6 +157,19 @@ def _e210(vl_sld: str = "500", line: int = 60) -> SpedRecord:
     }, line)
 
 
+def _e210_st(vl_retencao: str = "500", line: int = 60) -> SpedRecord:
+    """E210 com VL_RETENCAO_ST preenchido (cenario real de ST nos docs)."""
+    return _rec("E210", {
+        "IND_MOV_ST": "0", "VL_SLD_CRED_ANT_ST": "0",
+        "VL_DEVOL_ST": "0", "VL_RESSARC_ST": "0",
+        "VL_OUT_CRED_ST": "0", "VL_AJ_CREDITOS_ST": "0",
+        "VL_RETENCAO_ST": vl_retencao, "VL_OUT_DEB_ST": "0",
+        "VL_AJ_DEBITOS_ST": "0", "VL_SLD_DEV_ANT_ST": vl_retencao,
+        "VL_DEDUCOES_ST": "0", "VL_ICMS_RECOL_ST": vl_retencao,
+        "VL_SLD_CRED_ST_TRANSPORTAR": "0", "DEB_ESP_ST": "0",
+    }, line)
+
+
 def _0000(uf: str = "SP", line: int = 1) -> SpedRecord:
     return _rec("0000", {
         "COD_VER": "017", "COD_FIN": "0", "DT_INI": "01012024",
@@ -407,21 +420,66 @@ class TestBeneficioDesproporcional:
 
 
 class TestStApuracao:
-    def test_st_inconsistente(self):
-        """C170 with CST ST and E210 divergent => ST_APURACAO_INCONSISTENTE."""
+    def test_st_inconsistente_c170_com_st(self):
+        """C170 with VL_ICMS_ST > 0 and E210 divergent => ST_APURACAO_INCONSISTENTE."""
         records = [
             _0000(),
-            _c170(cst="010", cfop="5102", vl_icms="300", line=10),
-            _e210(vl_sld="100"),
+            _rec("E200", {"UF": "SP", "DT_INI": "01012024", "DT_FIN": "31012024"}, line=55),
+            _c170(cst="010", cfop="5102", VL_ICMS_ST="300", line=10),
+            _e210_st(vl_retencao="100"),
         ]
         errors = validate_beneficio_audit(records)
         types = {e.error_type for e in errors}
         assert "ST_APURACAO_INCONSISTENTE" in types
 
+    def test_st_inconsistente_sem_c170_fallback_c100(self):
+        """Sem C170, usa C100.VL_ICMS_ST como fallback."""
+        records = [
+            _0000(),
+            _rec("E200", {"UF": "MG", "DT_INI": "01012024", "DT_FIN": "31012024"}, line=55),
+            _rec("C100", {
+                "IND_OPER": "1", "IND_EMIT": "0", "COD_PART": "P1",
+                "COD_MOD": "55", "COD_SIT": "00", "NUM_DOC": "123",
+                "VL_DOC": "500", "VL_ICMS_ST": "200", "VL_MERC": "500",
+            }, line=10),
+            _e210_st(vl_retencao="100"),
+        ]
+        errors = validate_beneficio_audit(records)
+        types = {e.error_type for e in errors}
+        assert "ST_APURACAO_INCONSISTENTE" in types
+
+    def test_st_valores_batem_sem_erro(self):
+        """C100 VL_ICMS_ST == E210 VL_RETENCAO_ST => sem erro."""
+        records = [
+            _0000(),
+            _rec("E200", {"UF": "MG", "DT_INI": "01012024", "DT_FIN": "31012024"}, line=55),
+            _rec("C100", {
+                "IND_OPER": "1", "IND_EMIT": "0", "COD_PART": "P1",
+                "COD_MOD": "55", "COD_SIT": "00", "NUM_DOC": "123",
+                "VL_DOC": "500", "VL_ICMS_ST": "137.81", "VL_MERC": "500",
+            }, line=10),
+            _e210_st(vl_retencao="137.81"),
+        ]
+        errors = validate_beneficio_audit(records)
+        types = {e.error_type for e in errors}
+        assert "ST_APURACAO_INCONSISTENTE" not in types
+
     def test_no_e210_no_error(self):
         records = [
             _0000(),
             _c170(cst="010", cfop="5102", vl_icms="300", line=10),
+        ]
+        errors = validate_beneficio_audit(records)
+        types = {e.error_type for e in errors}
+        assert "ST_APURACAO_INCONSISTENTE" not in types
+
+    def test_st_e220_ajuste_explica_diferenca(self):
+        """Se nao ha ST nos docs mas E210 tem retencao com ajustes E220, sem erro."""
+        records = [
+            _0000(),
+            _rec("E200", {"UF": "SP", "DT_INI": "01012024", "DT_FIN": "31012024"}, line=55),
+            _e210_st(vl_retencao="100"),
+            _rec("E220", {"COD_AJ_APUR": "SP100001", "DESCR_COMPL_AJ": "Ajuste ST", "VL_AJ_APUR": "100"}, line=62),
         ]
         errors = validate_beneficio_audit(records)
         types = {e.error_type for e in errors}

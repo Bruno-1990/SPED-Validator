@@ -299,6 +299,8 @@ def audit_scope(
     has_bloco_h = _count_reg("H010") > 0
     has_e110 = _count_reg("E110") > 0
     has_e111 = _count_reg("E111") > 0
+    has_e115 = _count_reg("E115") > 0
+    has_c197 = _count_reg("C197") > 0
     is_validated = db.execute(
         "SELECT status FROM sped_files WHERE id = ?", (file_id,)
     ).fetchone()[0] == "validated"
@@ -356,7 +358,9 @@ def audit_scope(
     s_aliq = _check(has_c170, needs_table=True, table_ok=has_aliq_tables)
     s_c190 = _check(has_c190)
     s_bloco_d = _check(has_bloco_d)
-    s_audit_ben = _check(has_e111, needs_table=True, table_ok=tabelas_externas["codigos_ajuste_uf"] == "disponivel")
+    # Beneficio pode vir de E111, E115, C197 ou XMLs com cBenef
+    has_beneficio_data = has_e111 or has_e115 or has_c197
+    s_audit_ben = _check(has_beneficio_data, needs_table=True, table_ok=tabelas_externas["codigos_ajuste_uf"] == "disponivel")
     s_pend = _check(has_c100)
     s_bc = _check(has_c170)
     s_difal = _check(has_c170, needs_table=True, table_ok=has_aliq_tables)
@@ -411,7 +415,7 @@ def audit_scope(
         AuditCheckInfo(id="bloco_d", status=s_bloco_d, regras=6,
                        motivo_parcial=_motivo(s_bloco_d, sem_dados="Arquivo nao possui Bloco D (CT-e)")),
         AuditCheckInfo(id="audit_beneficios", status=s_audit_ben, regras=50,
-                       motivo_parcial=_motivo(s_audit_ben, sem_dados="Sem registros E111 (ajustes)", sem_tabela="Tabela 5.1.1 de codigos de ajuste nao disponivel")),
+                       motivo_parcial=_motivo(s_audit_ben, sem_dados="Sem registros de beneficio (E111/E115/C197)", sem_tabela="Tabela 5.1.1 de codigos de ajuste nao disponivel")),
         AuditCheckInfo(id="pendentes", status=s_pend, regras=5,
                        motivo_parcial=_motivo(s_pend, sem_dados="Sem registros C100")),
         AuditCheckInfo(id="base_calculo", status=s_bc, regras=5,
@@ -560,6 +564,34 @@ def dismiss_error(
     )
     db.commit()
     return {"dismissed": True, "total_errors": total}
+
+
+@router.delete("/errors/group/{error_type}")
+def dismiss_error_group(
+    file_id: int,
+    error_type: str,
+    db: AuditConnection = Depends(get_db),
+) -> dict:
+    """Ignora (remove) todos os erros de um tipo especifico."""
+    deleted = db.execute(
+        "DELETE FROM validation_errors WHERE file_id = ? AND error_type = ? AND status = 'open'",
+        (file_id, error_type),
+    ).rowcount
+    total = db.execute(
+        "SELECT COUNT(*) FROM validation_errors WHERE file_id = ? AND status = 'open'",
+        (file_id,),
+    ).fetchone()[0]
+    db.execute(
+        "UPDATE sped_files SET total_errors = ? WHERE id = ?",
+        (total, file_id),
+    )
+    db.commit()
+    db.execute(
+        "INSERT INTO audit_log (file_id, action, details) VALUES (?, ?, ?)",
+        (file_id, "dismiss_group", f"{deleted} erros do tipo {error_type} ignorados pelo analista."),
+    )
+    db.commit()
+    return {"dismissed": deleted, "error_type": error_type, "total_errors": total}
 
 
 @router.delete("/errors")
