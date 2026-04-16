@@ -843,12 +843,34 @@ def cruzar_xml_vs_sped(
                         "prot_cstat", cstat, "C100.COD_SIT", cod_sit, None,
                         f"{_nf}: NF-e denegada (cStat={cstat}) escriturada como ativa (COD_SIT=00). "
                         f"Esperado COD_SIT=05."))
+                # NF-e autorizada no XML mas escriturada como cancelada/denegada no SPED
+                elif cstat == "100" and cod_sit in ("02", "03"):
+                    findings.append(_finding(
+                        file_id, nfe_id, chave, "NF_ATIVA_ESCRITURADA_CANCELADA", "critical",
+                        "prot_cstat", cstat, "C100.COD_SIT", cod_sit, None,
+                        f"{_nf}: NF-e autorizada (cStat=100) escriturada como cancelada "
+                        f"(COD_SIT={cod_sit}) no SPED. A nota esta valida na SEFAZ mas "
+                        f"nao esta gerando efeitos fiscais na escrituracao.\n"
+                        f"Chave: {chave}"))
+                elif cstat == "100" and cod_sit in ("04", "05"):
+                    findings.append(_finding(
+                        file_id, nfe_id, chave, "NF_ATIVA_ESCRITURADA_DENEGADA", "critical",
+                        "prot_cstat", cstat, "C100.COD_SIT", cod_sit, None,
+                        f"{_nf}: NF-e autorizada (cStat=100) escriturada como denegada "
+                        f"(COD_SIT={cod_sit}) no SPED. A nota esta valida na SEFAZ.\n"
+                        f"Chave: {chave}"))
                 elif cod_sit_esperado:
                     findings.append(_finding(
                         file_id, nfe_id, chave, "COD_SIT_DIVERGENTE_XML", "error",
                         "prot_cstat", cstat, "C100.COD_SIT", cod_sit, None,
                         f"{_nf}: COD_SIT={cod_sit} incompativel com cStat={cstat}. "
                         f"Esperado COD_SIT={cod_sit_esperado}."))
+
+        # COD_SIT 02/03/04/05: campos monetarios ficam vazios por determinacao
+        # do Guia Pratico. Nao comparar valores — o erro de status (acima) ja
+        # foi registrado e e a causa raiz. Comparacoes monetarias seriam falsos positivos.
+        if cod_sit in ("02", "03", "04", "05"):
+            continue
 
         # XML003: VL_DOC
         _compare_value(findings, file_id, nfe_id, chave, "XML003", "critical",
@@ -976,6 +998,8 @@ _CORRIGIVEL_POR_XML: dict[str, tuple[str, str, bool]] = {
     "XML011": (None, "C100", False),            # Cancelada — não corrigível, requer exclusão
     "XML001": (None, None, False),              # Ausente no SPED — não corrigível
     "XML002": (None, None, False),              # Ausente nos XMLs — não corrigível
+    "NF_ATIVA_ESCRITURADA_CANCELADA": ("COD_SIT", "C100", False),  # Status errado — investigar
+    "NF_ATIVA_ESCRITURADA_DENEGADA": ("COD_SIT", "C100", False),   # Status errado — investigar
     "XML013": (None, "0150", False),            # CNPJ participante — investigar
     "XML012": (None, None, False),              # Qtd itens — estrutural
     "XML_C190_DIVERGE": (None, "C190", False),   # C190 vs XML — investigar
@@ -1085,6 +1109,23 @@ _LEGAL_BASIS_XML: dict[str, dict] = {
             "(tag dhSaiEnt). Impacta o periodo de aproveitamento do credito."
         ),
     },
+    "NF_ATIVA_ESCRITURADA_CANCELADA": {
+        "fonte": "Guia Pratico EFD ICMS/IPI + Ajuste SINIEF 07/2005",
+        "artigo": "Registro C100, campo COD_SIT — Escrituracao de documentos",
+        "trecho": (
+            "Documentos fiscais autorizados devem ser escriturados com COD_SIT=00. "
+            "A escrituracao de NF-e valida como cancelada resulta em omissao de "
+            "receita ou perda de credito, conforme o caso."
+        ),
+    },
+    "NF_ATIVA_ESCRITURADA_DENEGADA": {
+        "fonte": "Guia Pratico EFD ICMS/IPI + Ajuste SINIEF 07/2005",
+        "artigo": "Registro C100, campo COD_SIT — Escrituracao de documentos",
+        "trecho": (
+            "Documentos fiscais autorizados devem ser escriturados com COD_SIT=00. "
+            "A escrituracao de NF-e valida como denegada impede o reflexo fiscal correto."
+        ),
+    },
     "NF_CANCELADA_ESCRITURADA": {
         "fonte": "Ajuste SINIEF 07/2005, Art. 19 + LC 87/96, Art. 23",
         "artigo": "Cancelamento — Vedacao de credito",
@@ -1180,6 +1221,21 @@ def _build_friendly_xml(
             f"NF-e {nf}: **data diverge** entre XML ({f['valor_xml']}) "
             f"e SPED ({f['valor_sped']})."
         )
+    if rule_id == "NF_ATIVA_ESCRITURADA_CANCELADA":
+        chave = f.get("chave_nfe", "")
+        return (
+            f"NF-e {nf} **autorizada na SEFAZ** (cStat=100) mas escriturada como "
+            f"**cancelada** (COD_SIT={f['valor_sped']}) no SPED. "
+            f"A nota e valida e deveria gerar efeitos fiscais.\n"
+            f"Chave NF-e: **{chave}**"
+        )
+    if rule_id == "NF_ATIVA_ESCRITURADA_DENEGADA":
+        chave = f.get("chave_nfe", "")
+        return (
+            f"NF-e {nf} **autorizada na SEFAZ** (cStat=100) mas escriturada como "
+            f"**denegada** (COD_SIT={f['valor_sped']}) no SPED.\n"
+            f"Chave NF-e: **{chave}**"
+        )
     if rule_id == "NF_CANCELADA_ESCRITURADA":
         return (
             f"NF-e {nf} **cancelada** (cStat={f['valor_xml']}) escriturada como "
@@ -1273,6 +1329,27 @@ def _build_doc_suggestion_xml(
             f"**Como corrigir:**\n"
             f"Confira a data no DANFE/XML original e corrija o campo {campo_dt} "
             f"no registro C100."
+        )
+    if rule_id == "NF_ATIVA_ESCRITURADA_CANCELADA":
+        return (
+            f"A NF-e {nf} esta **autorizada na SEFAZ** (cStat=100), porem foi escriturada "
+            f"como cancelada (COD_SIT={f['valor_sped']}) no SPED.\n\n"
+            f"Isso significa que a nota e valida mas **nao esta produzindo efeitos fiscais** "
+            f"na escrituracao. Pode resultar em omissao de receita (saida) ou perda de "
+            f"credito (entrada).\n\n"
+            f"**Como corrigir:**\n"
+            f"Verifique se a NF-e foi realmente cancelada consultando a SEFAZ. "
+            f"Se estiver ativa, altere o COD_SIT para 00 e preencha os campos monetarios "
+            f"do C100 (VL_DOC, VL_MERC, VL_ICMS, etc.) conforme o XML. "
+            f"Inclua tambem os registros C170/C190 correspondentes."
+        )
+    if rule_id == "NF_ATIVA_ESCRITURADA_DENEGADA":
+        return (
+            f"A NF-e {nf} esta **autorizada na SEFAZ** (cStat=100), porem foi escriturada "
+            f"como denegada (COD_SIT={f['valor_sped']}) no SPED.\n\n"
+            f"**Como corrigir:**\n"
+            f"Consulte a situacao na SEFAZ. Se estiver autorizada, altere COD_SIT para 00 "
+            f"e preencha os campos do C100 conforme o XML."
         )
     if rule_id == "NF_CANCELADA_ESCRITURADA":
         return (

@@ -461,6 +461,8 @@ const ERROR_TYPE_LABELS: Record<string, string> = {
   XML012: 'Quantidade de itens divergente',
   NF_CANCELADA_ESCRITURADA: 'NF-e cancelada escriturada como ativa',
   NF_DENEGADA_ESCRITURADA: 'NF-e denegada escriturada como ativa',
+  NF_ATIVA_ESCRITURADA_CANCELADA: 'NF-e autorizada escriturada como cancelada',
+  NF_ATIVA_ESCRITURADA_DENEGADA: 'NF-e autorizada escriturada como denegada',
   COD_SIT_DIVERGENTE_XML: 'Situacao do documento divergente (COD_SIT)',
   // ST
   ST_APURACAO_INCONSISTENTE: 'Apuracao ST inconsistente com documentos',
@@ -696,6 +698,50 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
     setCorrectingGroup(false)
   }
 
+  // Exportar lista de NF-e (XML001 / XML002)
+  const handleExportGroup = () => {
+    if (!currentGroup) return
+    const openErrors = currentGroup.items.filter(e => e.status === 'open')
+    if (openErrors.length === 0) return
+
+    const lines: string[] = []
+    const tipo = currentGroup.errorType
+    const titulo = currentGroup.label
+
+    lines.push(`=== ${titulo} ===`)
+    lines.push(`Total: ${openErrors.length} apontamento(s)`)
+    lines.push(`Exportado em: ${new Date().toLocaleString('pt-BR')}`)
+    lines.push('')
+    lines.push('---')
+    lines.push('')
+
+    for (const e of openErrors) {
+      const msg = e.message || ''
+      // Extrair numero da NF: "NF 575361" ou do friendly_message "NF-e 575361"
+      const nfMatch = msg.match(/NF[- ]?e?\s*(\d+)/) || (e.friendly_message || '').match(/NF[- ]?e?\s*(\d+)/)
+      const numNf = nfMatch ? nfMatch[1] : '?'
+
+      // Extrair chave: 44 digitos consecutivos
+      const chaveMatch = msg.match(/(\d{44})/) || (e.friendly_message || '').match(/(\d{44})/) || (e.value || '').match(/(\d{44})/)
+      const chave = chaveMatch ? chaveMatch[1] : (e.value || '?')
+
+      lines.push(`Numero da NF: ${numNf}`)
+      lines.push(`Chave da NF:  ${chave}`)
+      lines.push('')
+    }
+
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${tipo}_${openErrors.length}_notas.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Tipos exportaveis (erros que listam NF-e com chave)
+  const exportableTypes = new Set(['XML001', 'XML002', 'NF_CANCELADA_ESCRITURADA', 'NF_DENEGADA_ESCRITURADA', 'NF_ATIVA_ESCRITURADA_CANCELADA', 'NF_ATIVA_ESCRITURADA_DENEGADA', 'COD_SIT_DIVERGENTE_XML'])
+
   const isError = variant === 'error'
 
   const sevColor = (sev: string) =>
@@ -772,6 +818,14 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
                     <p className="text-xs text-gray-500 mt-0.5 font-mono">{currentGroup.errorType}</p>
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
+                    {exportableTypes.has(currentGroup.errorType) && currentGroup.openCount > 0 && (
+                      <button
+                        onClick={handleExportGroup}
+                        className="text-sm text-blue-600 px-3 py-1.5 rounded border border-blue-300 hover:bg-blue-50 font-medium"
+                      >
+                        Exportar TXT ({currentGroup.openCount})
+                      </button>
+                    )}
                     {currentGroup.correctableCount > 0 && (
                       <button
                         onClick={handleCorrectGroup}
