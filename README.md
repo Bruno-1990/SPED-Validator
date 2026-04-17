@@ -325,6 +325,7 @@ SPED/
 | `POST` | `/findings/{finding_id}/resolve` | Resolve achado (accepted/rejected/deferred/noted) |
 | `GET` | `/findings/resolutions` | Lista resolucoes de achados |
 | `DELETE` | `/errors/{error_id}` | Remove erro individual |
+| `DELETE` | `/errors/group/{error_type}` | Remove todos os erros de um tipo especifico |
 | `DELETE` | `/errors` | Limpa todos os erros |
 
 ### Registros (`/api/files/{file_id}/records`) — 3 endpoints
@@ -388,10 +389,10 @@ SPED/
 
 | Pagina | Arquivo | Descricao |
 |---|---|---|
-| Upload | `UploadPage.tsx` | Upload SPED com regime override opcional |
+| Upload | `UploadPage.tsx` | Upload SPED + selecao de pasta de XMLs (webkitdirectory) |
 | Arquivos | `FilesPage.tsx` | Lista com status, acoes rapidas |
-| Detalhes | `FileDetailPage.tsx` (47KB) | Tabela erros, registros, graficos, audit-scope, correcoes |
-| XML | `XMLCrossPage.tsx` (15KB) | Upload XMLs, cruzamento, divergencias |
+| Detalhes | `FileDetailPage.tsx` | Erros agrupados por tipo em abas, correcoes, graficos, audit-scope |
+| XML | `XMLCrossPage.tsx` | Upload XMLs, cruzamento, divergencias |
 | Cruzamento XC | `CrossValidationPage.tsx` | Findings XC com filtros e deduplicacao |
 | Regras | `RulesPage.tsx` | Catalogo 193 regras, geracao IA |
 
@@ -404,6 +405,20 @@ SPED/
 - **Records/FieldEditor.tsx** — Editor inline de campo SPED
 - **Records/SuggestionPanel.tsx** — Sugestoes de correcao
 - **Corrections/CorrectionApprovalPanel.tsx** — Aprovacao/rejeicao de correcoes
+- **ConfirmModal** (inline em FileDetailPage) — Modal de confirmacao com backdrop blur
+
+### Erros Agrupados por Tipo (Abas)
+
+O `FileDetailPage` exibe erros agrupados por `error_type` em sidebar com abas:
+
+- Sidebar com lista de grupos ordenados por severidade maxima
+- Bolinha colorida indica severidade (vermelho/laranja/amarelo/azul)
+- Badge com contagem de erros abertos por grupo
+- Indicador de quantos sao auto-corrigiveis
+- **Acoes por grupo**: "Corrigir Grupo (N)", "Ignorar Grupo (N)", "Exportar TXT (N)"
+- **Exportar TXT**: disponivel para XML001, XML002 e divergencias de NF-e — gera arquivo com numero e chave de cada NF-e
+- Labels descritivos para ~45 error_types (ex: `XML001` = "NF-e ausente no SPED")
+- Modal de confirmacao moderno (substitui `window.confirm`) com cores por contexto
 
 ### Tecnologias Frontend
 
@@ -697,8 +712,13 @@ Persistencia em cross_validation_findings + nfe_cruzamento (retrocompat)
 
 ### Estagio 3 — Enriquecimento
 
-- Mensagens amigaveis (700+ mapeamentos)
-- Base legal
+- Mensagens amigaveis (700+ mapeamentos hardcoded)
+- **IA Explicativa integrada ao pipeline** (GPT-4o-mini): gera `doc_suggestion` estruturado
+  com secoes "O que foi encontrado", "Por que isso importa", "Como corrigir", "Base legal"
+- Contexto fiscal (regime, UF, beneficio) passado ao prompt para respostas especificas
+- Resultados cacheados em `ai_error_cache` (1 chamada por grupo de erros identicos)
+- Fallback para mensagem hardcoded quando API indisponivel
+- Base legal via busca semantica (embeddings + FTS5)
 - Scores de risco e cobertura
 - Finalizacao do status
 
@@ -732,7 +752,7 @@ Persistencia em cross_validation_findings + nfe_cruzamento (retrocompat)
 | `fiscal_semantics.py` | 641 | CST x CFOP, CST x aliq, monofasicos | Semantica fiscal |
 | `aliquota_validator.py` | 474 | Interestaduais, internas, media | Aliquotas ICMS |
 | `tax_recalc.py` | 431 | ICMS, ICMS-ST, IPI, PIS/COFINS, E110 | Recalculo tributario |
-| `st_validator.py` | 292 | ICMS-ST, MVA, CST 60 | Substituicao tributaria |
+| `st_validator.py` | 292 | ICMS-ST, MVA, CST 60 | ST com fallback C170→C100→C190 |
 | `ipi_validator.py` | 185 | Reflexo BC, CST, recalculo | IPI |
 | `pis_cofins_validator.py` | 222 | Direcao, CST, campos | PIS/COFINS |
 | `base_calculo_validator.py` | 300 | BASE_001-006 | Base de calculo ICMS |
@@ -747,19 +767,19 @@ Persistencia em cross_validation_findings + nfe_cruzamento (retrocompat)
 |---|---|---|---|
 | `beneficio_validator.py` | 334 | BENE_001-003 | Deteccao contaminacao |
 | `beneficio_cross_validator.py` | 576 | 9 regras cross-beneficio | Cruzamento beneficio x SPED |
-| `beneficio_audit_validator.py` | 1.587 | 50+ regras | Auditoria completa: E111, NCM, CST, CFOP, credito |
+| `beneficio_audit_validator.py` | 1.587 | 50+ regras | Auditoria: E111, ST com E220/saldo/devolucoes |
 
 ### Tier 5 — Avancado
 
 | Validador | Linhas | Regras | Descricao |
 |---|---|---|---|
-| `c190_validator.py` | 423 | Consolidacao C170 x C190 | Reconciliacao |
+| `c190_validator.py` | 423 | Consolidacao C170 x C190 | Reconciliacao (valida total antes de apontar por grupo) |
 | `apuracao_validator.py` | 525 | E110, E111, E116 | Apuracao ICMS |
 | `devolucao_validator.py` | 269 | DEV_001-003 | Devolucoes |
 | `destinatario_validator.py` | 244 | IE, UF, CEP | Destinatario |
 | `parametrizacao_validator.py` | 315 | Erros sistematicos | Deteccao falha ERP |
 | `audit_rules.py` | 467 | Regras avancadas | Auditoria fiscal |
-| `encadeamento_validator.py` | 269 | C100→C170, ST, IPI | Encadeamento |
+| `encadeamento_validator.py` | 269 | C100→C170, ST, IPI | Encadeamento com fallback C170→C100→C190 |
 | `correction_hypothesis.py` | 309 | Multi-step | Hipoteses correcao |
 | `field_map_validator.py` | 714 | C100/C170/C190 x XML | Conferencia declarativa |
 | `pendentes_validator.py` | 300 | Pendentes | Regras pendentes |
@@ -939,13 +959,13 @@ XC008 (cancelada) → causa raiz de todos findings do scope
 
 ---
 
-## Cruzamento XML Legacy (17 Regras)
+## Cruzamento XML Legacy (19 Regras)
 
 O cruzamento legacy (xml_service.py) permanece ativo para retrocompatibilidade:
 
 | Regra | Severidade | Descricao | Corrigivel |
 |---|---|---|---|
-| XML001 | critical | NF-e no XML sem C100 no SPED | Nao |
+| XML001 | critical | NF-e no XML sem C100 no SPED (exibe chave NF-e) | Nao |
 | XML002 | error | C100 com CHV_NFE sem XML | Nao |
 | XML003 | critical | VL_DOC divergente | Proposta |
 | XML004 | critical | VL_ICMS divergente | Proposta |
@@ -957,6 +977,26 @@ O cruzamento legacy (xml_service.py) permanece ativo para retrocompatibilidade:
 | XML014 | warning | Data documento divergente | Investigar |
 | XML015 | warning | Data entrada/saida divergente | Investigar |
 | XML_C190 | high | Consolidacao C190 vs XML | Investigar |
+| NF_CANCELADA_ESCRITURADA | critical | NF-e cancelada escriturada como ativa | Nao |
+| NF_DENEGADA_ESCRITURADA | critical | NF-e denegada escriturada como ativa | Nao |
+| NF_ATIVA_ESCRITURADA_CANCELADA | critical | NF-e autorizada escriturada como cancelada | Nao |
+| NF_ATIVA_ESCRITURADA_DENEGADA | critical | NF-e autorizada escriturada como denegada | Nao |
+| COD_SIT_DIVERGENTE_XML | error | COD_SIT incompativel com cStat do XML | Nao |
+
+### Logica de Validacao COD_SIT
+
+O cruzamento valida primeiro a consistencia entre `C100.COD_SIT` e `XML.cStat`:
+
+```
+1. Validar COD_SIT vs cStat (gerar erro de status se divergente)
+   - cStat=101/135 + COD_SIT=00 → NF_CANCELADA_ESCRITURADA
+   - cStat=110/301 + COD_SIT=00 → NF_DENEGADA_ESCRITURADA
+   - cStat=100 + COD_SIT=02/03  → NF_ATIVA_ESCRITURADA_CANCELADA
+   - cStat=100 + COD_SIT=04/05  → NF_ATIVA_ESCRITURADA_DENEGADA
+2. Se COD_SIT=02/03/04/05 → skip comparacoes monetarias (XML003-XML012)
+   Campos vazios sao corretos para docs cancelados/denegados
+3. Comparar valores apenas quando COD_SIT permite (00/01)
+```
 
 ---
 
@@ -1070,12 +1110,31 @@ def tolerancia_proporcional(valor: float) -> float:
 
 ### Funcionamento
 
-1. Recebe erro + contexto (regime, UF, beneficio, operacao)
-2. Gera hash do contexto para cache
+A IA e integrada em dois pontos:
+
+**1. Pipeline de Validacao (automatico):** Durante o estagio de enriquecimento, cada grupo de erros
+recebe uma explicacao estruturada via GPT-4o-mini com secoes formatadas:
+
+```
+**O que foi encontrado:** [descricao do erro com valores e campos]
+**Por que isso importa:** [impacto fiscal — credito indevido, omissao, risco]
+**Como corrigir:** [instrucoes objetivas citando campos e registros]
+**Base legal:** [LC 87/96, Guia Pratico EFD, RICMS, etc.]
+```
+
+O frontend renderiza cada secao com cor distinta (vermelho/amarelo/azul/cinza).
+
+**2. Endpoint sob demanda** (`POST /api/ai/explain`): Permite consultar explicacao
+para qualquer erro especifico, retornando explicacao + sugestao.
+
+### Cache
+
+1. Recebe erro + contexto (regime, UF, beneficio, operacao, valor, expected)
+2. Gera hash SHA256 do contexto para cache
 3. Busca no cache (`ai_error_cache`)
-4. Se miss: chama OpenAI/Anthropic com prompt especializado
-5. Retorna explicacao + sugestao de correcao
-6. Persiste no cache com TTL
+4. Se miss: chama OpenAI GPT-4o-mini (temperature=0.2, max_tokens=600)
+5. Retorna explicacao estruturada
+6. Persiste no cache (1 chamada por grupo de erros identicos)
 
 ### Cache Key
 
