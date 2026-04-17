@@ -764,18 +764,18 @@ def _search_legal_basis(
         return None
 
 
-_openai_key_checked = False
-_openai_key_available = False
+_ai_key_checked = False
+_ai_key_available = False
 
 
 def _has_openai_key() -> bool:
-    """Verifica se OPENAI_API_KEY esta configurada (cached)."""
-    global _openai_key_checked, _openai_key_available
-    if not _openai_key_checked:
+    """Verifica se alguma chave de IA esta configurada (Claude ou OpenAI)."""
+    global _ai_key_checked, _ai_key_available
+    if not _ai_key_checked:
         import os
-        _openai_key_available = bool(os.getenv("OPENAI_API_KEY"))
-        _openai_key_checked = True
-    return _openai_key_available
+        _ai_key_available = bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY"))
+        _ai_key_checked = True
+    return _ai_key_available
 
 
 _AI_SYSTEM_PROMPT = """Voce e um auditor fiscal especializado em SPED EFD ICMS/IPI.
@@ -816,11 +816,12 @@ def _generate_ai_doc_suggestion(
     beneficio: str,
     guidance: str,
 ) -> str | None:
-    """Gera doc_suggestion via OpenAI com cache. Retorna None se falhar."""
+    """Gera doc_suggestion via IA (Claude prioritario, OpenAI fallback) com cache."""
     import os
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+    if not anthropic_key and not openai_key:
         return None
 
     # Tentar cache primeiro
@@ -850,22 +851,44 @@ def _generate_ai_doc_suggestion(
     ]
     user_prompt = "\n".join(p for p in parts if p)
 
-    try:
-        import openai
-        client = openai.OpenAI(api_key=api_key)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": _AI_SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.2,
-            max_tokens=600,
-        )
-        content = response.choices[0].message.content or ""
-    except Exception as e:
-        logger.warning("Falha ao gerar doc_suggestion via IA: %s", e)
-        return None
+    content = ""
+    model_used = ""
+
+    # Tentar Claude primeiro
+    if anthropic_key:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=anthropic_key)
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=600,
+                system=_AI_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            content = response.content[0].text if response.content else ""
+            model_used = "claude-sonnet-4"
+        except Exception as e:
+            logger.warning("Falha Claude doc_suggestion, tentando OpenAI: %s", e)
+
+    # Fallback OpenAI
+    if not content and openai_key:
+        try:
+            import openai
+            client = openai.OpenAI(api_key=openai_key)
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": _AI_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.2,
+                max_tokens=600,
+            )
+            content = response.choices[0].message.content or ""
+            model_used = "gpt-4o-mini"
+        except Exception as e:
+            logger.warning("Falha OpenAI doc_suggestion: %s", e)
+            return None
 
     if not content.strip():
         return None

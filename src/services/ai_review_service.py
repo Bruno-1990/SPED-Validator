@@ -25,7 +25,8 @@ from .db_types import AuditConnection
 
 logger = logging.getLogger(__name__)
 
-MODEL_REVIEW = "gpt-4o"  # Modelo mais capaz para analise profunda
+MODEL_OPENAI = "gpt-4o"
+MODEL_CLAUDE = "claude-sonnet-4-20250514"
 
 
 _SYSTEM_PROMPT = """Voce e um auditor fiscal senior especializado em SPED EFD ICMS/IPI.
@@ -87,18 +88,14 @@ def review_error_group(
     # 4. Montar dossie com dados reais
     dossie = _montar_dossie(db, file_id, error_type, amostras, contexto)
 
-    # 5. Chamar OpenAI
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        return {"veredito": "inconclusivo", "justificativa": "OPENAI_API_KEY nao configurada.", "cached": False}
-
-    resultado = _chamar_openai(api_key, dossie)
+    # 5. Chamar IA (Claude prioritario, OpenAI fallback)
+    resultado = _chamar_ia(dossie)
 
     # 6. Se inconclusivo, tentar 2a rodada com mais dados
     if resultado["veredito"] == "inconclusivo":
         dossie_expandido = _expandir_dossie(db, file_id, amostras, dossie)
         if dossie_expandido != dossie:
-            resultado = _chamar_openai(api_key, dossie_expandido, rodada=2)
+            resultado = _chamar_ia(dossie_expandido, rodada=2)
 
     # 7. Cachear
     resultado["amostras_analisadas"] = len(amostras)
@@ -420,34 +417,57 @@ def _expandir_dossie(db: AuditConnection, file_id: int, amostras: list[dict], do
     return dossie_original + "\n" + "\n".join(extras)
 
 
-def _chamar_openai(api_key: str, dossie: str, rodada: int = 1) -> dict:
-    """Envia dossie para OpenAI e parseia resposta."""
-    try:
-        import openai
-        client = openai.OpenAI(api_key=api_key)
+def _chamar_ia(dossie: str, rodada: int = 1) -> dict:
+    """Envia dossie para IA (Claude prioritario, OpenAI fallback)."""
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
 
-        messages = [
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": f"{'[RODADA 2 — DADOS EXPANDIDOS] ' if rodada > 1 else ''}Analise o seguinte dossie:\n\n{dossie}"},
-        ]
+    prompt_user = f"{'[RODADA 2 — DADOS EXPANDIDOS] ' if rodada > 1 else ''}Analise o seguinte dossie:\n\n{dossie}"
 
-        response = client.chat.completions.create(
-            model=MODEL_REVIEW,
-            messages=messages,
-            temperature=0.1,
-            max_tokens=1000,
-        )
+    # Tentar Claude primeiro
+    if anthropic_key:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=anthropic_key)
+            response = client.messages.create(
+                model=MODEL_CLAUDE,
+                max_tokens=1000,
+                system=_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": prompt_user}],
+            )
+            content = response.content[0].text if response.content else ""
+            result = _parsear_veredito(content)
+            result["modelo"] = MODEL_CLAUDE
+            return result
+        except Exception as e:
+            logger.warning("Falha ao chamar Claude, tentando OpenAI: %s", e)
 
-        content = response.choices[0].message.content or ""
-        return _parsear_veredito(content)
+    # Fallback OpenAI
+    if openai_key:
+        try:
+            import openai
+            client = openai.OpenAI(api_key=openai_key)
+            response = client.chat.completions.create(
+                model=MODEL_OPENAI,
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt_user},
+                ],
+                temperature=0.1,
+                max_tokens=1000,
+            )
+            content = response.choices[0].message.content or ""
+            result = _parsear_veredito(content)
+            result["modelo"] = MODEL_OPENAI
+            return result
+        except Exception as e:
+            logger.warning("Falha ao chamar OpenAI para review: %s", e)
 
-    except Exception as e:
-        logger.warning("Falha ao chamar OpenAI para review: %s", e)
-        return {
-            "veredito": "inconclusivo",
-            "justificativa": f"Erro na chamada IA: {e}",
-            "resposta_completa": "",
-        }
+    return {
+        "veredito": "inconclusivo",
+        "justificativa": "Nenhuma chave de IA configurada (ANTHROPIC_API_KEY ou OPENAI_API_KEY).",
+        "resposta_completa": "",
+    }
 
 
 def _parsear_veredito(content: str) -> dict:
