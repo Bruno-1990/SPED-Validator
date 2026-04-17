@@ -835,20 +835,20 @@ def cruzar_xml_vs_sped(
                     findings.append(_finding(
                         file_id, nfe_id, chave, "NF_CANCELADA_ESCRITURADA", "critical",
                         "prot_cstat", cstat, "C100.COD_SIT", cod_sit, None,
-                        f"{_nf}: NF-e cancelada (cStat={cstat}) escriturada como ativa (COD_SIT=00). "
-                        f"Credito de ICMS indevido. Esperado COD_SIT=02."))
+                        f"NF-e cancelada (cStat={cstat}) escriturada como ativa (COD_SIT=00). "
+                        f"Credito de ICMS indevido. Esperado COD_SIT=02.\nChave: {chave}"))
                 elif cstat in ("110", "301") and cod_sit == "00":
                     findings.append(_finding(
                         file_id, nfe_id, chave, "NF_DENEGADA_ESCRITURADA", "critical",
                         "prot_cstat", cstat, "C100.COD_SIT", cod_sit, None,
-                        f"{_nf}: NF-e denegada (cStat={cstat}) escriturada como ativa (COD_SIT=00). "
-                        f"Esperado COD_SIT=05."))
+                        f"NF-e denegada (cStat={cstat}) escriturada como ativa (COD_SIT=00). "
+                        f"Esperado COD_SIT=05.\nChave: {chave}"))
                 # NF-e autorizada no XML mas escriturada como cancelada/denegada no SPED
                 elif cstat == "100" and cod_sit in ("02", "03"):
                     findings.append(_finding(
                         file_id, nfe_id, chave, "NF_ATIVA_ESCRITURADA_CANCELADA", "critical",
                         "prot_cstat", cstat, "C100.COD_SIT", cod_sit, None,
-                        f"{_nf}: NF-e autorizada (cStat=100) escriturada como cancelada "
+                        f"NF-e autorizada (cStat=100) escriturada como cancelada "
                         f"(COD_SIT={cod_sit}) no SPED. A nota esta valida na SEFAZ mas "
                         f"nao esta gerando efeitos fiscais na escrituracao.\n"
                         f"Chave: {chave}"))
@@ -856,15 +856,15 @@ def cruzar_xml_vs_sped(
                     findings.append(_finding(
                         file_id, nfe_id, chave, "NF_ATIVA_ESCRITURADA_DENEGADA", "critical",
                         "prot_cstat", cstat, "C100.COD_SIT", cod_sit, None,
-                        f"{_nf}: NF-e autorizada (cStat=100) escriturada como denegada "
+                        f"NF-e autorizada (cStat=100) escriturada como denegada "
                         f"(COD_SIT={cod_sit}) no SPED. A nota esta valida na SEFAZ.\n"
                         f"Chave: {chave}"))
                 elif cod_sit_esperado:
                     findings.append(_finding(
                         file_id, nfe_id, chave, "COD_SIT_DIVERGENTE_XML", "error",
                         "prot_cstat", cstat, "C100.COD_SIT", cod_sit, None,
-                        f"{_nf}: COD_SIT={cod_sit} incompativel com cStat={cstat}. "
-                        f"Esperado COD_SIT={cod_sit_esperado}."))
+                        f"COD_SIT={cod_sit} incompativel com cStat={cstat}. "
+                        f"Esperado COD_SIT={cod_sit_esperado}.\nChave: {chave}"))
 
         # COD_SIT 02/03/04/05: campos monetarios ficam vazios por determinacao
         # do Guia Pratico. Nao comparar valores — o erro de status (acima) ja
