@@ -9,6 +9,63 @@ import ErrorChart from '../components/Dashboard/ErrorChart'
 import AuditScopePanel from '../components/Dashboard/AuditScopePanel'
 import CorrectionApprovalPanel from '../components/Corrections/CorrectionApprovalPanel'
 
+// ── Modal de Confirmacao ──
+
+interface ConfirmModalState {
+  open: boolean
+  title: string
+  message: string
+  confirmLabel: string
+  confirmColor: 'red' | 'green' | 'blue'
+  onConfirm: () => void
+}
+
+const CONFIRM_INITIAL: ConfirmModalState = {
+  open: false, title: '', message: '', confirmLabel: 'Confirmar',
+  confirmColor: 'blue', onConfirm: () => {},
+}
+
+function ConfirmModal({ state, onClose }: { state: ConfirmModalState; onClose: () => void }) {
+  if (!state.open) return null
+
+  const colorClasses = {
+    red: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+    green: 'bg-green-600 hover:bg-green-700 focus:ring-green-500',
+    blue: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500',
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" />
+
+      {/* Modal */}
+      <div
+        className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all"
+        onClick={e => e.stopPropagation()}
+      >
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">{state.title}</h3>
+        <p className="text-sm text-gray-600 mb-6 leading-relaxed">{state.message}</p>
+
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => { state.onConfirm(); onClose() }}
+            className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${colorClasses[state.confirmColor]}`}
+          >
+            {state.confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /** Converte **texto** em <strong>texto</strong> para exibicao formatada. */
 function renderBold(text: string) {
   const parts = text.split(/\*\*(.*?)\*\*/g)
@@ -51,6 +108,8 @@ export default function FileDetailPage() {
   const [pipelineEvent, setPipelineEvent] = useState<PipelineEvent | null>(null)
   const [expandedError, setExpandedError] = useState<number | null>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(CONFIRM_INITIAL)
+  const closeModal = useCallback(() => setConfirmModal(CONFIRM_INITIAL), [])
 
   const loadData = useCallback(async () => {
     const f = await api.getFile(id)
@@ -156,12 +215,20 @@ export default function FileDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [errorItems.length, alertItems.length, fromXml, validating])
 
-  const handleDeleteFile = useCallback(async () => {
-    if (!confirm(`Excluir este arquivo e todos os dados associados?`)) return
-    try {
-      await api.deleteFile(id)
-      window.location.href = '/files'
-    } catch { /* */ }
+  const handleDeleteFile = useCallback(() => {
+    setConfirmModal({
+      open: true,
+      title: 'Excluir arquivo',
+      message: 'Tem certeza que deseja excluir este arquivo e todos os dados associados? Esta acao nao pode ser desfeita.',
+      confirmLabel: 'Excluir',
+      confirmColor: 'red',
+      onConfirm: async () => {
+        try {
+          await api.deleteFile(id)
+          window.location.href = '/files'
+        } catch { /* */ }
+      },
+    })
   }, [id])
 
   if (!file) return <p className="text-gray-500">Carregando...</p>
@@ -298,6 +365,7 @@ export default function FileDetailPage() {
               fileId={id}
               onReload={loadData}
               onRevalidate={handleValidateStream}
+              onRequestConfirm={(s) => setConfirmModal({ ...s, open: true })}
             />
           )}
           {tab === 'alerts' && (
@@ -309,6 +377,7 @@ export default function FileDetailPage() {
               fileId={id}
               onReload={loadData}
               onRevalidate={handleValidateStream}
+              onRequestConfirm={(s) => setConfirmModal({ ...s, open: true })}
             />
           )}
           {tab === 'corrections' && (
@@ -321,6 +390,8 @@ export default function FileDetailPage() {
           {tab === 'report' && <ReportTab fileId={id} />}
         </>
       )}
+
+      <ConfirmModal state={confirmModal} onClose={closeModal} />
     </div>
   )
 }
@@ -445,6 +516,7 @@ interface ListProps {
   fileId: number
   onReload: () => void
   onRevalidate: () => void
+  onRequestConfirm: (state: Omit<ConfirmModalState, 'open'>) => void
 }
 
 // ── Helpers para agrupamento por error_type ──
@@ -578,7 +650,7 @@ function buildGroups(items: ValidationError[]): ErrorGroup[] {
   return groups
 }
 
-function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileId, onReload }: ListProps) {
+function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileId, onReload, onRequestConfirm }: ListProps) {
   const [activeGroup, setActiveGroup] = useState<string | null>(null)
   const [showCorrected, setShowCorrected] = useState(false)
 
@@ -665,37 +737,51 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
 
   // Ignorar grupo inteiro
   const [dismissingGroup, setDismissingGroup] = useState(false)
-  const handleDismissGroup = async () => {
+  const handleDismissGroup = () => {
     if (!currentGroupKey || !currentGroup) return
-    if (!confirm(`Ignorar todos os ${currentGroup.openCount} apontamentos do grupo "${currentGroup.label}"?`)) return
-    setDismissingGroup(true)
-    try {
-      await api.dismissErrorGroup(fileId, currentGroupKey)
-      onReload()
-    } catch { /* */ }
-    setDismissingGroup(false)
+    onRequestConfirm({
+      title: 'Ignorar grupo',
+      message: `Ignorar todos os ${currentGroup.openCount} apontamentos do grupo "${currentGroup.label}"? Eles serao removidos da lista de erros.`,
+      confirmLabel: 'Ignorar Todos',
+      confirmColor: 'red',
+      onConfirm: async () => {
+        setDismissingGroup(true)
+        try {
+          await api.dismissErrorGroup(fileId, currentGroupKey!)
+          onReload()
+        } catch { /* */ }
+        setDismissingGroup(false)
+      },
+    })
   }
 
   // Corrigir grupo inteiro
   const [correctingGroup, setCorrectingGroup] = useState(false)
-  const handleCorrectGroup = async () => {
+  const handleCorrectGroup = () => {
     if (!currentGroup) return
     const correctable = currentGroup.items.filter(e => e.auto_correctable && e.expected_value && e.record_id && e.status === 'open')
     if (correctable.length === 0) return
-    if (!confirm(`Aplicar ${correctable.length} correcoes do grupo "${currentGroup.label}"?`)) return
-    setCorrectingGroup(true)
-    try {
-      for (const error of correctable) {
-        await api.updateRecord(fileId, error.record_id!, {
-          field_no: error.field_no || 0,
-          field_name: error.field_name || '',
-          new_value: error.expected_value!,
-          error_id: error.id,
-        })
-      }
-      onReload()
-    } catch { /* */ }
-    setCorrectingGroup(false)
+    onRequestConfirm({
+      title: 'Corrigir grupo',
+      message: `Aplicar ${correctable.length} correcoes automaticas do grupo "${currentGroup.label}"? Os valores serao atualizados no SPED conforme sugerido.`,
+      confirmLabel: 'Aplicar Correcoes',
+      confirmColor: 'green',
+      onConfirm: async () => {
+        setCorrectingGroup(true)
+        try {
+          for (const error of correctable) {
+            await api.updateRecord(fileId, error.record_id!, {
+              field_no: error.field_no || 0,
+              field_name: error.field_name || '',
+              new_value: error.expected_value!,
+              error_id: error.id,
+            })
+          }
+          onReload()
+        } catch { /* */ }
+        setCorrectingGroup(false)
+      },
+    })
   }
 
   // Exportar lista de NF-e (XML001 / XML002)
