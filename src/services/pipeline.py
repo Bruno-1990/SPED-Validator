@@ -663,7 +663,7 @@ def _enrich_errors(
             if context:
                 regime_str = context.regime.value if hasattr(context.regime, 'value') else str(context.regime or "")
                 uf_str = context.uf_contribuinte or ""
-                beneficio_str = ", ".join(context.beneficios_ativos) if context.beneficios_ativos else ""
+                beneficio_str = ", ".join(b.codigo if hasattr(b, 'codigo') else str(b) for b in context.beneficios_ativos) if context.beneficios_ativos else ""
 
             ai_doc_suggestion = _generate_ai_doc_suggestion(
                 db, error_type, sample["message"], register, field_name,
