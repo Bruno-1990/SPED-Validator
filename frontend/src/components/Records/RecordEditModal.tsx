@@ -101,7 +101,8 @@ export default function RecordEditModal({ fileId, error, onClose, onSaved }: Pro
     }
 
     return entries.map(([name, value], index) => {
-      const fieldError = errorByField.get(name) || errorByNo.get(index)
+      // Priorizar match por nome (mais confiavel). field_no=0 ignorado (REG)
+      const fieldError = errorByField.get(name) || (index > 0 ? errorByNo.get(index) : undefined)
       const isError = fieldError?.status === 'open'
       const isCorrected = fieldError?.status === 'corrected'
       return {

@@ -987,22 +987,30 @@ def cruzar_xml_vs_sped(
 # Campos corrigíveis automaticamente pelo XML
 # ──────────────────────────────────────────────
 
-# Mapeamento rule_id → (campo SPED no C100/C170, nome do campo, corrigível)
-_CORRIGIVEL_POR_XML: dict[str, tuple[str, str, bool]] = {
+# Mapeamento rule_id → (campo SPED no C100/C170, registro, corrigível, field_no)
+_CORRIGIVEL_POR_XML: dict[str, tuple[str | None, str | None, bool]] = {
     "XML003": ("VL_DOC", "C100", True),
     "XML004": ("VL_ICMS", "C100", True),
     "XML005": ("VL_ICMS_ST", "C100", True),
     "XML006": ("VL_IPI", "C100", True),
-    "XML014": ("DT_DOC", "C100", False),      # Data — investigar, não corrigir auto
-    "XML015": ("DT_E_S", "C100", False),       # Data — investigar
-    "XML011": (None, "C100", False),            # Cancelada — não corrigível, requer exclusão
-    "XML001": (None, None, False),              # Ausente no SPED — não corrigível
-    "XML002": (None, None, False),              # Ausente nos XMLs — não corrigível
-    "NF_ATIVA_ESCRITURADA_CANCELADA": ("COD_SIT", "C100", False),  # Status errado — investigar
-    "NF_ATIVA_ESCRITURADA_DENEGADA": ("COD_SIT", "C100", False),   # Status errado — investigar
-    "XML013": (None, "0150", False),            # CNPJ participante — investigar
-    "XML012": (None, None, False),              # Qtd itens — estrutural
-    "XML_C190_DIVERGE": (None, "C190", False),   # C190 vs XML — investigar
+    "XML014": ("DT_DOC", "C100", False),
+    "XML015": ("DT_E_S", "C100", False),
+    "XML011": (None, "C100", False),
+    "XML001": (None, None, False),
+    "XML002": (None, None, False),
+    "NF_ATIVA_ESCRITURADA_CANCELADA": ("COD_SIT", "C100", False),
+    "NF_ATIVA_ESCRITURADA_DENEGADA": ("COD_SIT", "C100", False),
+    "XML013": (None, "0150", False),
+    "XML012": (None, None, False),
+    "XML_C190_DIVERGE": (None, "C190", False),
+}
+
+# Posicao (field_no) correta de cada campo no C100 para o RecordEditModal
+_FIELD_NO_C100: dict[str, int] = {
+    "COD_SIT": 5, "DT_DOC": 9, "DT_E_S": 10, "VL_DOC": 11,
+    "VL_MERC": 15, "VL_FRT": 17, "VL_SEG": 18, "VL_OUT_DA": 19,
+    "VL_BC_ICMS": 20, "VL_ICMS": 21, "VL_BC_ICMS_ST": 22,
+    "VL_ICMS_ST": 23, "VL_IPI": 24, "VL_PIS": 25, "VL_COFINS": 26,
 }
 
 
@@ -1463,6 +1471,9 @@ def _gerar_erros_com_sugestao_xml(
         legal_data = _LEGAL_BASIS_XML.get(rule_id)
         legal_json = json.dumps(legal_data, ensure_ascii=False) if legal_data else None
 
+        # field_no correto para que o modal de edicao destaque o campo certo
+        field_no = _FIELD_NO_C100.get(campo_sped or "", 0) if (register or "C100") == "C100" else 0
+
         try:
             db.execute(
                 """INSERT INTO validation_errors
@@ -1470,10 +1481,10 @@ def _gerar_erros_com_sugestao_xml(
                     value, expected_value, error_type, severity, message,
                     friendly_message, auto_correctable, categoria, certeza, impacto,
                     doc_suggestion, legal_basis)
-                   VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, 'cruzamento_xml', 'objetivo', 'critico', ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cruzamento_xml', 'objetivo', 'critico', ?, ?)""",
                 (
                     file_id, record_id, line_no, register or "C100",
-                    campo_sped or f["campo_sped"],
+                    field_no, campo_sped or f["campo_sped"],
                     f["valor_sped"], expected,
                     rule_id, severity, msg, friendly, auto_corr,
                     doc_sug, legal_json,
