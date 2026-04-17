@@ -84,6 +84,7 @@ export interface ValidationError {
   impacto: string | null
   categoria: string | null
   materialidade: number
+  error_hash: string | null
 }
 
 export interface SearchResult {

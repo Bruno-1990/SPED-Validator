@@ -135,6 +135,7 @@ class ValidationErrorInfo(BaseModel):
     certeza: str = "objetivo"
     impacto: str = "relevante"
     materialidade: float = 0
+    error_hash: str | None = None
 
 
 class ErrorSummary(BaseModel):

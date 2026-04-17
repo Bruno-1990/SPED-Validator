@@ -62,6 +62,43 @@ class ValidationError:
     certeza: str = "objetivo"          # 'objetivo' | 'provavel' | 'indicio'
     impacto: str = "relevante"         # 'critico' | 'relevante' | 'informativo'
 
+    @property
+    def error_hash(self) -> str:
+        """Hash SHA256 que identifica unicamente esta ocorrencia de erro.
+
+        Composicao: line_number + register + field_name + error_type + value
+        Permite deduplicacao entre validacoes, rastreabilidade de correcoes
+        e vinculacao de revisoes IA ao erro especifico.
+        """
+        return compute_error_hash(
+            self.line_number, self.register, self.field_name,
+            self.error_type, self.value,
+        )
+
+
+def compute_error_hash(
+    line_number: int,
+    register: str,
+    field_name: str | None,
+    error_type: str,
+    value: str | None,
+) -> str:
+    """Gera hash SHA256 que identifica unicamente uma ocorrencia de erro.
+
+    O hash NAO inclui file_id (para permitir comparacao entre arquivos
+    do mesmo contribuinte) nem message (que pode mudar entre versoes).
+
+    Inclui:
+    - line_number: posicao no arquivo
+    - register: tipo de registro (C100, E210, etc.)
+    - field_name: campo afetado (VL_ICMS, etc.)
+    - error_type: regra que detectou (XML004, ST_APURACAO_INCONSISTENTE, etc.)
+    - value: valor encontrado (para distinguir erros no mesmo campo com valores diferentes)
+    """
+    import hashlib
+    raw = f"{line_number}|{register}|{field_name or ''}|{error_type}|{value or ''}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
 
 @dataclass
 class Chunk:

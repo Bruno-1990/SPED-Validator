@@ -1474,20 +1474,24 @@ def _gerar_erros_com_sugestao_xml(
         # field_no correto para que o modal de edicao destaque o campo certo
         field_no = _FIELD_NO_C100.get(campo_sped or "", 0) if (register or "C100") == "C100" else 0
 
+        # Hash de deduplicacao
+        from ..models import compute_error_hash
+        err_hash = compute_error_hash(line_no, register or "C100", campo_sped or f["campo_sped"], rule_id, f["valor_sped"])
+
         try:
             db.execute(
                 """INSERT INTO validation_errors
                    (file_id, record_id, line_number, register, field_no, field_name,
                     value, expected_value, error_type, severity, message,
                     friendly_message, auto_correctable, categoria, certeza, impacto,
-                    doc_suggestion, legal_basis)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cruzamento_xml', 'objetivo', 'critico', ?, ?)""",
+                    doc_suggestion, legal_basis, error_hash)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cruzamento_xml', 'objetivo', 'critico', ?, ?, ?)""",
                 (
                     file_id, record_id, line_no, register or "C100",
                     field_no, campo_sped or f["campo_sped"],
                     f["valor_sped"], expected,
                     rule_id, severity, msg, friendly, auto_corr,
-                    doc_sug, legal_json,
+                    doc_sug, legal_json, err_hash,
                 ),
             )
         except Exception as exc:

@@ -106,6 +106,10 @@ def _apply_pg_schema_patches(raw_conn) -> None:
             )
         """)
         cur.execute("ALTER TABLE cross_validation_findings ADD COLUMN IF NOT EXISTS chave_nfe TEXT")
+
+        # cBenef e vICMSDeson nos itens XML (NT 2019.001)
+        cur.execute("ALTER TABLE nfe_itens ADD COLUMN IF NOT EXISTS cbenef TEXT DEFAULT ''")
+        cur.execute("ALTER TABLE nfe_itens ADD COLUMN IF NOT EXISTS vl_icms_deson REAL DEFAULT 0")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_xvf_file ON cross_validation_findings(file_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_xvf_rule ON cross_validation_findings(file_id, rule_id)")
         cur.execute("""
@@ -124,6 +128,11 @@ def _apply_pg_schema_patches(raw_conn) -> None:
                 vigencia_fim DATE
             )
         """)
+
+        # Migration 17: Hash de deduplicacao
+        cur.execute("ALTER TABLE validation_errors ADD COLUMN IF NOT EXISTS error_hash TEXT")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_ve_error_hash ON validation_errors(error_hash)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_ve_file_hash ON validation_errors(file_id, error_hash)")
 
         raw_conn.commit()
     except Exception as exc:
