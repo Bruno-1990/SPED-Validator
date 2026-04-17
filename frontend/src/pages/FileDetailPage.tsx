@@ -856,6 +856,20 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
   // Tipos exportaveis (erros que listam NF-e com chave)
   const exportableTypes = new Set(['XML001', 'XML002', 'NF_CANCELADA_ESCRITURADA', 'NF_DENEGADA_ESCRITURADA', 'NF_ATIVA_ESCRITURADA_CANCELADA', 'NF_ATIVA_ESCRITURADA_DENEGADA', 'COD_SIT_DIVERGENTE_XML'])
 
+  // Tipos que NAO precisam de revisao IA (ausencia pura, sem dados para cruzar)
+  const skipReviewTypes = new Set([
+    'XML001',                          // NF-e ausente no SPED — so ausencia
+    'XML002',                          // NF-e sem XML — so ausencia
+    'CAMPO_OBRIGATORIO',               // Campo vazio — objetivo
+    'VALOR_INVALIDO',                  // Formato errado — objetivo
+    'REGISTRO_DUPLICADO',              // Duplicata — objetivo
+    'REFERENCIA_INVALIDA',             // Ref inexistente — objetivo
+    'CHECKLIST_INCOMPLETO',            // Meta — nao e erro fiscal
+    'CLASSIFICACAO_TIPO_ERRO',         // Meta
+    'ACHADO_LIMITADO_AO_SPED',         // Meta
+    'AMOSTRAGEM_MATERIALIDADE',        // Meta
+  ])
+
   const isError = variant === 'error'
 
   const sevColor = (sev: string) =>
@@ -932,7 +946,7 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
                     <p className="text-xs text-gray-500 mt-0.5 font-mono">{currentGroup.errorType}</p>
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
-                    {currentGroup.openCount > 0 && (
+                    {currentGroup.openCount > 0 && !skipReviewTypes.has(currentGroup.errorType) && (
                       <button
                         onClick={handleReviewGroup}
                         disabled={reviewing}
