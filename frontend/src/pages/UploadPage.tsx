@@ -468,7 +468,18 @@ export default function UploadPage() {
             onClick={() => {
               const input = document.createElement('input')
               input.type = 'file'; input.accept = '.xml'; input.multiple = true
-              input.onchange = () => { if (input.files) addXmlFiles(input.files) }
+              input.setAttribute('webkitdirectory', '')
+              input.onchange = () => {
+                if (input.files) {
+                  // Filtrar apenas .xml da pasta selecionada
+                  const xmls = Array.from(input.files).filter(f => f.name.toLowerCase().endsWith('.xml'))
+                  if (xmls.length > 0) {
+                    const dt = new DataTransfer()
+                    xmls.forEach(f => dt.items.add(f))
+                    addXmlFiles(dt.files)
+                  }
+                }
+              }
               input.click()
             }}
             className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
@@ -476,7 +487,7 @@ export default function UploadPage() {
             }`}
           >
             <p className="text-lg font-medium text-gray-700">Arraste XMLs de NF-e aqui</p>
-            <p className="text-sm text-gray-500 mt-1">ou clique para selecionar — aceita multiplos arquivos</p>
+            <p className="text-sm text-gray-500 mt-1">ou clique para selecionar a pasta contendo os XMLs</p>
           </div>
 
           {/* Lista de XMLs selecionados */}
