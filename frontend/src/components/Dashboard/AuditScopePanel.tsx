@@ -17,6 +17,7 @@ export default function AuditScopePanel({ fileId }: Props) {
   const [scope, setScope] = useState<AuditScope | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
     setLoading(true)
@@ -39,7 +40,6 @@ export default function AuditScopePanel({ fileId }: Props) {
 
   const barColor = coverage < 80 ? 'bg-red-500' : coverage < 100 ? 'bg-yellow-500' : 'bg-green-500'
 
-  const [expanded, setExpanded] = useState(false)
   const okCount = scope.checks.filter(c => c.status === 'ok').length
   const totalChecks = scope.checks.length
 
