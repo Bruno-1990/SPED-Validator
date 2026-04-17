@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
-import type { ErrorSummary, FileInfo, LegalBasis, PipelineEvent, RecordInfo, StructuredReport, ValidationError } from '../types/sped'
-import RecordDetail from '../components/Records/RecordDetail'
-import FieldEditor from '../components/Records/FieldEditor'
-import SuggestionPanel from '../components/Records/SuggestionPanel'
+import type { ErrorSummary, FileInfo, LegalBasis, PipelineEvent, StructuredReport, ValidationError } from '../types/sped'
+import RecordEditModal from '../components/Records/RecordEditModal'
 import ErrorChart from '../components/Dashboard/ErrorChart'
 import AuditScopePanel from '../components/Dashboard/AuditScopePanel'
 import CorrectionApprovalPanel from '../components/Corrections/CorrectionApprovalPanel'
@@ -674,46 +672,14 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
   const totalOpen = items.filter(e => e.status === 'open').length
   const correctedCount = items.filter(e => e.status === 'corrected').length
 
-  // RecordDetail / FieldEditor state
-  const [selectedRecord, setSelectedRecord] = useState<RecordInfo | null>(null)
-  const [selectedRecordErrors, setSelectedRecordErrors] = useState<ValidationError[]>([])
-  const [editingField, setEditingField] = useState<{ fieldName: string; error: ValidationError } | null>(null)
-  const [loadingRecord, setLoadingRecord] = useState<number | null>(null)
+  // Modal de edicao de registro
+  const [editModalError, setEditModalError] = useState<ValidationError | null>(null)
 
-  const handleOpenRecordDetail = async (error: ValidationError) => {
+  const handleOpenRecordDetail = (error: ValidationError) => {
     if (!error.record_id) return
-    if (selectedRecord && selectedRecord.id === error.record_id && !editingField) {
-      setSelectedRecord(null)
-      setSelectedRecordErrors([])
-      return
-    }
-    setEditingField(null)
-    setLoadingRecord(error.record_id)
-    try {
-      const record = await api.getRecord(fileId, error.record_id!)
-      setSelectedRecord(record)
-      const recordErrors = items.filter(e => e.record_id === error.record_id)
-      setSelectedRecordErrors(recordErrors)
-    } catch { /* */ }
-    setLoadingRecord(null)
+    setEditModalError(error)
   }
 
-  const handleFieldClick = (fieldName: string, error: ValidationError) => {
-    setEditingField({ fieldName, error })
-  }
-
-  const handleFieldSave = async (newValue: string) => {
-    if (!editingField || !selectedRecord) return
-    await api.updateRecord(fileId, selectedRecord.id, {
-      field_no: editingField.error.field_no || 0,
-      field_name: editingField.error.field_name || editingField.fieldName,
-      new_value: newValue,
-      error_id: editingField.error.id,
-    })
-    setEditingField(null)
-    setSelectedRecord(null)
-    onReload()
-  }
 
   const handleCorrect = async (error: ValidationError) => {
     if (!error.expected_value || !error.record_id) return
@@ -909,7 +875,7 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
               return (
                 <button
                   key={g.errorType}
-                  onClick={() => { setActiveGroup(g.errorType); setSelectedRecord(null); setEditingField(null) }}
+                  onClick={() => { setActiveGroup(g.errorType); setEditModalError(null) }}
                   className={`w-full text-left px-3 py-2.5 rounded-l-lg transition-colors text-sm ${
                     isActive
                       ? 'bg-white border border-r-0 border-gray-200 shadow-sm font-medium'
@@ -1046,39 +1012,24 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
                         onCorrect={() => handleCorrect(e)}
                         onDismiss={() => handleDismiss(e.id)}
                         onOpenRecord={() => handleOpenRecordDetail(e)}
-                        loadingRecord={loadingRecord === e.record_id}
+                        loadingRecord={false}
                       />
-                      {selectedRecord && selectedRecord.id === e.record_id && !editingField && (
-                        <RecordDetail
-                          record={selectedRecord}
-                          errors={selectedRecordErrors}
-                          onClose={() => { setSelectedRecord(null); setSelectedRecordErrors([]) }}
-                          onFieldClick={handleFieldClick}
-                        />
-                      )}
-                      {editingField && selectedRecord && selectedRecord.id === e.record_id && (
-                        <div className="flex flex-col md:flex-row gap-4 items-start">
-                          <div className="flex-1 min-w-0 w-full">
-                            <FieldEditor
-                              record={selectedRecord}
-                              fieldName={editingField.fieldName}
-                              error={editingField.error}
-                              onSave={handleFieldSave}
-                              onCancel={() => setEditingField(null)}
-                            />
-                          </div>
-                          <SuggestionPanel
-                            error={editingField.error}
-                            onSearch={(query) => api.searchDocs(query, editingField.error.field_name || undefined, editingField.error.register)}
-                          />
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
 
                 {displayItems.length === 0 && (
                   <p className="text-gray-400 text-center py-6 text-sm">Todos os apontamentos deste grupo foram tratados.</p>
+                )}
+
+                {/* Modal de edicao de registro */}
+                {editModalError && (
+                  <RecordEditModal
+                    fileId={fileId}
+                    error={editModalError}
+                    onClose={() => setEditModalError(null)}
+                    onSaved={onReload}
+                  />
                 )}
               </>
             )}

@@ -90,18 +90,22 @@ class CorrectionRequest(BaseModel):
     field_name: str
     new_value: str
     error_id: int | None = None
-    rule_id: str
-    correction_type: Literal["deterministic", "assisted", "manual"]
-    justificativa: str
+    rule_id: str = "MANUAL"
+    correction_type: Literal["deterministic", "assisted", "manual"] = "manual"
+    justificativa: str = "Correcao aplicada via interface"
 
     @field_validator("justificativa")
     @classmethod
     def justificativa_min_length(cls, v: str, info: ValidationInfo) -> str:
         rid = str((info.data or {}).get("rule_id") or "")
+        ct = str((info.data or {}).get("correction_type") or "")
+        # Correcoes manuais e assistidas com rule_id generico: minimo reduzido
+        if ct == "manual" or rid in ("MANUAL", ""):
+            return (v or "").strip() or "Correcao manual via interface"
         min_len = 10 if rid.startswith("FM_") else 20
         s = (v or "").strip()
         if len(s) < min_len:
-            raise ValueError(f"Justificativa deve ter no mínimo {min_len} caracteres")
+            raise ValueError(f"Justificativa deve ter no minimo {min_len} caracteres")
         return s
 
 
