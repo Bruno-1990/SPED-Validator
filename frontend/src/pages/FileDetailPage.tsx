@@ -784,6 +784,34 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
     })
   }
 
+  // Revisao IA (tribunal de validacao)
+  const [reviewing, setReviewing] = useState(false)
+  const [reviewResult, setReviewResult] = useState<{
+    veredito: string; justificativa: string; dados_sustentacao: string;
+    recomendacao: string; amostras_analisadas: number; cached: boolean;
+  } | null>(null)
+  const [reviewGroupKey, setReviewGroupKey] = useState<string | null>(null)
+
+  const handleReviewGroup = async () => {
+    if (!currentGroupKey) return
+    setReviewing(true)
+    setReviewResult(null)
+    setReviewGroupKey(currentGroupKey)
+    try {
+      const result = await api.reviewErrorGroup(fileId, currentGroupKey)
+      setReviewResult(result)
+    } catch (e) {
+      setReviewResult({
+        veredito: 'inconclusivo', justificativa: e instanceof Error ? e.message : 'Erro na revisao',
+        dados_sustentacao: '', recomendacao: '', amostras_analisadas: 0, cached: false,
+      })
+    }
+    setReviewing(false)
+  }
+
+  // Limpar review ao trocar de grupo
+  const activeReview = reviewGroupKey === currentGroupKey ? reviewResult : null
+
   // Exportar lista de NF-e (XML001 / XML002)
   const handleExportGroup = () => {
     if (!currentGroup) return
@@ -904,6 +932,15 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
                     <p className="text-xs text-gray-500 mt-0.5 font-mono">{currentGroup.errorType}</p>
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
+                    {currentGroup.openCount > 0 && (
+                      <button
+                        onClick={handleReviewGroup}
+                        disabled={reviewing}
+                        className="text-sm text-purple-700 px-3 py-1.5 rounded border border-purple-300 hover:bg-purple-50 font-medium disabled:opacity-50"
+                      >
+                        {reviewing ? 'Analisando...' : 'Revisar com IA'}
+                      </button>
+                    )}
                     {exportableTypes.has(currentGroup.errorType) && currentGroup.openCount > 0 && (
                       <button
                         onClick={handleExportGroup}
@@ -932,6 +969,56 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
                     )}
                   </div>
                 </div>
+
+                {/* Painel de veredito IA */}
+                {activeReview && (
+                  <div className={`rounded-lg border p-4 mb-4 ${
+                    activeReview.veredito === 'valido' ? 'bg-green-50 border-green-300' :
+                    activeReview.veredito === 'falso_positivo' ? 'bg-amber-50 border-amber-300' :
+                    'bg-gray-50 border-gray-300'
+                  }`}>
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className={`text-lg font-bold ${
+                        activeReview.veredito === 'valido' ? 'text-green-700' :
+                        activeReview.veredito === 'falso_positivo' ? 'text-amber-700' :
+                        'text-gray-600'
+                      }`}>
+                        {activeReview.veredito === 'valido' ? 'Apontamento Valido' :
+                         activeReview.veredito === 'falso_positivo' ? 'Falso Positivo' :
+                         'Inconclusivo'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        activeReview.veredito === 'valido' ? 'bg-green-200 text-green-800' :
+                        activeReview.veredito === 'falso_positivo' ? 'bg-amber-200 text-amber-800' :
+                        'bg-gray-200 text-gray-600'
+                      }`}>
+                        {activeReview.amostras_analisadas} amostra(s) analisada(s)
+                        {activeReview.cached && ' (cache)'}
+                      </span>
+                    </div>
+                    {activeReview.justificativa && (
+                      <p className="text-sm text-gray-800 mb-2">{activeReview.justificativa}</p>
+                    )}
+                    {activeReview.dados_sustentacao && (
+                      <details className="mb-2">
+                        <summary className="text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-700">Dados que sustentam</summary>
+                        <p className="text-xs text-gray-600 mt-1 whitespace-pre-line">{activeReview.dados_sustentacao}</p>
+                      </details>
+                    )}
+                    {activeReview.recomendacao && (
+                      <div className="text-sm text-blue-800 bg-blue-50 rounded p-2 mt-2">
+                        <span className="font-medium">Recomendacao:</span> {activeReview.recomendacao}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {reviewing && (
+                  <div className="flex items-center gap-3 p-4 mb-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div className="animate-spin h-5 w-5 border-2 border-purple-500 border-t-transparent rounded-full" />
+                    <span className="text-sm text-purple-700">Analisando dados do SPED e XMLs com IA (GPT-4o)...</span>
+                  </div>
+                )}
 
                 {/* Cards do grupo */}
                 <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">

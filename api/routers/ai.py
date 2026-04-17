@@ -1,4 +1,4 @@
-"""Endpoints de IA para explicação de erros fiscais."""
+"""Endpoints de IA para explicacao e revisao de erros fiscais."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from api.deps import get_db
 from src.services.db_types import AuditConnection
 from src.services.ai_service import generate_explanation, get_cache_stats
+from src.services.ai_review_service import review_error_group
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -60,6 +61,34 @@ def cache_stats(
 ) -> dict:
     """Estatísticas do cache de IA."""
     return get_cache_stats(db)
+
+
+@router.post("/review/{file_id}/{error_type}")
+def review_group(
+    file_id: int,
+    error_type: str,
+    db: AuditConnection = Depends(get_db),
+) -> dict:
+    """Revisa grupo de erros com IA — tribunal de validacao.
+
+    Monta dossie com dados reais do SPED e XML, envia para GPT-4o,
+    e retorna veredito: valido | falso_positivo | inconclusivo.
+    Resultado cacheado por (file_id, error_type).
+    """
+    # Verificar se arquivo existe
+    sped = db.execute("SELECT id FROM sped_files WHERE id = ?", (file_id,)).fetchone()
+    if not sped:
+        raise HTTPException(status_code=404, detail="Arquivo SPED nao encontrado")
+
+    # Verificar se tem erros desse tipo
+    count = db.execute(
+        "SELECT COUNT(*) FROM validation_errors WHERE file_id = ? AND error_type = ? AND status = 'open'",
+        (file_id, error_type),
+    ).fetchone()[0]
+    if count == 0:
+        raise HTTPException(status_code=404, detail=f"Nenhum erro do tipo {error_type} encontrado")
+
+    return review_error_group(db, file_id, error_type)
 
 
 @router.delete("/cache")

@@ -280,4 +280,15 @@ export const api = {
   explainError: (data: {error_type: string; message: string; regime?: string; uf?: string; register?: string; severity?: string; value?: string; expected_value?: string}) =>
     request<{explicacao: string; sugestao: string; cached: boolean; hits?: number}>('/ai/explain', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) }),
   aiCacheStats: () => request<{total_entries: number; total_hits: number; model: string}>('/ai/cache/stats'),
+
+  // AI review (tribunal de validacao)
+  reviewErrorGroup: (fileId: number, errorType: string) =>
+    request<{
+      veredito: 'valido' | 'falso_positivo' | 'inconclusivo'
+      justificativa: string
+      dados_sustentacao: string
+      recomendacao: string
+      amostras_analisadas: number
+      cached: boolean
+    }>(`/ai/review/${fileId}/${encodeURIComponent(errorType)}`, { method: 'POST' }),
 }
