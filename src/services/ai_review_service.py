@@ -26,7 +26,7 @@ from .db_types import AuditConnection
 logger = logging.getLogger(__name__)
 
 MODEL_OPENAI = "gpt-4o"
-MODEL_CLAUDE = "claude-sonnet-4-20250514"
+MODEL_CLAUDE = "claude-opus-4-20250514"
 
 
 _SYSTEM_PROMPT = """Voce e um auditor fiscal senior especializado em SPED EFD ICMS/IPI.

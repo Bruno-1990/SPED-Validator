@@ -865,7 +865,7 @@ def _generate_ai_doc_suggestion(
             import anthropic
             client = anthropic.Anthropic(api_key=anthropic_key)
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-opus-4-20250514",
                 max_tokens=600,
                 system=_AI_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_prompt}],
