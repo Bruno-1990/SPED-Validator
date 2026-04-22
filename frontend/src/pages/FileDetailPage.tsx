@@ -576,8 +576,12 @@ const ERROR_TYPE_LABELS: Record<string, string> = {
   K_REF_ITEM_INEXISTENTE: 'Bloco K referencia item inexistente',
   K_QTD_NEGATIVA: 'Bloco K com quantidade negativa',
   K_ORDEM_SEM_COMPONENTES: 'Ordem de producao sem componentes',
+  // Calculo
+  CALCULO_DIVERGENTE: 'Calculo de imposto divergente',
+  CALCULO_ARREDONDAMENTO: 'Arredondamento de calculo (centavos)',
   // C190
   C190_SOMA_DIVERGENTE: 'Soma C190 diverge do C100',
+  C190_DIVERGE_C170: 'C190 diverge da soma dos itens C170',
   // Encadeamento
   ENCADEAMENTO_VL_DOC: 'Soma itens diverge do documento',
   // Checklist / Meta

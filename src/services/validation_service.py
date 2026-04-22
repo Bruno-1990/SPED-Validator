@@ -396,8 +396,6 @@ def _severity_for(error_type: str, rule_index=None) -> str:
         # Hipotese de correcao
         "ALIQ_ICMS_AUSENTE",
         "CST_HIPOTESE",
-        # Arredondamento de aliquota
-        "CALCULO_ARREDONDAMENTO",
         # DIFAL — critical
         "DIFAL_FALTANTE_CONSUMO_FINAL",
         "DIFAL_ALIQ_INTERNA_INCORRETA",
@@ -447,6 +445,8 @@ def _severity_for(error_type: str, rule_index=None) -> str:
         "BENEFICIO_PERFIL_INCOMPATIVEL",
         "BENEFICIO_SEM_SEGREGACAO_DESTINATARIO",
         "SPED_CONTRIBUICOES_DIVERGENTE",
+        # Arredondamento — warning (nao e erro fiscal, e precisao de calculo)
+        "CALCULO_ARREDONDAMENTO",
         # Pendentes — warning
         "BENEFICIO_NAO_VINCULADO",
         "DEVOLUCAO_INCONSISTENTE",

@@ -40,9 +40,14 @@ def _check_calc(
 ) -> list[ValidationError]:
     """Verifica calculo imposto = BC * ALIQ / 100 com deteccao de arredondamento.
 
-    Se a divergencia decorre de arredondamento de aliquota (ERP usa
-    precisao maior que 2 decimais), gera CALCULO_ARREDONDAMENTO com
-    explicacao e botao de correcao. Caso contrario, gera CALCULO_DIVERGENTE.
+    Se a divergencia decorre de arredondamento ou truncamento (ERP usa
+    precisao diferente), gera CALCULO_ARREDONDAMENTO com explicacao.
+    Caso contrario, gera CALCULO_DIVERGENTE.
+
+    Deteccao de arredondamento/truncamento:
+    - R$ 0.01: sempre arredondamento (1 centavo)
+    - Taxa efetiva arredondada bate com aliquota
+    - Declarado == truncamento do calculo exato (int(calc*100)/100)
     """
     calc = vl_bc * aliq / 100
     diff = abs(calc - vl_declarado)
@@ -51,25 +56,50 @@ def _check_calc(
     if diff <= tol:
         return []
 
-    # Verificar arredondamento: taxa efetiva arredondada bate com aliquota?
+    # Verificar se e arredondamento/truncamento
+    is_rounding = False
+    motivo_arredondamento = ""
+
     if vl_bc > 0 and vl_declarado > 0:
-        taxa_efetiva = vl_declarado / vl_bc * 100
-        if round(taxa_efetiva, 2) == round(aliq, 2):
-            # Arredondamento: confianca 95% (taxa efetiva confirma, so precisao difere)
-            return [make_error(
-                record, field_name, "CALCULO_ARREDONDAMENTO",
-                f"{tributo_label}: diferenca de R$ {diff:.2f} entre calculado "
-                f"({calc:.2f} = BC {vl_bc:.2f} x {aliq:.2f}%) "
-                f"e declarado ({vl_declarado:.2f}). "
-                f"A taxa efetiva ({taxa_efetiva:.4f}%) arredondada em 2 decimais "
-                f"coincide com a aliquota informada ({aliq:.2f}%), indicando "
-                f"que o ERP calculou com precisao maior (comum em operacoes do "
-                f"Simples Nacional, LC 123/2006). "
-                f"Confianca: alta (95 pontos).",
-                field_no=field_no,
-                expected_value=f"{calc:.2f}",
-                value=f"{vl_declarado:.2f}",
-            )]
+        # Caso 1: diferenca de exatamente 1 centavo (arredondamento classico)
+        if round(diff, 2) == 0.01:
+            is_rounding = True
+            motivo_arredondamento = "diferenca de 1 centavo por arredondamento"
+
+        # Caso 2: taxa efetiva arredondada bate com aliquota
+        if not is_rounding:
+            taxa_efetiva = vl_declarado / vl_bc * 100
+            if round(taxa_efetiva, 2) == round(aliq, 2):
+                is_rounding = True
+                motivo_arredondamento = (
+                    f"taxa efetiva ({taxa_efetiva:.4f}%) coincide com aliquota ({aliq:.2f}%)"
+                )
+
+        # Caso 3: declarado == truncamento do calculo exato
+        if not is_rounding:
+            truncado = int(calc * 100) / 100
+            if abs(vl_declarado - truncado) < 0.005:
+                is_rounding = True
+                motivo_arredondamento = (
+                    f"ERP truncou {calc:.4f} para {truncado:.2f} em vez de arredondar para {round(calc, 2):.2f}"
+                )
+
+        # Caso 4: diferenca <= 0.02 (2 centavos) com aliquota inteira
+        if not is_rounding and diff <= 0.02 and aliq == round(aliq):
+            is_rounding = True
+            motivo_arredondamento = f"diferenca de R$ {diff:.2f} com aliquota inteira ({aliq:.0f}%)"
+
+    if is_rounding:
+        return [make_error(
+            record, field_name, "CALCULO_ARREDONDAMENTO",
+            f"{tributo_label}: calculado={calc:.2f} (BC {vl_bc:.2f} x {aliq:.2f}%) "
+            f"vs declarado={vl_declarado:.2f} (dif=R$ {diff:.2f}). "
+            f"Causa provavel: {motivo_arredondamento}. "
+            f"Confianca: alta (95 pontos).",
+            field_no=field_no,
+            expected_value=f"{calc:.2f}",
+            value=f"{vl_declarado:.2f}",
+        )]
 
     # Calculo divergente: confianca baseada na certeza matematica
     score = 100  # Recalculo deterministico = certeza maxima
