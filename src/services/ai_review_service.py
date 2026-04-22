@@ -664,7 +664,7 @@ def _parsear_veredito(content: str) -> dict:
 
 
 def _ensure_review_table(db: AuditConnection) -> None:
-    """Cria tabela ai_review_cache se nao existir."""
+    """Cria/atualiza tabela ai_review_cache."""
     try:
         db.execute("""
             CREATE TABLE IF NOT EXISTS ai_review_cache (
@@ -672,9 +672,14 @@ def _ensure_review_table(db: AuditConnection) -> None:
                 file_id INTEGER NOT NULL,
                 error_type TEXT NOT NULL,
                 veredito TEXT NOT NULL,
+                confianca TEXT DEFAULT 'media',
+                consenso TEXT DEFAULT '',
                 justificativa TEXT,
                 dados_sustentacao TEXT,
                 recomendacao TEXT,
+                analise_claude TEXT DEFAULT '',
+                analise_gpt TEXT DEFAULT '',
+                base_legal_relevante TEXT DEFAULT '',
                 resposta_completa TEXT,
                 amostras_analisadas INTEGER DEFAULT 0,
                 gerado_em TEXT DEFAULT (now()::text),
@@ -687,6 +692,20 @@ def _ensure_review_table(db: AuditConnection) -> None:
             db._conn.rollback()  # type: ignore[attr-defined]
         except Exception:
             pass
+    # Adicionar colunas novas se tabela ja existia
+    for col, default in [
+        ("confianca", "'media'"), ("consenso", "''"),
+        ("analise_claude", "''"), ("analise_gpt", "''"),
+        ("base_legal_relevante", "''"),
+    ]:
+        try:
+            db.execute(f"ALTER TABLE ai_review_cache ADD COLUMN IF NOT EXISTS {col} TEXT DEFAULT {default}")
+            db.commit()
+        except Exception:
+            try:
+                db._conn.rollback()  # type: ignore[attr-defined]
+            except Exception:
+                pass
 
 
 def _get_cached_review(db: AuditConnection, file_id: int, error_type: str) -> dict | None:
@@ -695,7 +714,8 @@ def _get_cached_review(db: AuditConnection, file_id: int, error_type: str) -> di
     try:
         row = db.execute(
             """SELECT veredito, justificativa, dados_sustentacao, recomendacao,
-                      resposta_completa, amostras_analisadas, gerado_em
+                      resposta_completa, amostras_analisadas, gerado_em,
+                      confianca, consenso, analise_claude, analise_gpt, base_legal_relevante
                FROM ai_review_cache
                WHERE file_id = ? AND error_type = ?""",
             (file_id, error_type),
@@ -718,32 +738,49 @@ def _get_cached_review(db: AuditConnection, file_id: int, error_type: str) -> di
         "resposta_completa": row[4],
         "amostras_analisadas": row[5],
         "gerado_em": row[6],
+        "confianca": row[7] or "media",
+        "consenso": row[8] or "",
+        "analise_claude": row[9] or "",
+        "analise_gpt": row[10] or "",
+        "base_legal_relevante": row[11] or "",
         "cached": True,
     }
 
 
 def _salvar_cache(db: AuditConnection, file_id: int, error_type: str, resultado: dict) -> None:
-    """Salva revisao no cache."""
+    """Salva revisao no cache com todos os campos de triangulacao."""
     try:
         _ensure_review_table(db)
         db.execute(
             """INSERT INTO ai_review_cache
-               (file_id, error_type, veredito, justificativa, dados_sustentacao,
-                recomendacao, resposta_completa, amostras_analisadas, gerado_em)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+               (file_id, error_type, veredito, confianca, consenso,
+                justificativa, dados_sustentacao, recomendacao,
+                analise_claude, analise_gpt, base_legal_relevante,
+                resposta_completa, amostras_analisadas, gerado_em)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT (file_id, error_type) DO UPDATE SET
                 veredito = EXCLUDED.veredito,
+                confianca = EXCLUDED.confianca,
+                consenso = EXCLUDED.consenso,
                 justificativa = EXCLUDED.justificativa,
                 dados_sustentacao = EXCLUDED.dados_sustentacao,
                 recomendacao = EXCLUDED.recomendacao,
+                analise_claude = EXCLUDED.analise_claude,
+                analise_gpt = EXCLUDED.analise_gpt,
+                base_legal_relevante = EXCLUDED.base_legal_relevante,
                 resposta_completa = EXCLUDED.resposta_completa,
                 amostras_analisadas = EXCLUDED.amostras_analisadas,
                 gerado_em = EXCLUDED.gerado_em""",
             (
                 file_id, error_type, resultado["veredito"],
+                resultado.get("confianca", "media"),
+                resultado.get("consenso", ""),
                 resultado.get("justificativa", ""),
                 resultado.get("dados_sustentacao", ""),
                 resultado.get("recomendacao", ""),
+                resultado.get("analise_claude", ""),
+                resultado.get("analise_gpt", ""),
+                resultado.get("base_legal_relevante", ""),
                 resultado.get("resposta_completa", ""),
                 resultado.get("amostras_analisadas", 0),
                 datetime.now().isoformat(),
