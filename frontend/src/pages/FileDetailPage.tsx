@@ -1106,6 +1106,15 @@ function ErrorCard({
       <div className="flex items-start gap-3 p-4 cursor-pointer hover:bg-opacity-80" onClick={onToggle}>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
+            {error.error_hash && (
+              <span
+                className="font-mono text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-all"
+                title="Clique para copiar o hash"
+                onClick={(ev) => { ev.stopPropagation(); navigator.clipboard.writeText(error.error_hash!) }}
+              >
+                #{error.error_hash.slice(0, 8)}
+              </span>
+            )}
             <span className="font-mono text-xs text-gray-500">Linha {error.line_number}</span>
             <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{error.register}</span>
             {error.field_name && <span className="text-xs text-gray-500">{error.field_name}</span>}
