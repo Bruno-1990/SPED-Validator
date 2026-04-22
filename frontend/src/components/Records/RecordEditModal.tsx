@@ -65,11 +65,13 @@ export default function RecordEditModal({ fileId, error, onClose, onSaved }: Pro
     api.getRecord(fileId, error.record_id)
       .then(r => {
         setRecord(r)
-        // Load all errors for this record to highlight affected fields
-        api.getErrors(fileId, { page_size: '500' }).then(res => {
-          const recErrors = (res as unknown as ValidationError[]).filter(
-            (e: ValidationError) => e.record_id === error.record_id
-          )
+        // Load ALL errors for this record (fiscal + XML) to highlight affected fields
+        Promise.all([
+          api.getErrors(fileId, { page_size: '500', categoria: 'fiscal' }),
+          api.getErrors(fileId, { page_size: '500', categoria: 'cruzamento_xml' }),
+        ]).then(([fiscal, xml]) => {
+          const all = [...fiscal, ...xml]
+          const recErrors = all.filter(e => e.record_id === error.record_id)
           setAllErrors(recErrors)
         }).catch(() => {})
       })
