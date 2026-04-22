@@ -528,67 +528,76 @@ const ERROR_TYPE_LABELS: Record<string, string> = {
   XML001: 'NF-e ausente no SPED',
   XML002: 'NF-e sem XML correspondente',
   XML003: 'Valor do documento divergente (VL_DOC)',
-  XML004: 'Valor ICMS divergente (VL_ICMS)',
-  XML005: 'Valor ICMS-ST divergente (VL_ICMS_ST)',
-  XML006: 'Valor IPI divergente (VL_IPI)',
+  XML004: 'Valor do ICMS divergente (VL_ICMS)',
+  XML005: 'Valor do ICMS-ST divergente (VL_ICMS_ST)',
+  XML006: 'Valor do IPI divergente (VL_IPI)',
   XML012: 'Quantidade de itens divergente',
   NF_CANCELADA_ESCRITURADA: 'NF-e cancelada escriturada como ativa',
   NF_DENEGADA_ESCRITURADA: 'NF-e denegada escriturada como ativa',
   NF_ATIVA_ESCRITURADA_CANCELADA: 'NF-e autorizada escriturada como cancelada',
   NF_ATIVA_ESCRITURADA_DENEGADA: 'NF-e autorizada escriturada como denegada',
   COD_SIT_DIVERGENTE_XML: 'Situacao do documento divergente (COD_SIT)',
-  // ST
-  ST_APURACAO_INCONSISTENTE: 'Apuracao ST inconsistente com documentos',
-  ST_APURACAO_DIVERGENTE: 'Apuracao ST divergente (E210 vs docs)',
-  ST_CST60_DEBITO_INDEVIDO: 'CST 60 com debito indevido de ST',
-  ST_BC_MENOR_QUE_ITEM: 'Base ST menor que valor do item',
-  ST_MISTURA_DIFAL: 'Mistura ST com DIFAL',
-  ST_MVA_DIVERGENTE: 'Base/valor ST diverge do MVA',
-  ST_MVA_AUSENTE: 'Produto com ST mas BC zerada',
-  ST_MVA_NCM_SEM_ST: 'NCM sujeito a ST sem retencao',
-  ST_ALIQ_INCORRETA: 'Aliquota ST diverge da tabela',
+  // Substituicao tributaria
+  ST_APURACAO_INCONSISTENTE: 'Apuracao de ST inconsistente com documentos',
+  ST_APURACAO_DIVERGENTE: 'Apuracao de ST divergente (E210 vs documentos)',
+  ST_CST60_DEBITO_INDEVIDO: 'CST 60 com debito indevido de ICMS-ST',
+  ST_BC_MENOR_QUE_ITEM: 'Base de calculo ST menor que o valor do item',
+  ST_MISTURA_DIFAL: 'Mistura de ST com DIFAL na mesma operacao',
+  ST_MVA_DIVERGENTE: 'Base ou valor de ST diverge do MVA esperado',
+  ST_MVA_AUSENTE: 'Produto sujeito a ST com base de calculo zerada',
+  ST_MVA_NCM_SEM_ST: 'NCM sujeito a ST sem retencao aplicada',
+  ST_ALIQ_INCORRETA: 'Aliquota de ST diverge da tabela de referencia',
   // Apuracao
   APURACAO_DEBITO_DIVERGENTE: 'Debitos divergentes na apuracao (E110)',
   APURACAO_CREDITO_DIVERGENTE: 'Creditos divergentes na apuracao (E110)',
   APURACAO_SALDO_DIVERGENTE: 'Saldo divergente na apuracao (E110)',
-  // Beneficios / Ajustes
-  BENEFICIO_VALOR_DESPROPORCIONAL: 'Beneficio fiscal desproporcional',
-  BENEFICIO_SOBREPOSICAO: 'Sobreposicao de beneficios',
+  // Beneficios e ajustes
+  BENEFICIO_VALOR_DESPROPORCIONAL: 'Beneficio fiscal com valor desproporcional',
+  BENEFICIO_SOBREPOSICAO: 'Sobreposicao de beneficios fiscais',
   AJUSTE_CODIGO_GENERICO: 'Ajuste com codigo generico (E111)',
   AJUSTE_NUMERICO_SEM_VALIDADE_JURIDICA: 'Ajuste sem validade juridica',
   AJUSTE_SEM_RASTREABILIDADE: 'Ajuste sem rastreabilidade (E112/E113)',
   AJUSTE_SOMA_DIVERGENTE: 'Soma dos ajustes diverge do E110',
-  AJUSTE_UF_INCOMPATIVEL: 'Codigo de ajuste incompativel com UF',
+  AJUSTE_UF_INCOMPATIVEL: 'Codigo de ajuste incompativel com a UF',
   // Simples Nacional
   SN_PERFIL_INVALIDO: 'Perfil invalido para Simples Nacional',
-  SN_CREDITO_INCONSISTENTE: 'Credito ICMS inconsistente no SN',
+  SN_CREDITO_INCONSISTENTE: 'Credito de ICMS inconsistente no Simples Nacional',
   // Estrutural
   CAMPO_OBRIGATORIO: 'Campo obrigatorio ausente',
-  VALOR_INVALIDO: 'Valor invalido',
-  REGISTRO_DUPLICADO: 'Registro duplicado',
+  VALOR_INVALIDO: 'Valor invalido no campo',
+  REGISTRO_DUPLICADO: 'Registro duplicado no arquivo',
   REFERENCIA_INVALIDA: 'Referencia a registro inexistente',
   // Inventario
-  INVENTARIO_VL_ZERO: 'Item no inventario com valor zero',
+  INVENTARIO_VL_ZERO: 'Item do inventario com valor zero',
   INVENTARIO_QTD_EXCESSIVA: 'Quantidade excessiva no inventario',
-  INVENTARIO_ITEM_NAO_CADASTRADO: 'Item do inventario sem cadastro (0200)',
+  INVENTARIO_ITEM_NAO_CADASTRADO: 'Item do inventario sem cadastro no 0200',
   // Bloco K
-  K_BLOCO_SEM_MOVIMENTO_COM_REGISTROS: 'Bloco K sem movimento com registros',
+  K_BLOCO_SEM_MOVIMENTO_COM_REGISTROS: 'Bloco K sem movimento mas com registros',
   K_REF_ITEM_INEXISTENTE: 'Bloco K referencia item inexistente',
   K_QTD_NEGATIVA: 'Bloco K com quantidade negativa',
   K_ORDEM_SEM_COMPONENTES: 'Ordem de producao sem componentes',
-  // Calculo
+  // CST e semantica fiscal
+  CST_ALIQ_ZERO_FORTE: 'CST tributado com aliquota zero',
+  CST_CFOP_INCOMPATIVEL: 'CST incompativel com o CFOP',
+  CST_INVALIDO: 'CST invalido ou nao reconhecido',
+  CST_020_SEM_REDUCAO: 'CST 020 sem reducao de base aplicada',
+  ISENCAO_INCONSISTENTE: 'Isencao informada de forma inconsistente',
+  TRIBUTACAO_INCONSISTENTE: 'Tributacao informada de forma inconsistente',
+  DATE_OUT_OF_PERIOD: 'Data fora do periodo de apuracao',
+  // Calculo de impostos
   CALCULO_DIVERGENTE: 'Calculo de imposto divergente',
-  CALCULO_ARREDONDAMENTO: 'Arredondamento de calculo (centavos)',
-  // C190
-  C190_SOMA_DIVERGENTE: 'Soma C190 diverge do C100',
+  CALCULO_ARREDONDAMENTO: 'Diferenca de arredondamento no calculo (centavos)',
+  // Consolidacao C190
+  C190_SOMA_DIVERGENTE: 'Soma do C190 diverge do C100',
   C190_DIVERGE_C170: 'C190 diverge da soma dos itens C170',
+  C190_COMBINACAO_INCOMPATIVEL: 'Combinacao incompativel de CST, CFOP e aliquota no C190',
   // Encadeamento
-  ENCADEAMENTO_VL_DOC: 'Soma itens diverge do documento',
-  // Checklist / Meta
+  ENCADEAMENTO_VL_DOC: 'Soma dos itens diverge do valor do documento',
+  // Checklist e meta-regras
   CHECKLIST_INCOMPLETO: 'Checklist de auditoria incompleto',
-  CLASSIFICACAO_TIPO_ERRO: 'Classificacao de tipo de erro',
-  ACHADO_LIMITADO_AO_SPED: 'Achado limitado ao SPED',
-  AMOSTRAGEM_MATERIALIDADE: 'Amostragem por materialidade',
+  CLASSIFICACAO_TIPO_ERRO: 'Classificacao automatica do tipo de erro',
+  ACHADO_LIMITADO_AO_SPED: 'Achado limitado ao arquivo SPED',
+  AMOSTRAGEM_MATERIALIDADE: 'Amostragem por materialidade financeira',
 }
 
 /** Gera label amigavel a partir do error_type */
