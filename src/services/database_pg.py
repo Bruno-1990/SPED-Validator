@@ -129,10 +129,9 @@ def _apply_pg_schema_patches(raw_conn) -> None:
             )
         """)
 
-        # Migration 17: Hash de deduplicacao
+        # Migration 17: Hash de deduplicacao (UNIQUE por file_id)
         cur.execute("ALTER TABLE validation_errors ADD COLUMN IF NOT EXISTS error_hash TEXT")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_ve_error_hash ON validation_errors(error_hash)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_ve_file_hash ON validation_errors(file_id, error_hash)")
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_ve_file_hash ON validation_errors(file_id, error_hash) WHERE error_hash IS NOT NULL")
 
         raw_conn.commit()
     except Exception as exc:

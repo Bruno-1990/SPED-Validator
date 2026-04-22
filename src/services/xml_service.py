@@ -1494,8 +1494,8 @@ def _gerar_erros_com_sugestao_xml(
                     doc_sug, legal_json, err_hash,
                 ),
             )
-        except Exception as exc:
-            logger.warning("Falha ao inserir validation_error XML %s: %s", rule_id, exc)
+        except Exception:
+            pass  # Duplicata por hash ou outro erro — ignorar
 
     db.commit()
 

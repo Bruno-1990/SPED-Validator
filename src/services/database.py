@@ -418,8 +418,7 @@ _MIGRATIONS: dict[int, list[str]] = {
     17: [
         # ── Migration 17: Hash de deduplicacao para validation_errors ──
         "ALTER TABLE validation_errors ADD COLUMN error_hash TEXT",
-        "CREATE INDEX IF NOT EXISTS idx_ve_error_hash ON validation_errors(error_hash)",
-        "CREATE INDEX IF NOT EXISTS idx_ve_file_hash ON validation_errors(file_id, error_hash)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_ve_file_hash ON validation_errors(file_id, error_hash)",
     ],
     16: [
         # ── Migration 16: Motor de Cruzamento v.FINAL ──

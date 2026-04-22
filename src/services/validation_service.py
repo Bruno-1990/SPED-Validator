@@ -572,18 +572,21 @@ def _persist_errors(db: AuditConnection, file_id: int, errors: list[ValidationEr
             impacto = err.impacto
 
         materialidade = _calc_materialidade(err)
-        db.execute(
-            """INSERT INTO validation_errors
-               (file_id, record_id, line_number, register, field_no, field_name, value,
-                error_type, severity, message, expected_value, categoria, certeza, impacto,
-                materialidade, error_hash)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                file_id, record_id, err.line_number, err.register, err.field_no,
-                err.field_name, err.value, err.error_type,
-                _severity_for(err.error_type, rule_index), err.message,
-                err.expected_value, err.categoria, certeza, impacto,
-                materialidade, err.error_hash,
-            ),
-        )
+        try:
+            db.execute(
+                """INSERT INTO validation_errors
+                   (file_id, record_id, line_number, register, field_no, field_name, value,
+                    error_type, severity, message, expected_value, categoria, certeza, impacto,
+                    materialidade, error_hash)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    file_id, record_id, err.line_number, err.register, err.field_no,
+                    err.field_name, err.value, err.error_type,
+                    _severity_for(err.error_type, rule_index), err.message,
+                    err.expected_value, err.categoria, certeza, impacto,
+                    materialidade, err.error_hash,
+                ),
+            )
+        except Exception:
+            pass  # Duplicata por hash — ignorar silenciosamente
     db.commit()
