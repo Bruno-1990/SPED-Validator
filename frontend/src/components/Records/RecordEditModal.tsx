@@ -57,6 +57,7 @@ export default function RecordEditModal({ fileId, error, onClose, onSaved }: Pro
   const [editValue, setEditValue] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [justSaved, setJustSaved] = useState<Set<string>>(new Set())
 
   // Load record data
   useEffect(() => {
@@ -158,6 +159,8 @@ export default function RecordEditModal({ fileId, error, onClose, onSaved }: Pro
         correction_type: 'manual',
         justificativa: `Correcao manual: ${editingField} de "${field.value}" para "${editValue}"`,
       })
+      // Marcar campo como salvo com sucesso
+      setJustSaved(prev => new Set(prev).add(editingField))
       // Reload record to see updated value
       const updated = await api.getRecord(fileId, record.id)
       setRecord(updated)
@@ -172,6 +175,31 @@ export default function RecordEditModal({ fileId, error, onClose, onSaved }: Pro
   const handleCancelEdit = () => {
     setEditingField(null)
     setSaveError('')
+  }
+
+  // Corrigir direto com o valor sugerido (sem abrir editor)
+  const handleQuickFix = async (field: ParsedField) => {
+    if (!record || !field.error?.expected_value) return
+    setSaving(true)
+    setSaveError('')
+    try {
+      await api.updateRecord(fileId, record.id, {
+        field_no: field.index,
+        field_name: field.name,
+        new_value: field.error.expected_value,
+        error_id: field.error.id,
+        rule_id: field.error.error_type || 'MANUAL',
+        correction_type: 'assisted',
+        justificativa: `Correcao assistida: ${field.name} de "${field.value}" para "${field.error.expected_value}"`,
+      })
+      setJustSaved(prev => new Set(prev).add(field.name))
+      const updated = await api.getRecord(fileId, record.id)
+      setRecord(updated)
+      onSaved()
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Erro ao salvar')
+    }
+    setSaving(false)
   }
 
   if (loading) {
@@ -247,8 +275,10 @@ export default function RecordEditModal({ fileId, error, onClose, onSaved }: Pro
                 const isEditing = editingField === field.name
                 const hasError = field.status === 'error'
                 const isCorrected = field.status === 'corrected'
+                const wasSaved = justSaved.has(field.name)
 
                 const rowBg = isEditing ? 'bg-blue-50' :
+                  wasSaved ? 'bg-green-50' :
                   hasError ? 'bg-red-50' :
                   isCorrected ? 'bg-green-50' : ''
 
@@ -258,10 +288,11 @@ export default function RecordEditModal({ fileId, error, onClose, onSaved }: Pro
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs font-medium">{field.name}</span>
-                        {hasError && <span className="text-red-500 text-xs">&#9888;</span>}
-                        {isCorrected && <span className="text-green-600 text-xs">&#10003;</span>}
+                        {wasSaved && <span className="text-green-600 text-sm" title="Corrigido com sucesso">&#10004;</span>}
+                        {hasError && !wasSaved && <span className="text-red-500 text-xs">&#9888;</span>}
+                        {isCorrected && !wasSaved && <span className="text-green-600 text-xs">&#10003;</span>}
                         {field.isReadonly && <span className="text-gray-300 text-xs" title="Somente leitura">&#128274;</span>}
-                        {field.isMonetary && <span className="text-gray-300 text-xs" title="Valor monetario">R$</span>}
+                        {field.isMonetary && !wasSaved && <span className="text-gray-300 text-xs" title="Valor monetario">R$</span>}
                       </div>
                     </td>
                     <td className="px-4 py-2">
@@ -289,6 +320,8 @@ export default function RecordEditModal({ fileId, error, onClose, onSaved }: Pro
                             Cancelar
                           </button>
                         </div>
+                      ) : wasSaved ? (
+                        <span className="font-mono text-xs text-green-700 font-medium">{field.value} &#10004;</span>
                       ) : (
                         <div className="flex items-center gap-2">
                           <span className={`font-mono text-xs ${hasError ? 'text-red-700 font-medium' : 'text-gray-700'}`}>
@@ -303,19 +336,30 @@ export default function RecordEditModal({ fileId, error, onClose, onSaved }: Pro
                       )}
                     </td>
                     <td className="px-4 py-2">
-                      {!isEditing && !field.isReadonly && (
-                        <button
-                          onClick={() => handleStartEdit(field)}
-                          className={`text-xs px-2 py-1 rounded ${
-                            hasError
-                              ? 'bg-blue-600 text-white hover:bg-blue-700'
-                              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                          }`}
-                        >
-                          {hasError ? 'Corrigir' : 'Editar'}
-                        </button>
-                      )}
-                      {field.isReadonly && (
+                      {wasSaved ? (
+                        <span className="text-xs text-green-600 font-medium">Atualizado</span>
+                      ) : isEditing ? null : !field.isReadonly ? (
+                        hasError && field.error?.expected_value ? (
+                          <button
+                            onClick={() => handleQuickFix(field)}
+                            disabled={saving}
+                            className="text-xs bg-green-600 text-white px-2.5 py-1 rounded hover:bg-green-700 disabled:opacity-50"
+                          >
+                            {saving ? '...' : 'Corrigir'}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleStartEdit(field)}
+                            className={`text-xs px-2 py-1 rounded ${
+                              hasError
+                                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                            }`}
+                          >
+                            {hasError ? 'Editar' : 'Editar'}
+                          </button>
+                        )
+                      ) : (
                         <span className="text-xs text-gray-300">bloqueado</span>
                       )}
                     </td>
