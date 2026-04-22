@@ -85,7 +85,25 @@ export default function RecordEditModal({ fileId, error, onClose, onSaved }: Pro
         const names = REGISTER_FIELDS[rec.register] || []
         entries = json.map((v: string, i: number) => [names[i] || `Campo_${i}`, String(v ?? '')])
       } else {
-        entries = Object.entries(json).map(([k, v]) => [k, String(v ?? '')])
+        // Dict: reordenar na ordem oficial do leiaute SPED
+        const layoutOrder = REGISTER_FIELDS[rec.register]
+        if (layoutOrder) {
+          // Campos na ordem do leiaute, depois extras que nao estao no leiaute
+          const ordered: [string, string][] = []
+          for (const fieldName of layoutOrder) {
+            const val = (json as Record<string, unknown>)[fieldName]
+            ordered.push([fieldName, String(val ?? '')])
+          }
+          // Campos extras nao mapeados no leiaute
+          for (const [k, v] of Object.entries(json)) {
+            if (!layoutOrder.includes(k)) {
+              ordered.push([k, String(v ?? '')])
+            }
+          }
+          entries = ordered
+        } else {
+          entries = Object.entries(json).map(([k, v]) => [k, String(v ?? '')])
+        }
       }
     } catch {
       const parts = rec.raw_line.split('|').filter((_: string, i: number, arr: string[]) => i > 0 && i < arr.length - 1)
@@ -93,16 +111,14 @@ export default function RecordEditModal({ fileId, error, onClose, onSaved }: Pro
       entries = parts.map((v: string, i: number) => [names[i] || `Campo_${i}`, v])
     }
 
+    // Mapear erros por nome do campo (unica fonte confiavel)
     const errorByField = new Map<string, ValidationError>()
-    const errorByNo = new Map<number, ValidationError>()
     for (const e of allErrors) {
       if (e.field_name) errorByField.set(e.field_name, e)
-      if (e.field_no !== null) errorByNo.set(e.field_no, e)
     }
 
     return entries.map(([name, value], index) => {
-      // Priorizar match por nome (mais confiavel). field_no=0 ignorado (REG)
-      const fieldError = errorByField.get(name) || (index > 0 ? errorByNo.get(index) : undefined)
+      const fieldError = errorByField.get(name)
       const isError = fieldError?.status === 'open'
       const isCorrected = fieldError?.status === 'corrected'
       return {
