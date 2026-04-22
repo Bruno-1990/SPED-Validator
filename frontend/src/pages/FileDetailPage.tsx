@@ -231,8 +231,11 @@ export default function FileDetailPage() {
 
   if (!file) return <p className="text-gray-500">Carregando...</p>
 
+  // Conformidade: registros com erro / total de registros (limitado a 0-100%)
+  // Usa unique record_ids dos erros para nao contar multiplos erros no mesmo registro
+  const uniqueErrorRecords = new Set(errorItems.concat(alertItems).filter(e => e.record_id && e.status === 'open').map(e => e.record_id)).size
   const conformidade = file.total_records > 0
-    ? ((file.total_records - file.total_errors) / file.total_records * 100).toFixed(1)
+    ? Math.max(0, (100 - (uniqueErrorRecords / file.total_records * 100))).toFixed(1)
     : '100.0'
 
   const openErrors = errorItems.filter(e => e.status === 'open')
