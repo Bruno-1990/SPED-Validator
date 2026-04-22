@@ -1056,7 +1056,7 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
                 {reviewing && (
                   <div className="flex items-center gap-3 p-4 mb-4 bg-purple-50 border border-purple-200 rounded-lg">
                     <div className="animate-spin h-5 w-5 border-2 border-purple-500 border-t-transparent rounded-full" />
-                    <span className="text-sm text-purple-700">Analisando dados do SPED e XMLs com IA (GPT-4o)...</span>
+                    <span className="text-sm text-purple-700">Analisando dados do SPED e XMLs com IA (Claude Sonnet 4 + GPT-4o)...</span>
                   </div>
                 )}
 
