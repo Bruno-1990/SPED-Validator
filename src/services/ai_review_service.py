@@ -67,10 +67,18 @@ def review_error_group(
     file_id: int,
     error_type: str,
 ) -> dict:
-    """Revisa um grupo de erros com IA, usando dados reais do banco.
+    """Revisa grupo de erros com triangulacao: Claude x GPT x Base Legal.
+
+    Fluxo:
+    1. Monta dossie com dados reais do SPED e XML
+    2. Envia para Claude e GPT-4o em paralelo (quando ambas chaves disponiveis)
+    3. Busca base legal na documentacao indexada (embeddings)
+    4. Triangula: compara vereditos e cruza com base legal
+    5. Gera veredito final com nivel de confianca
 
     Returns:
-        dict com: veredito, justificativa, dados_analisados, amostras, cached
+        dict com: veredito, confianca, justificativa, analise_claude, analise_gpt,
+                  base_legal_relevante, amostras_analisadas, cached
     """
     # 1. Verificar cache
     cached = _get_cached_review(db, file_id, error_type)
@@ -80,7 +88,8 @@ def review_error_group(
     # 2. Buscar amostras de erros
     amostras = _buscar_amostras(db, file_id, error_type, max_amostras=5)
     if not amostras:
-        return {"veredito": "inconclusivo", "justificativa": "Nenhum erro encontrado para este grupo.", "cached": False}
+        return {"veredito": "inconclusivo", "confianca": "baixa",
+                "justificativa": "Nenhum erro encontrado para este grupo.", "cached": False}
 
     # 3. Buscar contexto do arquivo
     contexto = _buscar_contexto_arquivo(db, file_id)
@@ -88,21 +97,161 @@ def review_error_group(
     # 4. Montar dossie com dados reais
     dossie = _montar_dossie(db, file_id, error_type, amostras, contexto)
 
-    # 5. Chamar IA (Claude prioritario, OpenAI fallback)
-    resultado = _chamar_ia(dossie)
+    # 5. Chamar Claude e GPT em paralelo
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
 
-    # 6. Se inconclusivo, tentar 2a rodada com mais dados
-    if resultado["veredito"] == "inconclusivo":
-        dossie_expandido = _expandir_dossie(db, file_id, amostras, dossie)
-        if dossie_expandido != dossie:
-            resultado = _chamar_ia(dossie_expandido, rodada=2)
+    resultado_claude = None
+    resultado_gpt = None
 
-    # 7. Cachear
+    if anthropic_key and openai_key:
+        # Ambas chaves disponíveis — triangulacao completa
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def call_claude():
+            return _chamar_claude(anthropic_key, dossie)
+
+        def call_gpt():
+            return _chamar_gpt(openai_key, dossie)
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = {
+                executor.submit(call_claude): "claude",
+                executor.submit(call_gpt): "gpt",
+            }
+            for future in as_completed(futures, timeout=60):
+                provider = futures[future]
+                try:
+                    result = future.result()
+                    if provider == "claude":
+                        resultado_claude = result
+                    else:
+                        resultado_gpt = result
+                except Exception as e:
+                    logger.warning("Falha ao chamar %s: %s", provider, e)
+
+    elif anthropic_key:
+        resultado_claude = _chamar_claude(anthropic_key, dossie)
+    elif openai_key:
+        resultado_gpt = _chamar_gpt(openai_key, dossie)
+    else:
+        return {"veredito": "inconclusivo", "confianca": "baixa",
+                "justificativa": "Nenhuma chave de IA configurada.", "cached": False}
+
+    # 6. Buscar base legal para triangulacao
+    register = amostras[0].get("register", "") if amostras else ""
+    field_name = amostras[0].get("field_name", "") if amostras else ""
+    base_legal = _buscar_base_legal(error_type, register, field_name)
+
+    # 7. Triangular vereditos
+    resultado = _triangular(resultado_claude, resultado_gpt, base_legal, error_type)
     resultado["amostras_analisadas"] = len(amostras)
     resultado["cached"] = False
+
+    # 8. Cachear
     _salvar_cache(db, file_id, error_type, resultado)
 
     return resultado
+
+
+def _triangular(
+    claude: dict | None,
+    gpt: dict | None,
+    base_legal: str,
+    error_type: str,
+) -> dict:
+    """Triangula vereditos de Claude, GPT e base legal.
+
+    Regras de consenso:
+    - Ambos concordam → confianca alta
+    - Um concorda com base legal → confianca media (prevalece)
+    - Discordam sem base legal → confianca baixa (inconclusivo)
+    - Apenas um disponivel → confianca media
+    """
+    v_claude = (claude or {}).get("veredito", "")
+    v_gpt = (gpt or {}).get("veredito", "")
+    j_claude = (claude or {}).get("justificativa", "")
+    j_gpt = (gpt or {}).get("justificativa", "")
+    r_claude = (claude or {}).get("recomendacao", "")
+    r_gpt = (gpt or {}).get("recomendacao", "")
+    d_claude = (claude or {}).get("dados_sustentacao", "")
+    d_gpt = (gpt or {}).get("dados_sustentacao", "")
+
+    # Montar analises individuais para exibicao
+    analise_claude = f"**Veredito:** {v_claude}\n{j_claude}" if v_claude else ""
+    analise_gpt = f"**Veredito:** {v_gpt}\n{j_gpt}" if v_gpt else ""
+
+    # Caso 1: Ambos disponíveis e concordam
+    if v_claude and v_gpt and v_claude == v_gpt:
+        return {
+            "veredito": v_claude,
+            "confianca": "alta",
+            "justificativa": f"Claude e GPT-4o concordam: {j_claude or j_gpt}",
+            "dados_sustentacao": d_claude or d_gpt,
+            "recomendacao": r_claude or r_gpt,
+            "analise_claude": analise_claude,
+            "analise_gpt": analise_gpt,
+            "base_legal_relevante": base_legal,
+            "consenso": "unanime",
+        }
+
+    # Caso 2: Discordam
+    if v_claude and v_gpt and v_claude != v_gpt:
+        # Base legal como desempate
+        veredito_final = "inconclusivo"
+        confianca = "baixa"
+        justificativa = (
+            f"Divergencia entre modelos. "
+            f"Claude: {v_claude}. GPT-4o: {v_gpt}. "
+        )
+
+        # Se um diz valido e outro falso_positivo, a base legal pode ajudar
+        if base_legal:
+            justificativa += "Base legal consultada para desempate."
+            # O modelo que concorda com a legislacao prevalece
+            # Heuristica: se base legal menciona obrigatoriedade do campo, erro e valido
+            bl_lower = base_legal.lower()
+            if any(kw in bl_lower for kw in ["obrigatorio", "deve corresponder", "vedado", "nao permitido"]):
+                veredito_final = "valido"
+                confianca = "media"
+                justificativa += " A legislacao sustenta que o apontamento e pertinente."
+            elif any(kw in bl_lower for kw in ["facultativo", "pode ser omitido", "nao obrigatorio"]):
+                veredito_final = "falso_positivo"
+                confianca = "media"
+                justificativa += " A legislacao indica que o campo nao e obrigatorio neste contexto."
+            else:
+                justificativa += " Base legal nao foi conclusiva para desempate."
+        else:
+            justificativa += "Sem base legal para desempate — requer analise manual."
+
+        return {
+            "veredito": veredito_final,
+            "confianca": confianca,
+            "justificativa": justificativa,
+            "dados_sustentacao": f"Claude: {d_claude}\nGPT: {d_gpt}",
+            "recomendacao": r_claude or r_gpt,
+            "analise_claude": analise_claude,
+            "analise_gpt": analise_gpt,
+            "base_legal_relevante": base_legal,
+            "consenso": "divergente",
+        }
+
+    # Caso 3: Apenas um disponivel
+    resultado = claude or gpt or {}
+    veredito = resultado.get("veredito", "inconclusivo")
+    modelo = "Claude" if claude else "GPT-4o"
+
+    return {
+        "veredito": veredito,
+        "confianca": "media" if veredito != "inconclusivo" else "baixa",
+        "justificativa": f"Analise por {modelo}: {resultado.get('justificativa', '')}",
+        "dados_sustentacao": resultado.get("dados_sustentacao", ""),
+        "recomendacao": resultado.get("recomendacao", ""),
+        "analise_claude": analise_claude if claude else "",
+        "analise_gpt": analise_gpt if gpt else "",
+        "base_legal_relevante": base_legal,
+        "consenso": "unico_modelo",
+    }
 
 
 def _buscar_amostras(db: AuditConnection, file_id: int, error_type: str, max_amostras: int = 5) -> list[dict]:
@@ -417,57 +566,47 @@ def _expandir_dossie(db: AuditConnection, file_id: int, amostras: list[dict], do
     return dossie_original + "\n" + "\n".join(extras)
 
 
-def _chamar_ia(dossie: str, rodada: int = 1) -> dict:
-    """Envia dossie para IA (Claude prioritario, OpenAI fallback)."""
-    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-    openai_key = os.getenv("OPENAI_API_KEY")
+def _chamar_claude(api_key: str, dossie: str) -> dict:
+    """Envia dossie para Claude e parseia resposta."""
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model=MODEL_CLAUDE,
+            max_tokens=1000,
+            system=_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": f"Analise o seguinte dossie:\n\n{dossie}"}],
+        )
+        content = response.content[0].text if response.content else ""
+        result = _parsear_veredito(content)
+        result["modelo"] = MODEL_CLAUDE
+        return result
+    except Exception as e:
+        logger.warning("Falha ao chamar Claude: %s", e)
+        return {"veredito": "inconclusivo", "justificativa": f"Erro Claude: {e}", "modelo": MODEL_CLAUDE}
 
-    prompt_user = f"{'[RODADA 2 — DADOS EXPANDIDOS] ' if rodada > 1 else ''}Analise o seguinte dossie:\n\n{dossie}"
 
-    # Tentar Claude primeiro
-    if anthropic_key:
-        try:
-            import anthropic
-            client = anthropic.Anthropic(api_key=anthropic_key)
-            response = client.messages.create(
-                model=MODEL_CLAUDE,
-                max_tokens=1000,
-                system=_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": prompt_user}],
-            )
-            content = response.content[0].text if response.content else ""
-            result = _parsear_veredito(content)
-            result["modelo"] = MODEL_CLAUDE
-            return result
-        except Exception as e:
-            logger.warning("Falha ao chamar Claude, tentando OpenAI: %s", e)
-
-    # Fallback OpenAI
-    if openai_key:
-        try:
-            import openai
-            client = openai.OpenAI(api_key=openai_key)
-            response = client.chat.completions.create(
-                model=MODEL_OPENAI,
-                messages=[
-                    {"role": "system", "content": _SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt_user},
-                ],
-                temperature=0.1,
-                max_tokens=1000,
-            )
-            content = response.choices[0].message.content or ""
-            result = _parsear_veredito(content)
-            result["modelo"] = MODEL_OPENAI
-            return result
-        except Exception as e:
-            logger.warning("Falha ao chamar OpenAI para review: %s", e)
-
-    return {
-        "veredito": "inconclusivo",
-        "justificativa": "Nenhuma chave de IA configurada (ANTHROPIC_API_KEY ou OPENAI_API_KEY).",
-        "resposta_completa": "",
-    }
+def _chamar_gpt(api_key: str, dossie: str) -> dict:
+    """Envia dossie para GPT-4o e parseia resposta."""
+    try:
+        import openai
+        client = openai.OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model=MODEL_OPENAI,
+            messages=[
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": f"Analise o seguinte dossie:\n\n{dossie}"},
+            ],
+            temperature=0.1,
+            max_tokens=1000,
+        )
+        content = response.choices[0].message.content or ""
+        result = _parsear_veredito(content)
+        result["modelo"] = MODEL_OPENAI
+        return result
+    except Exception as e:
+        logger.warning("Falha ao chamar GPT-4o: %s", e)
+        return {"veredito": "inconclusivo", "justificativa": f"Erro GPT: {e}", "modelo": MODEL_OPENAI}
 
 
 def _parsear_veredito(content: str) -> dict:

@@ -285,9 +285,14 @@ export const api = {
   reviewErrorGroup: (fileId: number, errorType: string) =>
     request<{
       veredito: 'valido' | 'falso_positivo' | 'inconclusivo'
+      confianca: 'alta' | 'media' | 'baixa'
       justificativa: string
       dados_sustentacao: string
       recomendacao: string
+      analise_claude: string
+      analise_gpt: string
+      base_legal_relevante: string
+      consenso: 'unanime' | 'divergente' | 'unico_modelo'
       amostras_analisadas: number
       cached: boolean
     }>(`/ai/review/${fileId}/${encodeURIComponent(errorType)}`, { method: 'POST' }),

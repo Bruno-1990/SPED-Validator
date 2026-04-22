@@ -756,8 +756,10 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
   // Revisao IA (tribunal de validacao)
   const [reviewing, setReviewing] = useState(false)
   const [reviewResult, setReviewResult] = useState<{
-    veredito: string; justificativa: string; dados_sustentacao: string;
-    recomendacao: string; amostras_analisadas: number; cached: boolean;
+    veredito: string; confianca: string; justificativa: string; dados_sustentacao: string;
+    recomendacao: string; analise_claude: string; analise_gpt: string;
+    base_legal_relevante: string; consenso: string;
+    amostras_analisadas: number; cached: boolean;
   } | null>(null)
   const [reviewGroupKey, setReviewGroupKey] = useState<string | null>(null)
 
@@ -771,8 +773,11 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
       setReviewResult(result)
     } catch (e) {
       setReviewResult({
-        veredito: 'inconclusivo', justificativa: e instanceof Error ? e.message : 'Erro na revisao',
-        dados_sustentacao: '', recomendacao: '', amostras_analisadas: 0, cached: false,
+        veredito: 'inconclusivo', confianca: 'baixa',
+        justificativa: e instanceof Error ? e.message : 'Erro na revisao',
+        dados_sustentacao: '', recomendacao: '',
+        analise_claude: '', analise_gpt: '', base_legal_relevante: '',
+        consenso: '', amostras_analisadas: 0, cached: false,
       })
     }
     setReviewing(false)
@@ -960,7 +965,8 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
                     activeReview.veredito === 'falso_positivo' ? 'bg-amber-50 border-amber-300' :
                     'bg-gray-50 border-gray-300'
                   }`}>
-                    <div className="flex items-center gap-3 mb-2">
+                    {/* Header com veredito + confianca */}
+                    <div className="flex items-center gap-3 mb-3 flex-wrap">
                       <span className={`text-lg font-bold ${
                         activeReview.veredito === 'valido' ? 'text-green-700' :
                         activeReview.veredito === 'falso_positivo' ? 'text-amber-700' :
@@ -970,26 +976,73 @@ function ErrorsAlertsList({ items, variant, expandedError, onToggleExpand, fileI
                          activeReview.veredito === 'falso_positivo' ? 'Falso Positivo' :
                          'Inconclusivo'}
                       </span>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        activeReview.veredito === 'valido' ? 'bg-green-200 text-green-800' :
-                        activeReview.veredito === 'falso_positivo' ? 'bg-amber-200 text-amber-800' :
-                        'bg-gray-200 text-gray-600'
-                      }`}>
-                        {activeReview.amostras_analisadas} amostra(s) analisada(s)
-                        {activeReview.cached && ' (cache)'}
+                      {activeReview.confianca && (
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          activeReview.confianca === 'alta' ? 'bg-green-200 text-green-800' :
+                          activeReview.confianca === 'media' ? 'bg-yellow-200 text-yellow-800' :
+                          'bg-gray-200 text-gray-600'
+                        }`}>
+                          Confianca {activeReview.confianca}
+                        </span>
+                      )}
+                      {activeReview.consenso === 'unanime' && (
+                        <span className="px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700 font-medium">
+                          Claude + GPT concordam
+                        </span>
+                      )}
+                      {activeReview.consenso === 'divergente' && (
+                        <span className="px-2 py-0.5 rounded text-xs bg-red-100 text-red-700 font-medium">
+                          Modelos divergem
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-400 ml-auto">
+                        {activeReview.amostras_analisadas} amostra(s){activeReview.cached ? ' (cache)' : ''}
                       </span>
                     </div>
+
+                    {/* Justificativa */}
                     {activeReview.justificativa && (
-                      <p className="text-sm text-gray-800 mb-2">{activeReview.justificativa}</p>
+                      <p className="text-sm text-gray-800 mb-3">{activeReview.justificativa}</p>
                     )}
-                    {activeReview.dados_sustentacao && (
-                      <details className="mb-2">
-                        <summary className="text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-700">Dados que sustentam</summary>
-                        <p className="text-xs text-gray-600 mt-1 whitespace-pre-line">{activeReview.dados_sustentacao}</p>
+
+                    {/* Analises individuais (colapsavel) */}
+                    {(activeReview.analise_claude || activeReview.analise_gpt) && (
+                      <details className="mb-3">
+                        <summary className="text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-700">
+                          Analises individuais (Claude / GPT)
+                        </summary>
+                        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {activeReview.analise_claude && (
+                            <div className="text-xs bg-white rounded border p-3">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-semibold text-purple-700">Claude</span>
+                              </div>
+                              <p className="text-gray-600 whitespace-pre-line">{activeReview.analise_claude}</p>
+                            </div>
+                          )}
+                          {activeReview.analise_gpt && (
+                            <div className="text-xs bg-white rounded border p-3">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-semibold text-emerald-700">GPT-4o</span>
+                              </div>
+                              <p className="text-gray-600 whitespace-pre-line">{activeReview.analise_gpt}</p>
+                            </div>
+                          )}
+                        </div>
                       </details>
                     )}
+
+                    {/* Base legal */}
+                    {activeReview.base_legal_relevante && (
+                      <details className="mb-3">
+                        <summary className="text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-700">Base legal consultada</summary>
+                        <p className="text-xs text-gray-600 mt-1 whitespace-pre-line">{activeReview.base_legal_relevante}</p>
+                      </details>
+                    )}
+
+                    {/* Recomendacao */}
                     {activeReview.recomendacao && (
-                      <div className="text-sm text-blue-800 bg-blue-50 rounded p-2 mt-2">
+                      <div className="text-sm text-blue-800 bg-blue-50 rounded p-2">
                         <span className="font-medium">Recomendacao:</span> {activeReview.recomendacao}
                       </div>
                     )}
