@@ -865,13 +865,16 @@ def _generate_ai_doc_suggestion(
             import anthropic
             client = anthropic.Anthropic(api_key=anthropic_key)
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=600,
                 system=_AI_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_prompt}],
             )
-            content = response.content[0].text if response.content else ""
-            model_used = "claude-sonnet-4"
+            content = next(
+                (b.text for b in response.content if b.type == "text"),
+                "",
+            )
+            model_used = "claude-sonnet-4-6"
         except Exception as e:
             logger.warning("Falha Claude doc_suggestion, tentando OpenAI: %s", e)
 

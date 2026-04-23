@@ -26,7 +26,8 @@ from .db_types import AuditConnection
 logger = logging.getLogger(__name__)
 
 MODEL_OPENAI = "gpt-4o"
-MODEL_CLAUDE = "claude-sonnet-4-20250514"
+# Sonnet 4.6 — GA, sem suffix de data. Sonnet 4 (20250514) entra em retirada em jun/2026.
+MODEL_CLAUDE = "claude-sonnet-4-6"
 
 
 _SYSTEM_PROMPT = """Voce e um auditor fiscal senior especializado em SPED EFD ICMS/IPI.
@@ -566,21 +567,83 @@ def _expandir_dossie(db: AuditConnection, file_id: int, amostras: list[dict], do
     return dossie_original + "\n" + "\n".join(extras)
 
 
+# Schema do veredito (structured outputs) — garante resposta em JSON parseavel.
+_VEREDITO_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "veredito": {
+            "type": "string",
+            "enum": ["valido", "falso_positivo", "inconclusivo"],
+            "description": "Classificacao do apontamento de erro.",
+        },
+        "justificativa": {
+            "type": "string",
+            "description": "Explicacao em 2-4 frases com base nos dados analisados.",
+        },
+        "dados_sustentacao": {
+            "type": "string",
+            "description": "Valores especificos dos registros que sustentam a conclusao.",
+        },
+        "recomendacao": {
+            "type": "string",
+            "description": "Se valido: o que o contribuinte deve corrigir. Se falso_positivo: por que o sistema errou.",
+        },
+    },
+    "required": ["veredito", "justificativa", "dados_sustentacao", "recomendacao"],
+    "additionalProperties": False,
+}
+
+
 def _chamar_claude(api_key: str, dossie: str) -> dict:
-    """Envia dossie para Claude e parseia resposta."""
+    """Envia dossie para Claude e parseia resposta via JSON schema.
+
+    - Sonnet 4.6 (GA) com adaptive thinking — modelo decide quando/quanto pensar.
+    - output_config.format garante resposta JSON conforme _VEREDITO_SCHEMA,
+      eliminando fragilidade do parser de texto.
+    - max_tokens=8000 da headroom para thinking tokens + resposta.
+    """
+    import anthropic
     try:
-        import anthropic
         client = anthropic.Anthropic(api_key=api_key)
         response = client.messages.create(
             model=MODEL_CLAUDE,
-            max_tokens=1000,
+            max_tokens=8000,
+            thinking={"type": "adaptive"},
+            output_config={
+                "effort": "medium",
+                "format": {"type": "json_schema", "schema": _VEREDITO_SCHEMA},
+            },
             system=_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": f"Analise o seguinte dossie:\n\n{dossie}"}],
         )
-        content = response.content[0].text if response.content else ""
-        result = _parsear_veredito(content)
-        result["modelo"] = MODEL_CLAUDE
-        return result
+        # Com structured outputs o text block contem JSON valido.
+        content = next(
+            (b.text for b in response.content if b.type == "text"),
+            "",
+        )
+        try:
+            data = json.loads(content) if content else {}
+        except json.JSONDecodeError:
+            # Fallback: parser legado caso o modelo (raramente) retorne texto nao-JSON
+            logger.warning("Claude retornou resposta nao-JSON, usando parser legado")
+            data = _parsear_veredito(content)
+        data["modelo"] = MODEL_CLAUDE
+        data["resposta_completa"] = content
+        return data
+    except anthropic.APIStatusError as e:
+        logger.warning("Claude API status %s: %s", e.status_code, e.message)
+        return {
+            "veredito": "inconclusivo",
+            "justificativa": f"Erro Claude API {e.status_code}: {e.message}",
+            "modelo": MODEL_CLAUDE,
+        }
+    except anthropic.APIConnectionError as e:
+        logger.warning("Claude conexao: %s", e)
+        return {
+            "veredito": "inconclusivo",
+            "justificativa": f"Erro de conexao com Claude: {e}",
+            "modelo": MODEL_CLAUDE,
+        }
     except Exception as e:
         logger.warning("Falha ao chamar Claude: %s", e)
         return {"veredito": "inconclusivo", "justificativa": f"Erro Claude: {e}", "modelo": MODEL_CLAUDE}
