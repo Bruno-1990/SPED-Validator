@@ -5,8 +5,15 @@ export const API_BASE = (import.meta.env.VITE_API_BASE || '/api').replace(/\/$/,
 
 /** Chave alinhada ao `API_KEY` do backend — defina `VITE_API_KEY` em `.env.local`. */
 const API_KEY =
-  (import.meta.env.VITE_API_KEY && String(import.meta.env.VITE_API_KEY).trim()) ||
-  'sped-audit-dev-key-2026-central-contabil'
+  (import.meta.env.VITE_API_KEY && String(import.meta.env.VITE_API_KEY).trim()) || ''
+
+if (!API_KEY) {
+  if (import.meta.env.DEV) {
+    console.error('[SPED] VITE_API_KEY ausente em .env.local — requests retornarão 401')
+  } else {
+    throw new Error('VITE_API_KEY obrigatória em producao')
+  }
+}
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers)

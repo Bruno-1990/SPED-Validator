@@ -12,6 +12,8 @@ warnings.filterwarnings(
     category=UserWarning,
 )
 
+import os  # noqa: E402
+
 from fastapi import Depends, FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
@@ -43,10 +45,15 @@ async def _unhandled(request: StarletteRequest, exc: Exception) -> JSONResponse:
     _logger.error("Unhandled: %s\n%s", exc, "".join(tb))
     return JSONResponse(status_code=500, content={"detail": str(exc)})
 
-# CORS — permitir frontend local
+# CORS — bug #2: wildcard + credentials viola spec; lista vem de ALLOWED_ORIGINS
+_origins_env = os.getenv(
+    "ALLOWED_ORIGINS", "http://localhost:5175,http://localhost:5173"
+)
+_allowed_origins = [o.strip() for o in _origins_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
