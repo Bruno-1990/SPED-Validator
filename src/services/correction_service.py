@@ -10,6 +10,7 @@ Governanca de correcoes:
 from __future__ import annotations
 
 import json
+import threading
 
 from .db_types import AuditConnection
 from ..validators.helpers import REGISTER_FIELDS, fields_to_dict
@@ -56,18 +57,23 @@ FIELDS_NO_AUTOMATICO_MESMO_COM_REF_XML: frozenset[str] = frozenset({
 })
 
 
-# Cache rule_id -> corrigivel
+# Cache rule_id -> corrigivel (bug #7: lock evita race no cold-start)
 _corrigivel_cache: dict[str, str] | None = None
+_corrigivel_lock = threading.Lock()
 
 
 def _get_corrigivel(rule_id: str | None) -> str:
     """Retorna o nivel de corrigibilidade da regra."""
     global _corrigivel_cache
     if _corrigivel_cache is None:
-        loader = RuleLoader()
-        _corrigivel_cache = {}
-        for r in loader.load_all_rules():
-            _corrigivel_cache[r["id"]] = r.get("corrigivel", "proposta")
+        with _corrigivel_lock:
+            if _corrigivel_cache is None:  # double-checked locking
+                loader = RuleLoader()
+                new_cache: dict[str, str] = {}
+                for r in loader.load_all_rules():
+                    new_cache[r["id"]] = r.get("corrigivel", "proposta")
+                # Atribuicao atomica: outras threads passam a ver o dict populado
+                _corrigivel_cache = new_cache
     if not rule_id:
         return "proposta"
     return _corrigivel_cache.get(rule_id, "proposta")

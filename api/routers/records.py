@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.deps import get_db
+from src.services.db_helpers import scalar_or
 from src.services.db_types import AuditConnection
 from api.schemas.models import CorrectionRequest, PaginatedResponse, RecordInfo
 from src.services.correction_service import (
@@ -40,7 +41,7 @@ def list_records(
         where += " AND status = ?"
         params.append(status)
 
-    total = db.execute(f"SELECT COUNT(*) FROM sped_records {where}", params).fetchone()[0]  # noqa: S608  # nosec B608
+    total = scalar_or(db.execute(f"SELECT COUNT(*) FROM sped_records {where}", params))  # noqa: S608  # nosec B608
 
     offset = (page - 1) * page_size
     query = f"SELECT * FROM sped_records {where} ORDER BY line_number LIMIT ? OFFSET ?"  # noqa: S608  # nosec B608

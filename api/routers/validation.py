@@ -227,16 +227,19 @@ def summary(file_id: int, db: AuditConnection = Depends(get_db)) -> ErrorSummary
 def _has_xml_cruzamento(db: AuditConnection, file_id: int) -> bool:
     """Verifica se o cruzamento XML foi executado (ha resultados persistidos)."""
     try:
-        cnt = db.execute(
-            "SELECT COUNT(*) FROM nfe_cruzamento WHERE file_id = ?", (file_id,)
-        ).fetchone()[0]
+        from src.services.db_helpers import scalar_or
+        cnt = scalar_or(
+            db.execute("SELECT COUNT(*) FROM nfe_cruzamento WHERE file_id = ?", (file_id,))
+        )
         if cnt > 0:
             return True
         # Pode ter rodado sem divergencias — verifica via validation_errors
-        cnt2 = db.execute(
-            "SELECT COUNT(*) FROM validation_errors WHERE file_id = ? AND categoria = 'cruzamento_xml'",
-            (file_id,),
-        ).fetchone()[0]
+        cnt2 = scalar_or(
+            db.execute(
+                "SELECT COUNT(*) FROM validation_errors WHERE file_id = ? AND categoria = 'cruzamento_xml'",
+                (file_id,),
+            )
+        )
         if cnt2 > 0:
             return True
         row = db.execute(

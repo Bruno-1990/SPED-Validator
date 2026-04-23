@@ -31,7 +31,8 @@ def audit_db(tmp_path: Path) -> sqlite3.Connection:
     path = tmp_path / "audit.db"
     conn = init_audit_db(path)
     conn.row_factory = sqlite3.Row
-    return conn
+    yield conn
+    conn.close()
 
 
 @pytest.fixture
@@ -64,15 +65,16 @@ def seeded_db(audit_db: sqlite3.Connection) -> sqlite3.Connection:
 def client(seeded_db: sqlite3.Connection) -> TestClient:
     """TestClient com banco de teste injetado."""
     def _override_db():
-        try:
-            yield seeded_db
-        finally:
-            pass
+        yield seeded_db
 
     app.dependency_overrides[get_db] = _override_db
-    c = TestClient(app, headers={"X-API-Key": os.environ.get("API_KEY", "test-api-key-for-pytest-minimum-32-chars!")})
-    yield c
-    app.dependency_overrides.clear()
+    try:
+        yield TestClient(
+            app,
+            headers={"X-API-Key": os.environ.get("API_KEY", "test-api-key-for-pytest-minimum-32-chars!")},
+        )
+    finally:
+        app.dependency_overrides.clear()
 
 
 # ──────────────────────────────────────────────

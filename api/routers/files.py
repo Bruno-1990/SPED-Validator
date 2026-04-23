@@ -36,29 +36,28 @@ def upload(
     # Leitura streaming em chunks de 1 MB
     chunk_size = 1024 * 1024
     total_read = 0
-    with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as tmp:
-        while True:
-            chunk = file.file.read(chunk_size)
-            if not chunk:
-                break
-            total_read += len(chunk)
-            if total_read > MAX_FILE_SIZE:
-                tmp.close()
-                Path(tmp.name).unlink(missing_ok=True)
-                raise HTTPException(
-                    status_code=413,
-                    detail={
-                        "error": "FILE_TOO_LARGE",
-                        "message": f"Arquivo excede o limite de {MAX_UPLOAD_MB}MB. "
-                                   f"Tamanho recebido: {total_read / 1024 / 1024:.1f}MB.",
-                        "limit_mb": MAX_UPLOAD_MB,
-                        "received_mb": round(total_read / 1024 / 1024, 1),
-                    },
-                )
-            tmp.write(chunk)
-        tmp_path = Path(tmp.name)
-
+    tmp_path: Path | None = None
     try:
+        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+            while True:
+                chunk = file.file.read(chunk_size)
+                if not chunk:
+                    break
+                total_read += len(chunk)
+                if total_read > MAX_FILE_SIZE:
+                    raise HTTPException(
+                        status_code=413,
+                        detail={
+                            "error": "FILE_TOO_LARGE",
+                            "message": f"Arquivo excede o limite de {MAX_UPLOAD_MB}MB. "
+                                       f"Tamanho recebido: {total_read / 1024 / 1024:.1f}MB.",
+                            "limit_mb": MAX_UPLOAD_MB,
+                            "received_mb": round(total_read / 1024 / 1024, 1),
+                        },
+                    )
+                tmp.write(chunk)
+
         file_id = upload_file(db, tmp_path)
 
         # Salvar regime informado pelo usuario (override)
@@ -79,7 +78,8 @@ def upload(
             status=info["status"],
         )
     finally:
-        tmp_path.unlink(missing_ok=True)
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
 
 
 @router.get("", response_model=list[FileInfo])
