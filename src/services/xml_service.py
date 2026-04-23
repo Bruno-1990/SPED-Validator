@@ -908,10 +908,30 @@ def cruzar_xml_vs_sped(
             (file_id, sped["record_id"], file_id, sped["record_id"]),
         ).fetchone()[0]
         if qtd_xml != qtd_sped:
-            findings.append(_finding(file_id, nfe_id, chave, "XML012", "error",
-                                     "qtd_itens", str(qtd_xml), "count(C170)", str(qtd_sped),
-                                     abs(qtd_xml - qtd_sped),
-                                     f"XML tem {qtd_xml} itens, SPED tem {qtd_sped} C170."))
+            # Excecao 2 do Guia Pratico EFD v3.2.2 (linhas 3087-3091): NF-e de emissao
+            # propria (COD_MOD=55, IND_EMIT=0) dispensa C170 na regra geral — so exigido
+            # se houver C176/C180/C181/C177 filhos (Excecao 10 do C100).
+            cod_mod = str(sf.get("COD_MOD", "") or "").strip()
+            ind_emit = str(sf.get("IND_EMIT", "") or "").strip()
+            dispensado = False
+            if cod_mod == "55" and ind_emit == "0" and qtd_sped == 0:
+                has_complementar = db.execute(
+                    "SELECT 1 FROM sped_records WHERE file_id = ? "
+                    "AND register IN ('C176','C177','C180','C181') "
+                    "AND line_number > (SELECT line_number FROM sped_records WHERE id = ?) "
+                    "AND line_number < COALESCE("
+                    "  (SELECT MIN(line_number) FROM sped_records "
+                    "   WHERE file_id = ? AND register IN ('C100','C990') "
+                    "   AND line_number > (SELECT line_number FROM sped_records WHERE id = ?)),"
+                    "  999999999) LIMIT 1",
+                    (file_id, sped["record_id"], file_id, sped["record_id"]),
+                ).fetchone()
+                dispensado = has_complementar is None
+            if not dispensado:
+                findings.append(_finding(file_id, nfe_id, chave, "XML012", "error",
+                                         "qtd_itens", str(qtd_xml), "count(C170)", str(qtd_sped),
+                                         abs(qtd_xml - qtd_sped),
+                                         f"XML tem {qtd_xml} itens, SPED tem {qtd_sped} C170."))
 
         # XML013: CNPJ participante
         cod_part = sf.get("COD_PART", "")
