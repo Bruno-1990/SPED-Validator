@@ -134,12 +134,17 @@ def _determine_regime_by_cst(db: AuditConnection, file_id: int) -> tuple[TaxRegi
     """
     from .db_types import json_field
     jf = json_field(db, "fields_json", "CST_ICMS")
+    # No SPED, CST_ICMS tem 3 digitos: origem(1) + CST(2).
+    # CSTs normais validos (2 ultimos digitos): 00,10,20,30,40,41,50,51,60,61,70,90
+    # CSOSNs do Simples Nacional: 101,102,103,201,202,203,300,400,500,900
+    # Problema: '300' pode ser origem=3+CST=00 (normal) OU CSOSN 300 (isento SN).
+    # Solucao: se os 2 ultimos digitos sao CST normal valido, e regime Normal.
+    # So classifica como SN se os 2 ultimos NAO forem CST normal valido.
+    right2 = f"RIGHT({jf}, 2)" if _is_pg(db) else f"SUBSTR({jf}, -2)"
+    cst_normais = "('00','10','20','30','40','41','50','51','60','61','70','90')"
     sql = f"""SELECT DISTINCT
         CASE
-            WHEN {jf}
-                IN ('101','102','103','201','202','203','300','400','500','900')
-            THEN 'SN'
-            WHEN CAST({jf} AS INTEGER) BETWEEN 101 AND 900
+            WHEN LENGTH({jf}) = 3 AND {right2} NOT IN {cst_normais}
             THEN 'SN'
             ELSE 'NORMAL'
         END as regime_type
@@ -281,17 +286,26 @@ def build_context(
     for c in conflitos:
         ctx.context_warnings.append(f"CONFLITO de beneficios: {c}. Auditor deve revisar.")
 
-    # Verificar se o usuario informou regime_override no upload
+    # Verificar se o usuario informou regime_override no upload (bug #10)
     row_override = db.execute(
         "SELECT regime_override FROM sped_files WHERE id = ?",
         (file_id,),
     ).fetchone()
     if row_override:
         override = row_override[0] if isinstance(row_override, tuple) else row_override["regime_override"]
-        if override == "simples_nacional":
-            ctx.regime = TaxRegime.SIMPLES_NACIONAL
-        elif override == "normal":
-            ctx.regime = TaxRegime.NORMAL
+        if override:
+            normalized = str(override).strip().lower()
+            if normalized == "simples_nacional":
+                ctx.regime = TaxRegime.SIMPLES_NACIONAL
+                ctx.regime_source = "OVERRIDE"
+            elif normalized == "normal":
+                ctx.regime = TaxRegime.NORMAL
+                ctx.regime_source = "OVERRIDE"
+            else:
+                ctx.context_warnings.append(
+                    f"regime_override='{override}' invalido — mantendo regime "
+                    f"detectado por CST ({ctx.regime.value})"
+                )
 
     # -- Participantes (0150) --
     rows_0150 = db.execute(
