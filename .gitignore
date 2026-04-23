@@ -26,6 +26,9 @@ data/sped_files/
 
 # Env (contém senhas)
 .env
+.env.local
+.env.*.local
+frontend/.env.local
 
 # OS
 .DS_Store
