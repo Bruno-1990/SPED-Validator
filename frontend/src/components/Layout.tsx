@@ -33,14 +33,17 @@ export default function Layout() {
 
       {/* Sidebar */}
       <nav className={`
-        fixed md:static inset-y-0 left-0 z-40
-        w-56 bg-gray-800 text-white p-4 flex flex-col gap-1
-        transform transition-transform duration-200 ease-in-out
+        group/sidebar fixed md:static inset-y-0 left-0 z-40
+        bg-gray-800 text-white p-4 flex flex-col gap-1
+        transform transition-all duration-200 ease-in-out
+        w-56 md:w-16 md:hover:w-56
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0
       `}>
-        <div className="flex items-center justify-between mb-6 px-3">
-          <h1 className="text-lg font-bold">SPED Audit</h1>
+        <div className="flex items-center justify-between mb-6 px-3 min-h-[28px]">
+          <h1 className="text-lg font-bold whitespace-nowrap overflow-hidden transition-opacity duration-200 md:opacity-0 md:group-hover/sidebar:opacity-100">
+            SPED Audit
+          </h1>
           <button
             onClick={() => setSidebarOpen(false)}
             className="md:hidden text-gray-400 hover:text-white text-xl"
@@ -54,11 +57,15 @@ export default function Layout() {
             key={item.path}
             to={item.path}
             onClick={() => setSidebarOpen(false)}
-            className={`px-3 py-2 rounded text-sm ${
+            title={item.label}
+            className={`px-3 py-2 rounded text-sm flex items-center gap-2 whitespace-nowrap overflow-hidden ${
               location.pathname === item.path ? 'bg-gray-600' : 'hover:bg-gray-700'
             }`}
           >
-            {item.icon} {item.label}
+            <span className="shrink-0">{item.icon}</span>
+            <span className="transition-opacity duration-200 md:opacity-0 md:group-hover/sidebar:opacity-100">
+              {item.label}
+            </span>
           </Link>
         ))}
       </nav>

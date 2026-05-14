@@ -45,3 +45,6 @@ htmlcov/
 # Scripts gerados
 _run_api.bat
 _run_frontend.bat
+
+# Nested repo (clone local do SPED-Validator dentro da arvore)
+SPED/

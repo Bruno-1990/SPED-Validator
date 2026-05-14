@@ -1,0 +1,104 @@
+# Mapeamento cBenef: XML da NF-e → SPED EFD ICMS/IPI
+# Fonte: NT 2019.001 (DFe) e Guia Pratico EFD ICMS/IPI
+# Atualizado: 2026-04-13
+
+version: "1.0"
+
+origem_xml:
+  campo_principal: cBenef
+  xpath: ".//infNFe/det/imposto/ICMS/*/cBenef"
+  descricao: >
+    Codigo de Beneficio Fiscal na UF aplicado ao item.
+    Preenchido pelo emitente conforme tabela publicada pela SEFAZ da UF.
+
+  campos_relacionados:
+    - campo: vICMSDeson
+      xpath: ".//infNFe/det/imposto/ICMS/*/vICMSDeson"
+      descricao: Valor do ICMS desonerado vinculado ao cBenef
+
+    - campo: motDesICMS
+      xpath: ".//infNFe/det/imposto/ICMS/*/motDesICMS"
+      descricao: Motivo da desoneracao (1=Taxi, 3=Produtor, 9=Outros, etc.)
+
+correspondencias_sped:
+  - registro: E115
+    campo: COD_INF_ADIC
+    valor_campo: VL_INF_ADIC
+    descricao_campo: DESCR_COMPL_AJ
+    regra: >
+      Correspondencia mais direta dentro da EFD ICMS/IPI.
+      A UF exige a informacao do beneficio em apuracao/informacao adicional.
+      O valor relacionado vai em VL_INF_ADIC.
+    prioridade: 1
+
+  - registro: C197
+    campo: COD_AJ
+    valor_campo: VL_ICMS (ou VL_OUTROS)
+    descricao_campo: DESCR_COMPL_AJ
+    regra: >
+      Usado quando o efeito do beneficio precisa ser escriturado no nivel
+      do documento fiscal, por meio de ajuste/observacao fiscal.
+      Nao e o campo cBenef literal, mas o reflexo dele na escrituracao.
+    prioridade: 2
+
+  - registro: E111
+    campo: COD_AJ_APUR
+    valor_campo: VL_AJ_APUR
+    descricao_campo: DESCR_COMPL_AJ
+    regra: >
+      Utilizado quando o beneficio repercute diretamente na apuracao do ICMS.
+      Tambem nao e o cBenef literal, mas o codigo de ajuste decorrente do beneficio.
+    prioridade: 3
+
+  - registro: C197_E111_E115
+    campo: DESCR_COMPL_AJ
+    regra: >
+      Usado quando a regra da UF ou do ajuste exigir detalhamento textual complementar.
+
+trilha_completa_beneficio:
+  descricao: >
+    A trilha completa de rastreabilidade de um beneficio fiscal no SPED e:
+    cBenef (XML) → C179 (info complementar) → C197 (ajuste documento)
+    → E111 (ajuste apuracao) → E115 (informacao adicional)
+  passos:
+    - passo: 1
+      fonte: XML
+      campo: cBenef
+      descricao: Codigo do beneficio informado na NF-e
+
+    - passo: 2
+      registro: C179
+      descricao: Informacoes complementares ST vinculadas ao C170
+
+    - passo: 3
+      registro: C197
+      campo: COD_AJ
+      descricao: Ajuste por documento fiscal (reflexo do beneficio)
+
+    - passo: 4
+      registro: E111
+      campo: COD_AJ_APUR
+      descricao: Ajuste na apuracao do ICMS (efeito fiscal do beneficio)
+
+    - passo: 5
+      registro: E115
+      campo: COD_INF_ADIC
+      descricao: Informacao adicional da apuracao (declaracao do beneficio)
+
+validacao_cruzada:
+  regras:
+    - id: BENEF_XML_SEM_E115
+      descricao: cBenef presente no XML mas sem registro E115 correspondente
+      severidade: warning
+
+    - id: BENEF_XML_SEM_C197
+      descricao: cBenef com vICMSDeson > 0 mas sem ajuste C197
+      severidade: warning
+
+    - id: BENEF_E115_SEM_XML
+      descricao: E115 com COD_INF_ADIC de beneficio mas sem cBenef nos XMLs
+      severidade: warning
+
+    - id: BENEF_TRILHA_INCOMPLETA
+      descricao: Beneficio com trilha parcial (falta algum elo da cadeia)
+      severidade: critico

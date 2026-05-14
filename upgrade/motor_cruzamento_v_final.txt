@@ -1,0 +1,1129 @@
+================================================================================
+  MOTOR DE CRUZAMENTO NF-e XML × SPED EFD — ESPECIFICAÇÃO FINAL
+  Central Contábil | Abril 2026
+================================================================================
+
+================================================================================
+BLOCO 1 — ARQUITETURA E PRINCÍPIOS
+================================================================================
+
+1.1 HIERARQUIA DE VERDADE
+──────────────────────────────────────────────────────────────────────────────
+
+Em qualquer conflito de dados entre fontes distintas, o motor obedece à
+seguinte ordem de precedência (do mais para o menos autoritativo):
+
+  Nível 1 — XML autorizada + eventos aplicáveis (fonte primária absoluta)
+  Nível 2 — Estrutura SPED (registros parseados do arquivo EFD)
+  Nível 3 — Cadastros internos (0150, 0200, 0190, 0220, 0400)
+  Nível 4 — Tabelas fiscais (CST, NCM, CFOP, alíquotas)
+  Nível 5 — Cadastro externo (MySQL DCTF_WEB)
+  Nível 6 — Cadastro de benefícios (JSONs modulares)
+  Nível 7 — Heurística (inferência por padrão de CST/histórico)
+
+Todo finding que compara duas fontes deve referenciar explicitamente os dois
+níveis envolvidos. Em caso de empate entre sinais de fontes iguais, prevalece
+a leitura que não exige heurística.
+
+1.2 POLÍTICA DE VERSÃO DO XML (MÚLTIPLOS XMLS / CC-e)
+──────────────────────────────────────────────────────────────────────────────
+
+Quando houver mais de uma versão disponível para a mesma chave de NF-e,
+o motor adota a seguinte ordem de precedência:
+
+  1. XML autorizado com todos os eventos aplicáveis processados
+  2. XML autorizado sem eventos
+  3. XML parcial/importado sem protocolo — usado apenas como apoio,
+     nunca como fonte primária de verdade
+
+Para cada escopo, persistir:
+  xml_effective_version      TEXT
+  xml_effective_event_set    TEXT   -- lista de tpEvento incluídos
+  xml_resolution_reason      TEXT
+
+Campos corrigíveis via CC-e (tpEvento=110110) — natureza da operação,
+destinatário, data de saída, UF do destinatário — devem ser lidos na versão
+pós-CC-e antes de executar regras de identidade (XC009–XC013).
+
+1.3 ESCOPO DAS REGRAS XC
+──────────────────────────────────────────────────────────────────────────────
+
+As regras XC001–XC095 aplicam-se EXCLUSIVAMENTE ao Bloco C (NF-e mod 55,
+NFC-e mod 65). Documentos do Bloco D (CT-e mod 57, MDF-e mod 58) NÃO são
+cobertos por este plano.
+
+  Bloco D: manter as validações do bloco_d_validator.py existente sem
+           migração para o framework XC.
+  CT-e com XML: especificado em plano futuro com família XD###.
+  D100 com CHV_CTE: registrar como document_scope_bloco_d separado.
+           NÃO criar DocumentScope para D100 no mesmo builder que C100.
+
+Modelos sem XML obrigatório na SEFAZ — COD_MOD 01, 02, 04, 06, 21, 22,
+2D, 59 — recebem match_status = "NAO_APLICAVEL" na xml_match_index e são
+excluídos do denominador do cálculo de cobertura XML.
+
+  XML_ELIGIBLE_MODELS = {"55", "65"}
+  cobertura_xml_pct = escopos_com_xml / escopos_xml_elegiveis
+
+1.4 CONVENÇÕES DO CATÁLOGO DE REGRAS
+──────────────────────────────────────────────────────────────────────────────
+
+  Variante numerada (ex: XC008b, XC028b):
+    Mesmo fenômeno econômico ou fiscal, causa distinta.
+    Documentada inline após a regra-mãe no catálogo.
+
+  Regra nova (ex: XC060, XC023b):
+    Fenômeno distinto, sem cobertura anterior.
+
+  Retrocompatibilidade:
+    Cada finding inclui o campo legacy_rule_id com o alias XML###
+    correspondente quando houver mapeamento histórico.
+    O frontend exibe ambos.
+
+  Tabela de status do catálogo (coluna "status"):
+    IMPLEMENTADO | A_IMPLEMENTAR | DESCONTINUADO
+
+1.5 ELEGIBILIDADE POR TIPO DE ITEM
+──────────────────────────────────────────────────────────────────────────────
+
+Antes de executar regras sensíveis (CST, crédito, benefício, apuração),
+o motor classifica internamente cada item:
+
+  item_nature:
+    revenda         — CFOP 1.102/5.102 e variantes de compra/venda para revenda
+    uso_consumo     — CFOP 1.556/5.556 e variantes
+    ativo           — CFOP 1.551/5.551 e variantes
+    servico         — itens sem bloco IPI e CFOP de serviço
+    bonificacao     — CFOP específico ou vDesc = vProd
+    outro           — demais casos
+
+Regras que exigem item_nature específico declaram isso em suas pré-condições.
+
+1.6 ESTADOS DE EXECUÇÃO DE REGRA
+──────────────────────────────────────────────────────────────────────────────
+
+Cada execução de regra produz um e apenas um rule_outcome:
+
+  EXECUTED_ERROR            — regra executada, divergência encontrada
+  EXECUTED_OK               — regra executada, nenhuma divergência
+  NOT_APPLICABLE            — pré-condição não satisfeita (modelo inelegível,
+                               CST incompatível, etc.)
+  NOT_EXECUTED_MISSING_DATA — dados de entrada insuficientes para decisão
+  SUPPRESSED_BY_ROOT_CAUSE  — finding seria derivado de causa raiz já reportada
+  NEUTRALIZED_BY_BENEFIT    — divergência coberta por benefício fiscal ativo
+  AMBIGUOUS_MATCH           — pareamento de item ambíguo; regra não executada
+
+O relatório final distingue EXECUTED_ERROR dos demais estados.
+Findings com estado diferente de EXECUTED_ERROR não entram no score de risco.
+
+1.7 STATES DE PAREAMENTO DE ITENS
+──────────────────────────────────────────────────────────────────────────────
+
+  MATCH_EXATO       — nItem XML == nItem C170 (sem ambiguidade)
+  MATCH_PROVAVEL    — score >= 70% por heurística (cProd, NCM, CFOP, valor)
+  MATCH_HEURISTICO  — score >= 50% e < 70%, com confidence rebaixada
+  AMBIGUO           — dois ou mais candidatos com score equivalente
+  SEM_MATCH         — nenhum candidato atinge 50%
+
+Para estado AMBIGUO: NÃO executar regras de item dependentes desse pareamento.
+Gerar finding XC019b (ITEM_PAREAMENTO_AMBIGUO) e avançar para o próximo escopo.
+
+Threshold mínimo configurável via ValidationContext:
+  MIN_ITEM_MATCH_SCORE = 0.70   (padrão)
+
+Para estado SEM_MATCH: gerar XC018 (ITEM_XML_SEM_C170) ou XC019 (C170_SEM_ITEM_XML)
+conforme a origem do item não pareado.
+
+1.8 GRUPOS SEM CAMPO DE CÁLCULO ICMS
+──────────────────────────────────────────────────────────────────────────────
+
+Os grupos a seguir NÃO possuem os campos vBC, pICMS e vICMS no XML.
+Qualquer acesso a esses campos para esses grupos é inválido:
+
+  GRUPOS_SEM_BC_ICMS = {
+      "ICMS40",    "ICMS41",    "ICMS50",    "ICMSST",
+      "ICMSSN102", "ICMSSN103", "ICMSSN300", "ICMSSN400",
+  }
+
+Para esses grupos, a lógica correta é verificar INDEVIMENTO no SPED,
+não divergência entre XML e SPED (ver regras XC024/XC025/XC026).
+
+1.9 GRUPOS PIS/COFINS E MODALIDADE DE TRIBUTAÇÃO
+──────────────────────────────────────────────────────────────────────────────
+
+  PIS_GRUPO_MAP = {
+      "PISAliq":  {"tipo": "ad_valorem", "bc": "vBC",     "aliq": "pPIS",      "vl": "vPIS"},
+      "PISQtde":  {"tipo": "qtde",       "bc": "qBCProd", "aliq": "vAliqProd", "vl": None},
+      "PISNT":    {"tipo": "nao_trib",   "bc": None,      "aliq": None,        "vl": None},
+      "PISOutr":  {"tipo": "outros",     "bc": "vBC",     "aliq": "pPIS",      "vl": "vPIS"},
+  }
+  # Idem para COFINS (COFINSAliq, COFINSQtde, COFINSNT, COFINSOutr)
+
+Para modalidade "qtde": vl_xml = qBCProd × vAliqProd.
+Para modalidade "nao_trib": se C170.VL_PIS > 0 → finding PIS_INDEVIDO.
+
+1.10 DETECÇÃO DE REGIME E CRT AUSENTE
+──────────────────────────────────────────────────────────────────────────────
+
+Ordem de prioridade dos sinais de regime quando CRT está ausente no XML
+(XMLs emitidos antes da obrigatoriedade do campo):
+
+  1. MySQL DCTF_WEB (cadastro externo — nível 5 da hierarquia)
+  2. Padrão CST predominante nos itens (CSOSN ≥ 100 → SN; CST < 100 → Normal)
+  3. Histórico de arquivos anteriores do mesmo CNPJ
+
+
+================================================================================
+BLOCO 2 — MODELO DE DADOS FINAL
+================================================================================
+
+2.1 TABELA: cross_validation_findings
+──────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE cross_validation_findings (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id               INTEGER NOT NULL REFERENCES efile_uploads(id),
+    document_scope_id     INTEGER REFERENCES document_scopes(id),
+
+    -- Identificação da regra
+    rule_id               TEXT NOT NULL,          -- ex: "XC024"
+    legacy_rule_id        TEXT,                   -- ex: "XML010" (retrocompatibilidade)
+    rule_version          TEXT,                   -- versão da especificação da regra
+    reference_pack_version TEXT,                  -- versão das tabelas fiscais usadas
+    benefit_context_version TEXT,                 -- versão do JSON de benefícios
+    layout_version_detected TEXT,                 -- COD_VER detectado no arquivo
+    config_hash           TEXT,                   -- hash da configuração usada
+
+    -- Tipologia
+    error_type            TEXT NOT NULL,          -- ex: "BC_ICMS_INDEVIDA_EM_CST_SEM_TRIBUTACAO"
+    rule_outcome          TEXT NOT NULL CHECK (rule_outcome IN (
+                              'EXECUTED_ERROR', 'EXECUTED_OK', 'NOT_APPLICABLE',
+                              'NOT_EXECUTED_MISSING_DATA', 'SUPPRESSED_BY_ROOT_CAUSE',
+                              'NEUTRALIZED_BY_BENEFIT', 'AMBIGUOUS_MATCH'
+                          )),
+    tipo_irregularidade   TEXT CHECK (tipo_irregularidade IN (
+                              'CANCELAMENTO', 'DENEGACAO', 'REGULAR', 'COMPLEMENTO',
+                              'DEVOLUCAO', 'IMPORTACAO', 'BENEFICIO', 'APURACAO'
+                          )),
+
+    -- Severidade e confiança
+    severity              TEXT NOT NULL CHECK (severity IN (
+                              'critico', 'error', 'warning', 'info'
+                          )),
+    confidence            TEXT CHECK (confidence IN ('alta', 'media', 'baixa', 'indicio')),
+
+    -- Localização SPED
+    sped_register         TEXT,    -- ex: "C170"
+    sped_field            TEXT,    -- ex: "VL_BC_ICMS"
+    value_sped            TEXT,
+
+    -- Localização XML
+    xml_field             TEXT,    -- ex: "ICMS00/vBC"
+    value_xml             TEXT,
+
+    -- Evidências e contexto
+    description           TEXT,
+    evidence              TEXT,    -- evidência mínima serializada (JSON)
+    regime_context        TEXT,    -- regime do declarante no momento da validação
+    benefit_context       TEXT,    -- código do benefício ativo, se aplicável
+
+    -- Ação sugerida
+    suggested_action      TEXT NOT NULL REFERENCES suggested_action_types(code),
+
+    -- Causa raiz e deduplicação
+    root_cause_group      TEXT,    -- ver seção 2.5
+    is_derived            INTEGER DEFAULT 0,  -- 1 = derivado de causa raiz
+
+    -- Scores e priorização
+    risk_score            REAL,
+    technical_risk_score  REAL,
+    fiscal_impact_estimate REAL,
+    action_priority       TEXT CHECK (action_priority IN ('P1','P2','P3','P4')),
+
+    -- Workflow de revisão humana
+    review_status         TEXT DEFAULT 'novo' CHECK (review_status IN (
+                              'novo', 'em_revisao', 'justificado',
+                              'corrigido', 'ignorado', 'falso_positivo'
+                          )),
+    reviewed_by           TEXT,
+    reviewed_at           DATETIME,
+    review_reason         TEXT,
+    review_evidence_ref   TEXT,
+
+    created_at            DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+2.2 TABELA: document_scopes
+──────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE document_scopes ADD COLUMN is_complementar    INTEGER DEFAULT 0;
+ALTER TABLE document_scopes ADD COLUMN xml_eligible       INTEGER DEFAULT 1;
+ALTER TABLE document_scopes ADD COLUMN xml_effective_version TEXT;
+ALTER TABLE document_scopes ADD COLUMN xml_effective_event_set TEXT;
+ALTER TABLE document_scopes ADD COLUMN xml_resolution_reason TEXT;
+
+-- Política de is_complementar:
+--   1 = DOIS sinais concordantes: COD_SIT=06 E C113 presente
+--   0 = menos de dois sinais (mantém regras de valor com confidence rebaixada)
+
+2.3 TABELA: field_equivalence_map
+──────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE field_equivalence_map (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    register_sped   TEXT NOT NULL,
+    field_sped      TEXT NOT NULL,
+    xml_xpath       TEXT,
+    calculo         TEXT,
+    fonte           TEXT,
+    tolerancia_abs  REAL DEFAULT 0.02,
+    tolerancia_rel  REAL DEFAULT 0.0,
+    leiaute_min     TEXT,    -- versão mínima do COD_VER (ex: "014")
+    leiaute_max     TEXT,    -- NULL = sem teto
+    vigencia_ini    DATE,    -- NULL = desde sempre
+    vigencia_fim    DATE,    -- NULL = vigente
+    UNIQUE (register_sped, field_sped, xml_xpath, leiaute_min)
+);
+
+-- Resolução de campo:
+--   COD_VER >= leiaute_min AND (leiaute_max IS NULL OR COD_VER <= leiaute_max)
+--   dt_ini_arquivo >= vigencia_ini AND (vigencia_fim IS NULL OR dt_ini_arquivo <= vigencia_fim)
+
+2.4 TABELA: suggested_action_types
+──────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE suggested_action_types (
+    code        TEXT PRIMARY KEY,
+    label_pt    TEXT NOT NULL,
+    description TEXT
+);
+
+INSERT INTO suggested_action_types VALUES
+    ('corrigir_no_sped',          'Corrigir no SPED',           'Campo do arquivo EFD deve ser corrigido'),
+    ('revisar_xml_emissor',       'Revisar XML com emissor',    'Inconsistência na NF-e emitida'),
+    ('revisar_parametrizacao_erp','Revisar parametrização ERP', 'Regra de escrituração incorreta no sistema'),
+    ('revisar_cadastro',          'Revisar cadastro',           'Dado cadastral divergente ou ausente'),
+    ('revisar_beneficio',         'Revisar benefício fiscal',   'Aplicação incorreta de benefício'),
+    ('revisar_apuracao',          'Revisar apuração',           'Erro ou omissão no bloco de apuração'),
+    ('investigar',                'Investigar',                 'Indício não conclusivo — requer análise manual');
+
+2.5 FORMAÇÃO DO root_cause_group
+──────────────────────────────────────────────────────────────────────────────
+
+FORMATO:
+  root_cause_group = rule_id_raiz + "|" + register + "|" + campo_primario
+  Exemplo: "XC020|C170|CST_ICMS"
+
+CRITÉRIO DE CAUSA RAIZ:
+  Finding A é causa raiz de B quando:
+    - A e B pertencem ao mesmo document_scope
+    - A é da camada mais baixa no pipeline (executada antes de B)
+    - Corrigir A eliminaria B como efeito colateral
+
+EXEMPLOS DE AGRUPAMENTO:
+  XC020 (CST errado) → causa raiz de XC024, XC025, XC026
+    → root_cause_group = "XC020|C170|CST_ICMS"
+
+  XC008 (nota cancelada escriturada) → causa raiz de XC018, XC020–XC030
+    → root_cause_group = "XC008|C100|COD_SIT"
+
+  XC052 (débitos E110 divergentes) → causa raiz de XC051 de múltiplos escopos
+    → root_cause_group = "XC052|E110|VL_TOT_DEBITOS"
+
+ALGORITMO DE DEDUPLICAÇÃO (etapa 9 do pipeline):
+  Para cada grupo com mesmo root_cause_group:
+    1. Manter o finding da causa raiz integralmente (is_derived = 0)
+    2. Marcar os demais como is_derived = 1
+    3. No relatório: exibir causa raiz + contagem de derivados colapsados
+    4. Na UI: expandir derivados sob demanda
+
+2.6 CACHE KEY PARA FINDINGS XC (IA)
+──────────────────────────────────────────────────────────────────────────────
+
+  def build_xc_cache_key(finding: CrossValidationFinding) -> str:
+      parts = [
+          finding.rule_id,
+          finding.sped_register or "",
+          finding.sped_field or "",
+          _bucket_value(finding.value_sped),
+          finding.xml_field or "",
+          _bucket_value(finding.value_xml),
+          finding.regime_context or "",
+          finding.benefit_context or "",
+      ]
+      return hashlib.sha256("|".join(parts).encode()).hexdigest()
+
+  def _bucket_value(v: str | None) -> str:
+      if v is None:
+          return ""
+      try:
+          n = float(v)
+          if n == 0:        return "zero"
+          if n < 10:        return "centavos"
+          if n < 100:       return "dezenas"
+          if n < 1000:      return "centenas"
+          if n < 10000:     return "milhares"
+          return "alto"
+      except ValueError:
+          return v  # valor nominal (CST, CFOP) → usar literal
+
+2.7 TABELA AUXILIAR: tabela_destinatario_operacoes.yaml
+──────────────────────────────────────────────────────────────────────────────
+
+Artefato a criar. Estrutura:
+
+  regime_declarante × CFOP_entrada × tipo_item × finalidade_operacao
+    → CST/CSOSN esperado
+    → permite_credito (boolean)
+    → exige_observacao (boolean)
+    → severidade_divergencia (critico | error | warning)
+
+Cobre as finalidades: compra para revenda, uso e consumo, ativo imobilizado,
+bonificação, brinde, amostra, devolução de compra, transferência, industrialização.
+
+Consumida pelas regras XC020 (modo IND_EMIT=1) e famílias XC07x.
+
+2.8 TABELA AUXILIAR: rounding_policy.yaml
+──────────────────────────────────────────────────────────────────────────────
+
+Artefato a criar. Define a política de arredondamento por nível:
+
+  item:          2 casas decimais para valor; 3 para quantidade decimal
+  documento:     2 casas decimais; resíduo de rateio ≤ R$0,02 não é finding
+  consolidação:  2 casas decimais; resíduo de acumulação ≤ R$1,00 não é finding
+  apuração:      2 casas decimais
+
+Findings de resíduo residual: severity = "info", não entram no risk_score.
+Findings materiais (acima dos thresholds): severity normal conforme regra.
+
+
+================================================================================
+BLOCO 3 — CATÁLOGO FINAL DE REGRAS
+================================================================================
+
+3.1 RENUMERAÇÃO — CAMADA D (IDENTIDADE E TOTAIS)
+──────────────────────────────────────────────────────────────────────────────
+
+  ANTES     DEPOIS    NOME
+  XC016   → XC012   | C100_CNPJ_DIVERGENTE
+  XC017   → XC013   | C100_UF_DIVERGENTE
+  XC012   → XC014   | C100_TOTAL_DIVERGENTE
+  XC013   → XC015   | C100_MERC_DIVERGENTE
+  XC014   → XC016   | C100_ICMS_DIVERGENTE
+  XC015   → XC017   | C100_IPI_DIVERGENTE
+
+Sequência final por camada:
+  Camada A — Estrutural:        XC001–XC007
+  Camada D — Identidade:        XC008–XC013
+  Camada D — Totais:            XC014–XC017
+  Camada E — Itens:             XC018–XC030 + extensões XC023b–j
+  Camada F — Regime:            XC031–XC040 (numeração existente mantida)
+  Camada G — Benefício:         XC041–XC057 (numeração existente mantida)
+  Família  — FCP/DIFAL/Partilha: XC060–XC066
+  Família  — Devolução/Remessa:  XC070–XC075
+  Família  — Importação/ST:      XC080–XC085
+  Família  — cBenef/C197/Deson:  XC090–XC095
+
+Mapeamento legacy XML### → XC### completo:
+
+  XML001 → XC001   IMPLEMENTADO
+  XML002 → XC002   IMPLEMENTADO
+  XML003 → XC003   IMPLEMENTADO
+  XML004 → XC004   IMPLEMENTADO
+  XML005 → XC005   IMPLEMENTADO
+  XML006 → XC006   IMPLEMENTADO
+  XML007 → XC018   A_IMPLEMENTAR (Sprint 4)
+  XML008 → XC019   A_IMPLEMENTAR (Sprint 4)
+  XML009 → XC021   A_IMPLEMENTAR (Sprint 4)
+  XML010 → XC022   A_IMPLEMENTAR (Sprint 4)
+  XML011 → XC023   A_IMPLEMENTAR (Sprint 4)
+  XML012 → XC014   A_IMPLEMENTAR (Sprint 3) ← nova numeração
+  XML013 → XC015   A_IMPLEMENTAR (Sprint 3) ← nova numeração
+  XML014 → XC016   A_IMPLEMENTAR (Sprint 3) ← nova numeração
+  XML015 → XC017   A_IMPLEMENTAR (Sprint 3) ← nova numeração
+  XML016 → XC012   A_IMPLEMENTAR (Sprint 3) ← era XC016, renumerado
+  XML017 → XC013   A_IMPLEMENTAR (Sprint 3) ← era XC017, renumerado
+
+3.2 REGRAS CAMADA D — IDENTIDADE (XC008–XC013) — ESPECIFICAÇÃO ATUALIZADA
+──────────────────────────────────────────────────────────────────────────────
+
+XC008 | XML_NOTA_CANCELADA_ESCRITURADA
+  Severidade: critico | Confiança: alta
+  Condição: COD_SIT IN ("02","04") E evento de cancelamento (tpEvento=110111,
+            cStat 101 ou 135) presente no escopo
+  Suggested_action: corrigir_no_sped
+  tipo_irregularidade: CANCELAMENTO
+  root_cause_group candidato a causa raiz de todos os findings do mesmo scope
+
+XC008b | NOTA_DENEGADA_ESCRITURADA
+  Variante de XC008 — mesmo fenômeno (documento inválido escriturado),
+  causa distinta (denegação, nunca autorizado).
+  Severidade: critico | Confiança: alta
+  Campos: scope.xml.cstat IN ("110","301","302")
+  Suggested_action: revisar_xml_emissor
+  tipo_irregularidade: DENEGACAO
+
+  def check_xc008b(scope: DocumentScope) -> CrossValidationError | None:
+      if scope.xml is None:
+          return None
+      cstat = scope.xml.cstat
+      if cstat in ("110", "301", "302"):
+          return CrossValidationError(
+              rule="XC008b",
+              error_type="NOTA_DENEGADA_ESCRITURADA",
+              severity="critico",
+              confidence="alta",
+              description=(
+                  f"NF-e {scope.chave_nfe[-8:]}... está DENEGADA pela SEFAZ "
+                  f"(cStat={cstat}) e não deveria existir no SPED. "
+                  f"Nota denegada nunca foi autorizada."
+              ),
+              suggested_action="revisar_xml_emissor",
+              tipo_irregularidade="DENEGACAO",
+          )
+
+XC008c | CC-e APLICADA — PRÉ-PROCESSAMENTO (não gera finding)
+  Antes de executar XC009–XC013, verificar se há CC-e (tpEvento=110110)
+  no escopo. Campos corrigíveis pela CC-e devem ser lidos da versão pós-CC-e.
+  Registrar evento em xml_effective_event_set.
+
+XC008d | CANCELAMENTO_FORA_DE_PRAZO
+  Variante — cancelamento extemporâneo (dhEvento > prazo legal após dhEmi).
+  Severidade: rebaixada para warning (não é erro de escrituração)
+  Suggested_action: revisar_cadastro
+  Nota: verificar dhEvento do evento 110111 vs dhEmi + prazo (24h ou prazo estendido)
+
+XC008e | GAP_NUMERACAO_SEM_INUTILIZACAO
+  Lacuna de NUM_DOC no SPED sem inutilização correspondente na SEFAZ.
+  Severidade: warning | Confiança: indício
+  Condição: gap na sequência NUM_DOC E ausência de inutilização registrada
+
+3.3 REGRAS CAMADA D — TOTAIS (XC014–XC017)
+──────────────────────────────────────────────────────────────────────────────
+
+XC014 | C100_TOTAL_DIVERGENTE    (legacy: XML012)
+XC015 | C100_MERC_DIVERGENTE     (legacy: XML013)
+XC016 | C100_ICMS_DIVERGENTE     (legacy: XML014)
+XC017 | C100_IPI_DIVERGENTE      (legacy: XML015)
+
+  Supressão: Se scope.is_complementar = 1, não executar XC014–XC017.
+  Se is_complementar = 0 com indício (um sinal apenas), executar com
+  confidence rebaixada e nota explicativa no finding.
+
+XC012 | C100_CNPJ_DIVERGENTE     (legacy: XML016)
+  Sprint 3. Normalizar CNPJ antes de comparar (remover formatação).
+
+XC013 | C100_UF_DIVERGENTE       (legacy: XML017)
+  Sprint 3. Verificar pós-CC-e (UF pode ter sido corrigida por CC-e).
+
+3.4 REGRAS CAMADA E — ITENS (XC018–XC030) — MELHORIAS INCORPORADAS
+──────────────────────────────────────────────────────────────────────────────
+
+XC019 | C170_SEM_ITEM_XML    (legacy: XML008)
+XC019b | ITEM_PAREAMENTO_AMBIGUO
+  Condição: dois ou mais itens XML disputam o mesmo C170 com score equivalente
+  Severidade: warning | Confiança: média
+  Suggested_action: investigar
+  rule_outcome: AMBIGUOUS_MATCH — bloqueia execução das regras subsequentes do item
+
+XC020 | CST_DIVERGENTE — LÓGICA IND_EMIT
+──────────────────────────────────────────────────────────────────────────────
+
+  def check_xc020(scope, c170, xml_item):
+      if scope.c100.get_field("IND_EMIT") == "1":
+          return check_xc020_destinatario(scope, c170, xml_item)
+      # IND_EMIT=0: comparação direta emitente
+      cst_sped = c170.get_field("CST_ICMS")
+      cst_xml  = CST_FROM_XML_GROUP.get(xml_item.grupo_icms)
+      if cst_xml and cst_sped != cst_xml:
+          return CrossValidationError(rule="XC020", ...)
+
+  def check_xc020_destinatario(scope, c170, xml_item):
+      # IND_EMIT=1: o CST/CSOSN do C170 é escolhido pelo DECLARANTE (destinatário)
+      # com base no SEU regime. Comparação direta com grupo ICMS do XML inválida.
+      # Validação: coerência do CST/CSOSN com o regime DO PRÓPRIO DECLARANTE,
+      # consultando tabela_destinatario_operacoes.yaml (CFOP × tipo_item × regime).
+      regime = scope.regime
+      cst    = c170.get_field("CST_ICMS")
+      if regime == "NORMAL" and int(cst) >= 100:
+          return CrossValidationError(rule="XC031",
+              confidence="alta",
+              description="Empresa em regime normal escriturando entrada com CSOSN.")
+      if regime in ("SN", "MEI") and int(cst) < 100:
+          return CrossValidationError(rule="XC032",
+              confidence="media",
+              description="Empresa SN escriturando entrada com CST de regime normal.")
+      return None
+
+XC023 | VL_ITEM_DIVERGENTE    (legacy: XML011)
+
+XC023b | QUANTIDADE_ITEM_DIVERGENTE
+  Severidade: warning | Confiança: alta
+  Campos SPED: C170.QTD | Campos XML: det/prod/qCom
+  Pré-condição: verificar conversão de unidade via 0190/0220 antes de comparar
+    - Se unidades idênticas: comparar diretamente
+    - Se unidades distintas com 0220 válido: comparar após conversão
+    - Se unidades distintas sem 0220: gerar XC023g/XC023h em vez de XC023b
+  Tolerância: 0% (inteiro) | R$0,001 (decimal)
+
+XC023c | DESCONTO_ITEM_DIVERGENTE
+  Severidade: warning | Confiança: alta
+  Campos: C170.VL_DESC vs det/prod/vDesc | Tolerância: R$0,02
+  Causa raiz de C100_MERC_DIVERGENTE quando presente.
+
+XC023d | FRETE_DOCUMENTO_DIVERGENTE
+  Campos: C100.VL_FRT vs total/ICMSTot/vFrete | Tolerância: R$0,02
+
+XC023e | SEGURO_DOCUMENTO_DIVERGENTE
+  Campos: C100.VL_SEG vs total/ICMSTot/vSeg | Tolerância: R$0,02
+
+XC023f | OUTRAS_DESPESAS_DOCUMENTO_DIVERGENTE
+  Campos: C100.VL_OUT_DA vs total/ICMSTot/vOutro | Tolerância: R$0,02
+
+XC023g | UNIDADE_ITEM_NAO_CADASTRADA_0190
+  Condição: unidade do item no SPED não existe no registro 0190
+  Severidade: warning | Confiança: alta
+  Causa raiz de XC023b quando unidades distintas sem cadastro.
+
+XC023h | FATOR_CONVERSAO_AUSENTE_0220
+  Condição: XML e SPED usam unidades distintas sem fator de conversão em 0220
+  Severidade: warning | Confiança: alta
+
+XC023i | QUANTIDADE_DIVERGENTE_APOS_CONVERSAO
+  Condição: após conversão válida via 0220, a quantidade ainda diverge
+  Severidade: warning | Confiança: alta
+
+XC023j | RATEIO_DESPESAS_ITEM_INCONSISTENTE
+  Condição: soma dos rateios inferidos nos itens não fecha com total documental
+  Severidade: warning | Confiança: média
+  Nota: não exigir rateio quando o XML/documento não permite inferência segura.
+        Propagar divergência de XC023d/e/f como possível causa raiz da BC do item.
+
+XC024 | BC_ICMS_DIVERGENTE — COM PRECONDIÇÃO DE GRUPO
+──────────────────────────────────────────────────────────────────────────────
+
+  Se xml_item.grupo_icms IN GRUPOS_SEM_BC_ICMS:
+    Se C170.VL_BC_ICMS > 0 → XC024b (BC_ICMS_INDEVIDA_EM_CST_SEM_TRIBUTACAO)
+                               Severidade: error | Confiança: objetivo
+    Senão → skip (correto: BC zero para isento/ST)
+  Senão → comparação normal BC XML vs SPED
+
+XC024b | BC_ICMS_INDEVIDA_EM_CST_SEM_TRIBUTACAO
+  Campos: C170.VL_BC_ICMS > 0 com grupo_icms IN GRUPOS_SEM_BC_ICMS
+  Suggested_action: corrigir_no_sped
+
+XC025 | ALIQUOTA_DIVERGENTE — COM PRECONDIÇÃO DE GRUPO
+  Se xml_item.grupo_icms IN GRUPOS_SEM_BC_ICMS:
+    Se C170.ALIQ_ICMS > 0 → XC025b (ALIQ_ICMS_INDEVIDA_EM_CST_SEM_TRIBUTACAO)
+    Senão → skip
+  Senão → comparação normal
+
+XC026 | VL_ICMS_DIVERGENTE — COM PRECONDIÇÃO DE GRUPO
+  Se xml_item.grupo_icms IN GRUPOS_SEM_BC_ICMS:
+    Se C170.VL_ICMS > 0 → XC026b (ICMS_INDEVIDO_EM_CST_SEM_TRIBUTACAO)
+                           Severidade: error | Confiança: objetivo
+    Senão → skip
+  Senão → comparação normal
+
+XC028 | IPI_DIVERGENTE — COM PRECONDIÇÃO DE GRUPO
+──────────────────────────────────────────────────────────────────────────────
+
+  def check_xc028(c170, xml_item):
+      grupo_ipi = xml_item.grupo_ipi  # "IPITrib", "IPINT", ou None
+
+      if grupo_ipi is None:
+          if to_float(c170.get_field("VL_IPI")) > 0:
+              return make_finding("XC028b", "IPI_SEM_RESPALDO_XML", severity="warning")
+          return None  # C170.VL_IPI=0 e XML sem IPI → correto
+
+      if grupo_ipi == "IPINT":
+          if to_float(c170.get_field("VL_IPI")) > 0:
+              return make_finding("XC028c", "IPI_INDEVIDO_ITEM_ISENTO", severity="error")
+          return None  # Correto
+
+      # IPITrib: comparação normal
+      vl_ipi_xml  = xml_item.v_ipi
+      vl_ipi_sped = to_float(c170.get_field("VL_IPI"))
+      if abs(vl_ipi_sped - vl_ipi_xml) > 0.01:
+          return make_finding("XC028", "IPI_DIVERGENTE", ...)
+
+XC029 | VL_PIS_DIVERGENTE — COM MODALIDADE DE TRIBUTAÇÃO
+  Ver PIS_GRUPO_MAP (seção 1.9).
+  Lógica:
+    grupo = xml_item.grupo_pis
+    config = PIS_GRUPO_MAP[grupo]
+    Se config["tipo"] == "nao_trib":
+      Se C170.VL_PIS > 0 → XC029b (PIS_INDEVIDO_ITEM_NAO_TRIBUTADO)
+    Se config["tipo"] == "qtde":
+      vl_xml = xml_item.q_bc_prod * xml_item.v_aliq_prod
+      Comparar C170.VL_PIS com vl_xml
+    Se config["tipo"] in ("ad_valorem", "outros"):
+      Comparar C170.VL_PIS com xml_item.v_pis
+
+XC030 | VL_COFINS_DIVERGENTE — idem lógica XC029 para COFINS
+
+3.5 FAMÍLIA XC06x — FCP, DIFAL, PARTILHA E CONSUMIDOR FINAL
+──────────────────────────────────────────────────────────────────────────────
+
+PRÉ-CONDIÇÕES DE ATIVAÇÃO:
+  - C100.IND_OPER="1" (saída) E CFOP iniciando com "6" (interestadual)
+  - OU C100.IND_OPER="0" (entrada) E CFOP iniciando com "2" (interestadual)
+  DIFAL: aplica-se a saídas para consumidor final não contribuinte.
+
+XC060 | FCP_AUSENTE_UF_OBRIGATORIA
+  O quê: UF destino exige FCP mas não há E310 correspondente
+  Severidade: error | Confiança: alta
+  Condição:
+    uf_dest = xml.uf_dest (de ide/cUFDest ou dest/enderDest/UF)
+    aliq_fcp = fcp_por_uf[uf_dest]
+    Se aliq_fcp > 0 E não existe E310 para uf_dest no período → finding
+  Suggested_action: revisar_apuracao
+
+XC061 | FCP_ALIQUOTA_INCORRETA
+  Severidade: error | Confiança: alta
+  Condição: E310.ALIQ_FCP_TRIB != fcp_por_uf[uf_dest]
+  Tolerância: 0% (alíquota nominal)
+
+XC062 | DIFAL_AUSENTE_CONSUMIDOR_FINAL
+  Severidade: error | Confiança: alta
+  Pré-condição: IND_OPER=1, CFOP 6.xxx, indFinal=1 OU indIEDest=9
+  Condição: não existe E300 para uf_dest → finding
+  Base legal: LC 190/2022, EC 87/2015
+
+XC063 | DIFAL_BASE_DIVERGENTE
+  Severidade: error | Confiança: alta
+  Condição: abs(E300.VL_BC_UF_DEST - scope.vl_merc) > 0.02 → finding
+
+XC064 | DIFAL_ALIQ_INTERNA_INCORRETA
+  Severidade: error | Confiança: alta
+  Condição: E300.ALIQ_INT_UF_DEST != aliquotas_internas_uf[uf_dest]
+  Tolerância: 0%
+
+XC065 | PARTILHA_ICMS_AUSENTE_PERIODO_TRANSICAO
+  Severidade: warning | Confiança: média
+  Aplicável apenas para datas 01/01/2016–31/12/2018
+  Condição: operação com consumidor final sem E300 com campos de partilha
+  Tabela de percentuais: 40%/60%/80% conforme EC 87/2015 por ano
+
+XC066 | XML_IND_FINAL_DIVERGE_CFOP
+  Severidade: warning | Confiança: média
+  Condição:
+    indFinal=1 (consumidor final) E CFOP indica revenda (ex: 6102)
+    OU indFinal=0 (contribuinte) E CFOP indica consumo (ex: 6108)
+
+3.6 FAMÍLIA XC07x — DEVOLUÇÃO, REMESSA, RETORNO, COMPLEMENTO E AJUSTE
+──────────────────────────────────────────────────────────────────────────────
+
+PRÉ-CONDIÇÕES:
+  CFOPs de devolução: 1201, 1202, 1410, 2201, 2202, 2410,
+                      5201, 5202, 5410, 6201, 6202, 6410 e variantes
+  CFOPs de remessa:   5901, 5902, 5903, 5906, 6901, 6902, 6903, 6906
+  COD_SIT: 06=complementar, 07=extemporânea, 08=denegada
+
+XC070 | DEVOLUCAO_SEM_NOTA_ORIGEM_REFERENCIADA
+  Severidade: warning | Confiança: provável
+  Condição: CFOP de devolução E ausência de C113 no scope → finding
+
+XC071 | DEVOLUCAO_VALOR_SUPERIOR_NOTA_ORIGEM
+  Severidade: error | Confiança: objetivo
+  Condição:
+    nota_origem = buscar_scope_por_chave(C113.CHV_DOC)
+    Se nota_origem E scope.vl_doc > nota_origem.vl_doc + 0.02 → finding
+  Tolerância: R$0,02
+
+XC072 | DEVOLUCAO_XML_CFOP_DIVERGE_OPERACAO
+  Severidade: error | Confiança: objetivo
+  Condição: CFOP de devolução de entrada em nota de saída ou vice-versa
+  Lógica: devolução de compra = entrada (1.xxx/2.xxx); devolução de venda = saída
+
+XC073 | REMESSA_SEM_RETORNO_NO_PERIODO
+  Severidade: info | Confiança: indício
+  Condição: CFOP de remessa sem CFOP de retorno correspondente no file_id
+  Nota: gerar apenas como indício (retorno pode ocorrer em período seguinte)
+  Suggested_action: investigar
+
+XC074 | COMPLEMENTO_DELTA_INCORRETO
+  Severidade: warning | Confiança: provável
+  Pré-condição: scope.is_complementar = 1 E nota_origem localizável via C113
+  Condição: delta (scope.vl_doc) não fecha com a diferença esperada entre
+            nota_origem.vl_doc e o valor complementado
+
+XC075 | AJUSTE_SEM_VINCULO_DOCUMENTAL
+  Severidade: warning | Confiança: indício
+  Condição: C197.COD_AJ exige documento-base mas C113 ausente ou chave inválida
+  Suggested_action: revisar_cadastro
+
+3.7 FAMÍLIA XC08x — IMPORTAÇÃO, DI, C120, C176, C177 E RESSARCIMENTO ST
+──────────────────────────────────────────────────────────────────────────────
+
+PRÉ-CONDIÇÕES:
+  - CFOP iniciando com "3": operações de importação
+  - CST 10/30/70 em saída: ST sujeito a possível ressarcimento
+
+XC080 | IMPORTACAO_SEM_C120
+  Severidade: error | Confiança: alta
+  Condição: cfop.startswith("3") E não existe C120 no scope → finding
+
+XC081 | C120_DI_DIVERGE_XML
+  Severidade: error | Confiança: alta
+  Campos: C120.NUM_LI_ORIG vs prod/DI/nDI (normalizar zeros à esquerda)
+
+XC082 | RESSARCIMENTO_ST_SEM_C176
+  Severidade: warning | Confiança: indício
+  Condição: saída CFOP interestadual, CST IN ("10","30","70"), ausência de C176
+  Nota: não é erro objetivo — depende de acordos específicos por UF
+
+XC083 | C176_VALOR_DIVERGENTE_APURACAO_ST
+  Severidade: warning | Confiança: provável
+  Condição: SUM(C176.VL_RESSARC) sem reflexo coerente no E210.VL_RESSARC_ST
+  Tolerância: R$1,00 (acumulação de múltiplos documentos)
+
+XC084 | C177_SEM_C120_VINCULADO
+  Severidade: warning | Confiança: alta
+  Condição: C177 presente E não há C120 no scope → finding
+
+XC085 | IMPORTACAO_IPI_SEM_CST_IMPORTACAO
+  Severidade: warning | Confiança: provável
+  Condição: CFOP de importação com CST IPI incompatível com modalidade de importação
+  Nota: validar com TIPI e tratamento do produto
+
+3.8 FAMÍLIA XC09x — cBENEF, C197, DESONERAÇÃO E TRILHA E111/E113
+──────────────────────────────────────────────────────────────────────────────
+
+PRÉ-CONDIÇÕES:
+  - Benefício ativo no benefit_context E/OU cBenef preenchido no XML
+  - vICMSDeson > 0 no XML
+  - C197 presente no scope
+
+XC090 | CBENEF_SEM_BENEFICIO_CADASTRADO
+  Severidade: warning | Confiança: provável
+  Condição: cBenef NOT IN benefit_context.codigos → finding
+  Suggested_action: revisar_cadastro
+
+XC091 | CBENEF_DIVERGE_CST_EXIGIDO
+  Severidade: critico | Confiança: alta
+  Condição: benefit_context.by_code(cBenef).cst_exigido_saida != C170.CST_ICMS
+  Exemplo: cBenef de COMPETE exige CST 00; se C170.CST_ICMS=51 → crítico
+
+XC092 | C197_SEM_E111_CORRESPONDENTE
+  Severidade: warning | Confiança: provável
+  Condição: C197.COD_AJ não tem E111.COD_AJ_APUR correspondente no período
+
+XC093 | VICRMDESON_SEM_AJUSTE_APURACAO
+  Severidade: warning | Confiança: provável
+  Condição: vICMSDeson > 0 E nenhum E111 com código de desoneração no período
+  Tolerância: R$1,00 (acumulação de período)
+  Nota: códigos de ajuste de desoneração variam por UF — consultar codigos_ajuste_uf.yaml
+
+XC094 | MOT_DES_VALOR_DESON_INCONSISTENTE
+  Severidade: error | Confiança: objetivo
+  Condição A: motDesICMS IS NOT NULL E vICMSDeson == 0
+    → MOT_DES_SEM_VALOR (motivo declarado, sem valor)
+  Condição B: vICMSDeson > 0 E motDesICMS IS NULL
+    → VALOR_DESON_SEM_MOTIVO (valor sem motivo)
+
+XC095 | TRILHA_BENEFICIO_INCOMPLETA
+  Severidade: warning | Confiança: provável
+  Lógica (por scope com benefício ativo ou cBenef presente):
+    Passo 1: cBenef → XC090/XC091 (elos 1 e 2)
+    Passo 2: Se cBenef presente, verificar C179 no scope:
+             Se C179 ausente → elo faltante "C179_AUSENTE_PARA_CBENEF"
+    Passo 3: C179 → verificar C197 com código compatível:
+             Se C197 ausente → elo faltante "C197_AUSENTE_PARA_BENEFICIO"
+    Passo 4: C197.COD_AJ → E111 (XC092)
+    Passo 5: E111 → E112 (se código exige):
+             Se E112 ausente → elo faltante "E111_SEM_E112"
+    Passo 6: E111 → E113 (se código exige):
+             Se E113 ausente → elo faltante "E111_SEM_E113"
+
+  Gerar UM finding TRILHA_BENEFICIO_INCOMPLETA com lista de elos faltantes.
+  Não gerar findings individuais por elo — deduplicar em um só.
+
+3.9 FINDING INFORMATIVO — NOTA COMPLEMENTAR IDENTIFICADA
+──────────────────────────────────────────────────────────────────────────────
+
+Gerado pelo DocumentScopeBuilder, não como regra XC autônoma.
+Registrado como finding de severidade "info" com suggested_action "investigar".
+
+DOIS SINAIS (COD_SIT=06 E C113 presente):
+  is_complementar = 1
+  Gerar NOTA_COMPLEMENTAR_IDENTIFICADA com confidence = alta
+  Suprimir XC014–XC017 para o scope
+
+UM SINAL APENAS:
+  is_complementar = 0
+  Gerar NOTA_COMPLEMENTAR_IDENTIFICADA com confidence = média
+  Manter regras de valor com confidence rebaixada e nota explicativa
+
+
+================================================================================
+BLOCO 4 — MATRIZ DE EXECUÇÃO / PRECEDÊNCIA
+================================================================================
+
+4.1 PIPELINE DE EXECUÇÃO
+──────────────────────────────────────────────────────────────────────────────
+
+Etapa 0 — Elegibilidade e pré-processamento
+  □ Verificar COD_MOD: se não em XML_ELIGIBLE_MODELS → NAO_APLICAVEL, skip
+  □ Detectar regime (CRT → DCTF_WEB → CST pattern)
+  □ Resolver versão efetiva do XML (com CC-e se disponível)
+  □ Detectar is_complementar (dois sinais necessários para is_complementar=1)
+  □ Classificar item_nature por CFOP/NCM/contexto
+
+Etapa 1 — Camada A: Estrutural (XC001–XC007)
+  Regras de integridade do escopo: chave NF-e, existência de C100, C170.
+
+Etapa 2 — Camada D: Identidade e Status (XC008–XC013)
+  XC008, XC008b — cancelamento, denegação (causa raiz de todo o scope)
+  XC009–XC011   — modelo, sentido, data (pós-CC-e)
+  XC012, XC013  — CNPJ, UF (pós-CC-e)
+
+Etapa 3 — Camada D: Totais (XC014–XC017)
+  Suprimidos se is_complementar=1.
+
+Etapa 4 — Pareamento de itens
+  □ Tentar MATCH_EXATO (nItem)
+  □ Fallback heurístico: score ≥ 70% → MATCH_PROVAVEL
+  □ Se AMBIGUO: gerar XC019b, rule_outcome = AMBIGUOUS_MATCH, skip etapas 5–6
+  □ Se SEM_MATCH: gerar XC018 ou XC019
+
+Etapa 5 — Camada E: Itens (XC020–XC030 + extensões)
+  Ordem dentro do escopo por item:
+    XC019b se ambíguo (e skip do restante)
+    XC020  — CST (com lógica IND_EMIT)
+    XC021  — CFOP
+    XC022  — NCM
+    XC023–XC023j — valor do item e campos econômicos
+    XC024/b, XC025/b, XC026/b — BC/alíquota/valor ICMS (com GRUPOS_SEM_BC_ICMS)
+    XC027  — BC ST
+    XC028/b/c — IPI (com grupo_ipi)
+    XC029/b — PIS (com PIS_GRUPO_MAP)
+    XC030  — COFINS
+
+Etapa 6 — Camada F: Regime (XC031–XC040)
+
+Etapa 7 — Camada G: Benefício e Apuração (XC041–XC057)
+
+Etapa 8 — Famílias avançadas (ativadas por pré-condição)
+  XC06x — operações interestaduais com FCP/DIFAL/partilha
+  XC07x — devolução/remessa/complemento (integrar devolucao_validator.py)
+  XC08x — importação (CFOP 3.xxx) e ressarcimento ST
+  XC09x — cBenef/C197/desoneração (scope com benefício ativo)
+
+Etapa 9 — Deduplicação inteligente
+  □ Agrupar findings por root_cause_group
+  □ Marcar is_derived=1 nos findings derivados
+  □ Calcular fiscal_impact_estimate e action_priority por finding-raiz
+
+4.2 PRIORIZAÇÃO DE FINDINGS (action_priority)
+──────────────────────────────────────────────────────────────────────────────
+
+  P1 — Corrige apuração / risco fiscal imediato
+       (ICMS, PIS, COFINS escriturado incorretamente com reflexo no E110/E200)
+  P2 — Corrige XML/SPED com reflexo provável
+       (divergência de item ou campo que impacta base de cálculo)
+  P3 — Revisão cadastral / documental
+       (CNPJ, UF, cadastro de produto, benefício não cadastrado)
+  P4 — Indício / investigação
+       (confidence=baixa ou indício, sem impacto imediato confirmado)
+
+  Campos paralelos:
+    technical_risk_score    REAL  -- calculado pelo motor
+    fiscal_impact_estimate  REAL  -- estimativa em R$ quando calculável
+    action_priority         TEXT  -- P1/P2/P3/P4
+
+4.3 POLÍTICA DE ARREDONDAMENTO (rounding_policy.yaml)
+──────────────────────────────────────────────────────────────────────────────
+
+  Nível            Precisão    Resíduo tolerado    Severidade do resíduo
+  ───────────────  ──────────  ──────────────────  ─────────────────────
+  Item             2 casas     R$0,02              info
+  Documento        2 casas     R$0,02              info
+  Consolidação     2 casas     R$1,00              info
+  Apuração         2 casas     R$1,00              info
+
+Divergências acima do resíduo tolerado: severidade normal conforme a regra.
+Findings residuais (severity=info) não entram no risk_score nem no fiscal_impact_estimate.
+
+4.4 GATES DE PERFORMANCE
+──────────────────────────────────────────────────────────────────────────────
+
+  COMPONENTE            COMPLEXIDADE         GATE OBRIGATÓRIO
+  ──────────────────    ───────────────────  ─────────────────────────────────
+  DocumentScopeBuilder  O(n)                 10.000 C100 em < 2 segundos
+  XC012–XC017 (doc)    O(escopos)           10.000 escopos em < 5 segundos
+  XC018–XC030 (item)   O(n_c170)            50.000 C170 em < 10 segundos
+  XC051 (C190 scope)   O(n_c170 + n_c190)   50.000 C170 em < 10 segundos
+  XC052–XC057 (E110)   O(1) por período     < 1 segundo
+
+  MITIGAÇÕES:
+    XC051: usar defaultdict em memória por escopo (O(n) amortizado).
+           Arquivos com > 5.000 escopos: processar em blocos de 500
+           com flush de memória entre blocos.
+    XC018–XC030: indexar itens XML por nItem em dict antes do loop.
+                 Não iterar lista para cada C170.
+    Gate de performance: obrigatório no Sprint 4.
+
+4.5 COBERTURA ESTIMADA APÓS IMPLEMENTAÇÃO COMPLETA
+──────────────────────────────────────────────────────────────────────────────
+
+  EIXO                                  ANTES   APÓS
+  ─────────────────────────────────────────────────────────────────────
+  XML ↔ C100 (identidade e totais)       85%     95%   (G01 parcial)
+  XML ↔ C170 (item a item)               70%     90%   (extensões E)
+  XML ↔ C190 (consolidação)              80%     85%
+  Regime tributário                      85%     90%
+  Benefício fiscal (CST, E111)           65%     85%   (XC09x)
+  FCP / DIFAL / Partilha                  5%     80%   (XC06x)
+  Devoluções / Remessas / Complementos   30%     75%   (XC07x)
+  Importação / C120 / ST ressarc.         0%     70%   (XC08x)
+  Campos econômicos (frete, desc., qtd.)  0%     80%   (XC023b–j)
+  Cadeia apuração (E110→E116)            75%     85%
+  Eventos NF-e (CC-e, fora prazo)        25%     45%   (XC008c/d)
+  ─────────────────────────────────────────────────────────────────────
+  COBERTURA GERAL ESTIMADA               75%     87%
+
+
+================================================================================
+BLOCO 5 — ROADMAP E FORA DE ESCOPO
+================================================================================
+
+5.1 SEQUÊNCIA DE IMPLEMENTAÇÃO POR SPRINT
+──────────────────────────────────────────────────────────────────────────────
+
+PRÉ-SPRINT 1 (pré-requisito absoluto):
+  □ Especificar e implementar formação do root_cause_group (seção 2.5)
+  □ Criar tabelas suggested_action_types e lookup de rule_outcome
+  □ Renumerar XC012–XC017 conforme tabela da seção 3.1
+
+SPRINT 3 (documentos e identidade):
+  □ XC012 — C100_CNPJ_DIVERGENTE (era XC016)
+  □ XC013 — C100_UF_DIVERGENTE   (era XC017)
+  □ XC014–XC017 com supressão is_complementar
+  □ XC008b — NF-e denegada
+  □ XC008c — pré-processamento CC-e
+  □ XC008d — cancelamento fora de prazo
+
+SPRINT 4 (itens — pré-requisito de elegibilidade):
+  □ M06 — Filtro XML_ELIGIBLE_MODELS no DocumentScopeBuilder
+  □ M02 — GRUPOS_SEM_BC_ICMS em XC024/XC025/XC026 (+ variantes XC024b/XC025b/XC026b)
+  □ M03 — Lógica IND_EMIT em XC020 + tabela_destinatario_operacoes.yaml
+  □ M05 — PIS_GRUPO_MAP em XC029/XC030 (+ XC029b)
+  □ M10 — grupo_ipi em XC028 (+ XC028b/XC028c)
+  □ XC018, XC019, XC019b, XC021, XC022, XC023 — itens MVP
+  □ XC023b–j — campos econômicos (com lógica G09 de pareamento ambíguo)
+  □ G09 — estados de pareamento e XC019b
+  □ Gate de performance Sprint 4
+
+SPRINT 5 (campos econômicos e regime):
+  □ G08 — conversão de unidade via 0190/0220 (XC023g/h/i)
+  □ G10 — tabela_destinatario_operacoes.yaml completa
+  □ G12 — rateio despesas/itens (XC023j)
+  □ G19 — classificação item_nature
+  □ Regime tributário (XC031–XC040 com validações destinatário)
+
+SPRINT 7 (apuração e benefício):
+  □ M14 — NF complementar: política de dois sinais + is_complementar
+  □ XC041–XC057 — bloco de benefício e apuração
+  □ G11 — rounding_policy.yaml implementado
+
+SPRINT 8 (governança e qualidade):
+  □ M01 — Confirmar renumeração e atualizar referências em todos os módulos
+  □ M08 — Vigência de leiaute em field_equivalence_map
+  □ M09 — Completar coluna "status" na tabela legacy XML### → XC###
+  □ M11 — Testes de performance automatizados
+  □ M12 — CHECK constraint em suggested_action (já implementado via tabela lookup)
+  □ M13 — Nota de escopo Bloco C no início do catálogo
+  □ M15 — Cache key com xml_value para IA
+  □ G14 — Campos action_priority, fiscal_impact_estimate, technical_risk_score
+  □ G15 — Workflow de revisão humana: review_status, reviewed_by, reviewed_at
+  □ G16 — Metadados de execução: rule_version, reference_pack_version, config_hash
+  □ G17 — rule_outcome formalizado em todos os executores
+
+SPRINT 9 (devoluções e operações correlatas):
+  □ XC070–XC075 — Família XC07x completa
+  □ Integração de devolucao_validator.py ao cross_engine
+  □ G13 — Operações triangulares e entrega em local diverso (XC07x)
+
+SPRINT 10 (cobertura avançada — 3 famílias em paralelo):
+  □ XC060–XC066 — Família XC06x (FCP, DIFAL, Partilha)
+  □ XC080–XC085 — Família XC08x (Importação, C120, C176, C177)
+  □ XC090–XC095 — Família XC09x (cBenef, C197, Desoneração)
+  □ XC008e — inutilização de numeração
+  □ G01 / XC008c,d — Eventos: CC-e, cancelamento fora de prazo
+
+5.2 LACUNAS OPERACIONAIS — ORDEM DE PRIORIDADE
+──────────────────────────────────────────────────────────────────────────────
+
+Os itens abaixo complementam as regras XC sem substituir nenhum delas.
+Devem ser implementados sem remover nada já consolidado.
+
+  Prioridade  Lacuna   Descrição                              Sprint
+  ──────────  ───────  ─────────────────────────────────────  ───────
+  1           G08      Unidade e conversão (0190/0220)        5
+  2           G09      Pareamento ambíguo de itens            4
+  3           G10      Tabela operacional destinatário        5
+  4           G11      Arredondamento e resíduo matemático    4 e 7
+  5           G12      Rateio frete/seguro/outras despesas    5
+  6           G17      Política formal de regra não executada 8
+  7           G18      Política de múltiplos XMLs             3
+  8           G19      Elegibilidade por tipo de item         5
+  9           G15      Workflow de revisão humana             8
+  10          G14      Materialidade fiscal / priorização     8
+  11          G16      Versionamento da regra/configuração    paralelo
+  12          G13      Operações triangulares                 9
+
+  Itens 1–8: impacto direto na precisão técnica do motor.
+  Itens 9–12: governança, operação e evolução do produto.
+
+5.3 FORA DE ESCOPO — v2 E PÓS-v2
+──────────────────────────────────────────────────────────────────────────────
+
+Permanece fora do escopo após implementação completa desta especificação:
+
+  — Manifestação do destinatário (ecossistema externo ao SPED EFD):
+      tpEvento 210200–210240 (Ciência, Confirmação, Desconhecimento,
+      Operação não realizada). Relevante para auditoria de entradas
+      não reconhecidas — fica no roadmap futuro.
+
+  — Bloco D (CT-e mod 57, MDF-e mod 58):
+      Família de regras XD### prevista para especificação separada.
+      Manter bloco_d_validator.py sem migração.
+
+  — EFD Contribuições (PIS/COFINS detalhado):
+      Produto separado. As regras XC029/XC030 cobrem PIS/COFINS apenas
+      no contexto do cruzamento NF-e × SPED ICMS/IPI.
+
+  — Bloco G (CIAP — Controle de Ativo Imobilizado):
+      Roadmap futuro. Não interfere com as regras XC atuais.
+
+  — SEFAZ WebService para ingestão automática de XML:
+      Risco de custódia de certificado digital. Implementação via
+      upload de ZIP (abordagem atual) mantida. Integração SEFAZ
+      avaliada em sprint dedicado fora deste plano.
+
+5.4 BASE LEGAL DE REFERÊNCIA
+──────────────────────────────────────────────────────────────────────────────
+
+  — IN RFB 1.252/2012 e atualizações
+  — Guia Prático EFD ICMS/IPI (versão vigente — campo COD_VER)
+  — ADE COFIS 20/2015 e atualizações
+  — Protocolo ICMS 42/2009
+  — NT 2019.001 (DFe) — eventos NF-e e campo cBenef
+  — LC 87/1996 (Lei Kandir)
+  — LC 190/2022 (DIFAL — regras nacionais)
+  — EC 87/2015 (DIFAL consumidor final e partilha)
+  — RICMS-ES (Dec. 1.090-R/2002)
+
+================================================================================
+FIM DA ESPECIFICAÇÃO — Motor de Cruzamento NF-e XML × SPED EFD — v.FINAL
+================================================================================
+
+Estatísticas de cobertura desta especificação:
+  Regras definidas/melhoradas:         XC001–XC057 (núcleo) + variantes
+  Extensões camada E:                  XC023b–XC023j (10 regras)
+  Novas famílias:                      XC060–XC095 (36 regras)
+  Variantes numeradas XC008:           XC008b–XC008e
+  Variantes de precondição:            XC024b, XC025b, XC026b, XC028b/c, XC029b
+  Cobertura geral estimada após v2:    ~87%
+================================================================================
